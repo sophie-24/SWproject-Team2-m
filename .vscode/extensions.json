@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "sswg.swift-lang",
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+    "editorconfig.editorconfig",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}
