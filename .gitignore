@@ -2,6 +2,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/xcode,macos,swift,swiftpackagemanager,cocoapods
 # Edit at https://www.toptal.com/developers/gitignore?templates=xcode,macos,swift,swiftpackagemanager,cocoapods
 
+
 ### CocoaPods ###
 ## CocoaPods GitIgnore Template
 
@@ -9,6 +10,18 @@
 #           - Also handy if you have a large number of dependant pods
 #           - AS PER https://guides.cocoapods.org/using/using-cocoapods.html NEVER IGNORE THE LOCK FILE
 Pods/
+
+###python###
+__pycache__/
+*.py[cod]
+venv/
+*.pyc
+
+#테스트용 프론트엔드 폴더 제외#
+mock_frontend/
+
+#환경 변수#
+.env
 
 ### macOS ###
 # General

@@ -56,6 +56,13 @@
 git clone https://github.com/yijuuuun/SWproject-Team2.git
 cd SWproject-Team2
 
+#가상환경 설치
+python -m venv venv
+.\venv\Scripts\activate
+cd backend
+pip install -r requirements.txt (백엔드)
+uvicorn main:app --reload --port 8080(서버 실행-> 백엔드)
+
 # 의존성 설치
 npm install
 
