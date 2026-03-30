@@ -24,16 +24,12 @@ YOUTUBE_API_KEY=발급받은_유튜브_API_키
 ### 3. 서버 실행
 
 ```bash
-uvicorn main:app --reload
+uvicorn main:app
 ```
 
 서버 주소: `http://localhost:8000`
 
-### 4. 프론트엔드 실행
-
-VSCode에서 `Projects/src/frontend/index.html`을 **Live Server**로 열기 (포트 5500).
-
-> Live Server 확장 설치: VSCode 확장 탭에서 "Live Server" 검색
+> 프론트엔드도 `http://localhost:8000` 에서 같이 서빙됨. Live Server 불필요.
 
 ---
 
