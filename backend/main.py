@@ -10,6 +10,7 @@ from googleapiclient.discovery import build
 from fastapi import FastAPI
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Query
 from googleapiclient.discovery import build
 
 load_dotenv()
@@ -58,36 +59,53 @@ def get_video_transcript(video_id: str):
         whisper_text = get_transcript_with_whisper(video_id)
         return whisper_text
 
-whisper_model = whisper.load_model("base")  
+#whisper
+# ffmpeg 경로 (혹시 몰라서 안전하게 추가)
+os.environ["PATH"] += os.pathsep + r"C:\ffmpeg-8.1-essentials_build\bin"
+
+# Whisper 모델 (처음엔 tiny 추천)
+whisper_model = whisper.load_model("tiny")
 # tiny (빠름) / base (적당) / small (정확) -> 속도 따라서 조정하기
 
 def get_transcript_with_whisper(video_id: str):
+    filename = None
     try:
         url = f"https://www.youtube.com/watch?v={video_id}"
-        
+        os.makedirs("temp", exist_ok=True)
         # 1. 오디오 다운로드
         ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': f'temp/{video_id}.%(ext)s',
-            'quiet': True,
-        }
-        
-        os.makedirs("temp", exist_ok=True)
+        'format': 'm4a/bestaudio/best', # m4a 형식이 가볍고 Whisper와 잘 맞습니다.
+        'outtmpl': f'temp/{video_id}.%(ext)s',
+        'quiet': True,
+        'postprocessors': [{ # 오디오만 추출하도록 강제
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality':'192',
+        }],
+}
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
+        print(f"[다운로드 완료] {filename}")
+
         # 2. Whisper로 변환
-        result = whisper_model.transcribe(filename)
+        result = whisper_model.transcribe(filename, fp16=False)
         
         # 3. 파일 삭제 (중요)
-        os.remove(filename)
-        
         return result["text"]
-
     except Exception as e:
+        print(f"Whisper 중단됨: {e}")
         return f"Whisper 실패: {str(e)}"
+    finally:
+        # 서버가 강제 종료되어도 임시 오디오 파일은 지워지도록 보호막을 칩니다.
+        if filename and os.path.exists(filename):
+            try:
+                os.remove(filename)
+                print(f"[임시 파일 삭제 완료] {filename}")
+            except:
+                pass
                 
 #서버 확인용
 @app.get("/")
@@ -113,6 +131,12 @@ def search_videos(keyword: str):
     response = request.execute()
     
     return response
+
+#whisper
+@app.get("/whisper")
+def whisper_api(video_id:str = Query(...)):
+    text = get_transcript_with_whisper(video_id)
+    return {"video_id": video_id, "text": text[:500]}
 
 #view rate 계산 로직 추가
 @app.get("/analyze")

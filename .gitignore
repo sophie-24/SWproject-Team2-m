@@ -21,6 +21,7 @@ venv/
 mock_frontend/
 
 #환경 변수#
+backend/.env
 .env
 
 ### macOS ###
