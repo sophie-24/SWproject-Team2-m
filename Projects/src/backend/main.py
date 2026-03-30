@@ -1,8 +1,9 @@
 import os
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
 
@@ -13,6 +14,8 @@ from transcript_service import get_transcript, format_transcript_with_timestamps
 from preprocessing import chunk_transcript
 
 load_dotenv()
+
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "../frontend")
 
 app = FastAPI(title="TechVisibility Backend")
 
@@ -32,7 +35,7 @@ _transcript_cache: dict = {}
 
 @app.get("/")
 def root():
-    return {"status": "ok"}
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -69,7 +72,7 @@ def callback(code: str, state: str):
         "client_secret": creds.client_secret,
         "scopes": list(creds.scopes or []),
     }
-    return RedirectResponse("http://127.0.0.1:5500/Projects/src/frontend/index.html?loggedIn=1")
+    return RedirectResponse("http://localhost:8000/?loggedIn=1")
 
 
 # ── YouTube 사용자 데이터 ────────────────────────────────────────────────────
@@ -114,7 +117,7 @@ def analyze(
 ):
     """
     키워드로 영상 검색 → view_rate(조회수/경과일) 계산 → 상위 5개 반환
-    규리(AI파트) 연동용
+    AI파트 연동용
     """
     videos = search_videos(keyword, max_results)
     if not videos:
@@ -172,7 +175,7 @@ def preprocess(
 ):
     """
     자막 수집 → 노이즈 제거 → 청크 분할 → 메타데이터 태깅
-    민선(DB파트)에게 넘길 청크 데이터 반환
+    DB파트에게 넘길 청크 데이터 반환
     """
     if video_id in _transcript_cache:
         formatted = _transcript_cache[video_id]["transcript"]

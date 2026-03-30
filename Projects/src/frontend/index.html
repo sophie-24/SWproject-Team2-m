@@ -223,8 +223,8 @@
   </head>
   <body>
     <div id="login-screen">
-      <h1>TechVisibility</h1>
-      <p>유튜브 기술 트렌드를 한눈에</p>
+      <h1>SWProjectTeam2</h1>
+      <p>유튜브 트렌드를 한눈에</p>
       <button class="google-btn" onclick="login()">
         <img src="https://www.google.com/favicon.ico" alt="" />
         Google 계정으로 로그인
@@ -233,7 +233,7 @@
 
     <div id="main-screen">
       <header>
-        <h1>TechVisibility</h1>
+        <h1>SWProjectTeam2</h1>
         <button class="logout-btn" onclick="logout()">로그아웃</button>
       </header>
 
@@ -250,7 +250,7 @@
     </div>
 
     <script>
-      const API = "http://localhost:8000";
+      const API = "";
 
       window.onload = () => {
         const params = new URLSearchParams(location.search);
@@ -305,12 +305,14 @@
         <p class="status-msg">상위 ${data.videos.length}개 · 영상 클릭하면 자막 펼쳐짐</p>
         ${data.videos.map(videoItem).join("")}
       `;
-          // 검색 결과 뜨자마자 자막 5개 백그라운드 프리페치
-          prefetchAll(data.videos.map(v => v.video_id));
         } catch {
           el.innerHTML =
             '<div class="empty">오류 발생. 서버가 실행 중인지 확인하세요.</div>';
         }
+      }
+
+      function escapeHtml(str) {
+        return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
       }
 
       // ── 영상 카드 렌더 ──────────────────────────────
@@ -323,8 +325,8 @@
         <div class="video-header" onclick="toggleTranscript('${v.video_id}', this)">
           <img src="${v.thumbnail}" alt="" loading="lazy" />
           <div class="video-info">
-            <h3>${v.title}</h3>
-            <div class="meta">${v.channel_title} · ${views}${v.duration}</div>
+            <h3>${escapeHtml(v.title)}</h3>
+            <div class="meta">${escapeHtml(v.channel_title)} · ${views}${escapeHtml(v.duration)}</div>
             <span class="toggle-hint" id="hint-${v.video_id}">▼ 자막 보기</span>
           </div>
         </div>
@@ -332,19 +334,6 @@
           <div class="loading">자막 불러오는 중...</div>
         </div>
       </div>`;
-      }
-
-      // ── 자막 프리페치 ───────────────────────────────
-      const cache = {};
-
-      function prefetchAll(videoIds) {
-        videoIds.forEach(id => {
-          if (cache[id]) return;
-          fetch(`${API}/transcript/${id}`)
-            .then(r => r.ok ? r.json() : null)
-            .then(data => { if (data) cache[id] = data; })
-            .catch(() => {});
-        });
       }
 
       // ── 자막 토글 ──────────────────────────────────
@@ -364,18 +353,17 @@
         area.classList.add("open");
         hint.textContent = "▲ 닫기";
 
-        if (loaded[videoId]) return;
+        if (loaded[videoId]) return; // 이미 로드됨
         loaded[videoId] = true;
 
         try {
-          // 프리페치된 캐시 있으면 즉시, 없으면 새로 요청
-          const data = cache[videoId] ?? await (async () => {
-            const res = await fetch(`${API}/transcript/${videoId}`);
-            if (res.status === 404) return null;
-            return res.json();
-          })();
-
-          if (!data) {
+          const res = await fetch(`${API}/transcript/${videoId}`, { redirect: 'error' });
+          if (!res.ok) {
+            area.innerHTML = '<div class="empty">자막 없음</div>';
+            return;
+          }
+          const data = await res.json();
+          if (!data.transcript) {
             area.innerHTML = '<div class="empty">자막 없음</div>';
             return;
           }
@@ -383,18 +371,14 @@
 
           area.innerHTML = `
         <p class="status-msg">총 ${data.count}개 항목 (앞 150개 표시)</p>
-        ${entries
-          .map(
-            (t) => `
+        ${entries.map(t => `
           <div class="transcript-entry">
             <span class="ts">${formatTime(t.start)}</span>
-            <span class="txt">${t.text}</span>
-          </div>`,
-          )
-          .join("")}
+            <span class="txt">${escapeHtml(t.text)}</span>
+          </div>`).join("")}
       `;
         } catch {
-          area.innerHTML = '<div class="empty">자막 로드 실패</div>';
+          area.innerHTML = '<div class="empty">자막 없음</div>';
         }
       }
 
