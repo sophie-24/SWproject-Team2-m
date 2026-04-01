@@ -15,11 +15,15 @@ _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     retry=retry_if_exception(lambda e: "429" in str(e)),
 )
 def _call_gemini(prompt: str) -> str:
-    return _client.models.generate_content(
-        model="gemini-1.5-flash",
+    response = _client.models.generate_content( 
+        model="gemini-2.0-flash-lite",         
         contents=prompt,
         config={"temperature": 0.3},
-    ).text
+    )
+    if response.text is None:                   
+        finish = response.candidates[0].finish_reason if response.candidates else "UNKNOWN"
+        raise ValueError(f"Gemini 응답 없음 (finish_reason: {finish})")
+    return response.text
 
 _PROMPT_TEMPLATE = """
 당신은 다양한 주제에 대해 깊이 있는 분석을 수행하는 전문가입니다.

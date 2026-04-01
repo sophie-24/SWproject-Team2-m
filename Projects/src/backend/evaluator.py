@@ -18,7 +18,7 @@ _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 )
 def _call_gemini(prompt: str) -> str:
     return _client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         contents=prompt,
         config={"temperature": 0},
     ).text
@@ -57,7 +57,7 @@ def score_analysis(query: str, analysis: str, chunks: List[Dict[str, Any]]) -> D
 {{"relevance": 0, "completeness": 0, "accuracy": 0, "clarity": 0, "reason": "한 줄 평"}}"""
 
     response = _client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         contents=prompt,
         config={"temperature": 0},
     )
@@ -86,7 +86,7 @@ def score_ad_detection(ad_score: int, chunks: List[Dict[str, Any]]) -> Dict[str,
 - confidence: 판단 신뢰도 (high / medium / low)"""
 
     response = _client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash-lite",
         contents=prompt,
         config={"temperature": 0},
     )

@@ -6,7 +6,7 @@ from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-from google import genai
+import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
 # 환경변수 로드
@@ -16,7 +16,8 @@ gemini_key = os.getenv("GEMINI_API_KEY")
 if not gemini_key:
     raise ValueError("GEMINI_API_KEY가 .env에 설정되지 않았습니다.")
 
-client = genai.Client(api_key=gemini_key)
+genai.configure(api_key=gemini_key)
+model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
 MAX_STEPS = 10
 
@@ -27,11 +28,15 @@ MAX_STEPS = 10
     retry=retry_if_exception(lambda e: "429" in str(e)),
 )
 def _call_gemini(prompt: str, temperature: float = 0.3) -> str:
-    return client.models.generate_content(
-        model="gemini-1.5-flash",
-        contents=prompt,
-        config={"temperature": temperature},
-    ).text
+    response = model.generate_content(
+        prompt,
+        generation_config={"temperature": temperature},
+    )
+    if response.text is None:
+        finish = response.candidates[0].finish_reason if response.candidates else "UNKNOWN"
+        raise ValueError(f"Gemini 응답 없음 (finish_reason: {finish})")
+    return response.text
+
 RAG_K = 5
 RAG_K_REANALYZE = 3
 RAG_DISTANCE_THRESHOLD = 1.5
@@ -144,8 +149,10 @@ def detect_ads_node(state: AgentState) -> Dict[str, Any]:
         score = int(match.group()) if match else 0
         score = max(0, min(100, score))
     except Exception as e:
-        cause = getattr(e, "__cause__", e)
-        print(f"  [광고 감지 오류] {cause} → 기본값 0 사용")
+        import traceback
+        traceback.print_exc()
+        # cause = getattr(e, "__cause__", e)
+        # print(f"  [광고 감지 오류] {cause} → 기본값 0 사용")
         score = 0
 
     return {"ad_score": score, "steps": ["detect_ads"], "step_count": state["step_count"] + 1}
