@@ -83,6 +83,9 @@ backend/
 ├── youtube_search.py    # 키워드 영상 검색
 ├── transcript_service.py# 자막 수집 (yt-dlp)
 ├── preprocessing.py     # 자막 정제 + 청크 분할
+├── orchestrator.py      # 파이프라인. LLM 2~3번 호출, 조건 분기 1개
+├── baseline.py          # 단일 LLM (빠름, 판단 없음)
+├── evaluator.py         # 실험 준비
 └── requirements.txt
 
 frontend/

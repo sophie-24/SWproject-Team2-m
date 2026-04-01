@@ -12,6 +12,9 @@ from youtube_service import get_subscriptions
 from youtube_search import search_videos
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
+from orchestrator import orchestrator_app, add_chunks_to_vectorstore
+import baseline
+import evaluator
 
 load_dotenv()
 
@@ -138,6 +141,125 @@ def analyze(
 
     top5 = sorted(results, key=lambda x: x["view_rate"], reverse=True)[:5]
     return JSONResponse({"keyword": keyword, "top_videos": top5})
+
+# ── AI 오케스트레이터  ─────────────────────────────────────────────────────────────────
+@app.get("/ai_analyze/{video_id}")
+async def ai_analyze_video(
+    video_id: str,
+    query: str = Query(...),
+    channel_id: str = Query("unknown"),
+    chunk_size: int = Query(500, ge=100, le=2000),
+    subscribed_channels: str = Query(""),
+    recent_searches: str = Query(""),
+    mode: str = Query("orchestrator", pattern="^(orchestrator|baseline|compare)$"),
+):
+    print(f"\n>>> [AI 분석 요청] 영상 ID: {video_id}, 질문: {query}")
+ 
+    try:
+        raw = get_transcript(video_id)
+        if raw is None:
+            return JSONResponse(status_code=404, content={"message": "자막이 없습니다."})
+ 
+        formatted = format_transcript_with_timestamps(raw)
+        chunks = chunk_transcript(formatted, video_id, channel_id, chunk_size)
+ 
+        add_chunks_to_vectorstore(video_id, chunks)
+
+        if mode == "baseline":
+            result = baseline.analyze(query, chunks)
+            return JSONResponse(result)
+
+        inputs = {
+            "query": query,
+            "video_id": video_id,
+            "chunks": chunks,
+            "ad_score": 0,
+            "final_analysis": "",
+            "steps": [],
+            "step_count": 0,
+            "user_context": {
+                "subscribed_channels": [c for c in subscribed_channels.split(",") if c],
+                "recent_searches": [s for s in recent_searches.split(",") if s],
+            },
+        }
+
+        if mode == "compare":
+            orchestrator_result = orchestrator_app.invoke(inputs)
+            baseline_result = baseline.analyze(query, chunks)
+            return JSONResponse({
+                "orchestrator": {
+                    "ad_score": orchestrator_result["ad_score"],
+                    "final_analysis": orchestrator_result["final_analysis"],
+                    "steps": orchestrator_result["steps"],
+                },
+                "baseline": baseline_result,
+            })
+
+        result = orchestrator_app.invoke(inputs)
+        return JSONResponse({
+            "ad_score": result["ad_score"],
+            "final_analysis": result["final_analysis"],
+            "steps": result["steps"]
+        })
+ 
+    except Exception as e:
+        print(f"!!! [AI 에러] {str(e)}")
+        raise HTTPException(status_code=500, detail=f"분석 중 오류 발생: {str(e)}")
+ 
+# ── 평가 ──────────────────────────────────────────────────────────────────────
+
+@app.get("/ai_evaluate/{video_id}")
+async def ai_evaluate_video(
+    video_id: str,
+    query: str = Query(...),
+    channel_id: str = Query("unknown"),
+    chunk_size: int = Query(500, ge=100, le=2000),
+):
+    print(f"\n>>> [평가 요청] 영상 ID: {video_id}, 질문: {query}")
+
+    try:
+        raw = get_transcript(video_id)
+        if raw is None:
+            return JSONResponse(status_code=404, content={"message": "자막이 없습니다."})
+
+        formatted = format_transcript_with_timestamps(raw)
+        chunks = chunk_transcript(formatted, video_id, channel_id, chunk_size)
+        add_chunks_to_vectorstore(video_id, chunks)
+
+        inputs = {
+            "query": query,
+            "video_id": video_id,
+            "chunks": chunks,
+            "ad_score": 0,
+            "final_analysis": "",
+            "steps": [],
+            "step_count": 0,
+            "user_context": {},
+        }
+
+        orch_result = orchestrator_app.invoke(inputs)
+        base_result = baseline.analyze(query, chunks)
+
+        orch_scores = evaluator.score_analysis(query, orch_result["final_analysis"], chunks)
+        base_scores = evaluator.score_analysis(query, base_result["final_analysis"], chunks)
+        ad_eval = evaluator.score_ad_detection(orch_result["ad_score"], chunks)
+
+        return JSONResponse({
+            "orchestrator": {
+                "ad_score": orch_result["ad_score"],
+                "steps": orch_result["steps"],
+                "quality": orch_scores,
+            },
+            "baseline": {
+                "steps": base_result["steps"],
+                "quality": base_scores,
+            },
+            "ad_detection_eval": ad_eval,
+        })
+
+    except Exception as e:
+        print(f"!!! [평가 에러] {str(e)}")
+        raise HTTPException(status_code=500, detail=f"평가 중 오류 발생: {str(e)}")
 
 
 # ── 자막 수집 ─────────────────────────────────────────────────────────────────
