@@ -158,8 +158,9 @@
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
+        line-clamp: 2;
         overflow: hidden;
-      }
+}
       .video-info .meta {
         font-size: 0.8rem;
         color: #888;
@@ -320,21 +321,27 @@
         const views = v.view_count
           ? `조회수 ${Number(v.view_count).toLocaleString()} · `
           : "";
-        return `
-      <div class="video-item">
-        <div class="video-header" onclick="toggleTranscript('${v.video_id}', this)">
-          <img src="${v.thumbnail}" alt="" loading="lazy" />
-          <div class="video-info">
-            <h3>${escapeHtml(v.title)}</h3>
-            <div class="meta">${escapeHtml(v.channel_title)} · ${views}${escapeHtml(v.duration)}</div>
-            <span class="toggle-hint" id="hint-${v.video_id}">▼ 자막 보기</span>
-          </div>
-        </div>
-        <div class="transcript-area" id="transcript-${v.video_id}">
-          <div class="loading">자막 불러오는 중...</div>
-        </div>
-      </div>`;
-      }
+          return `
+            <div class="video-item">
+              <div class="video-header" onclick="toggleTranscript('${v.video_id}', this)">
+                <img src="${v.thumbnail}" alt="" loading="lazy" />
+                <div class="video-info">
+                  <h3>${escapeHtml(v.title)}</h3>
+          
+                  <button onclick="runOrchestrator('${v.video_id}', event)" 
+                      style="background:#007bff; border:none; color:white; padding:4px 8px; border-radius:4px; font-size:0.8rem; cursor:pointer; margin-top:5px; margin-bottom:5px;">
+                  AI 쟁점 분석
+                  </button>
+
+                  <div class="meta">${escapeHtml(v.channel_title)} · ${views}${escapeHtml(v.duration)}</div>
+                  <span class="toggle-hint" id="hint-${v.video_id}">▼ 자막 보기</span>
+                </div>
+              </div>
+              <div class="transcript-area" id="transcript-${v.video_id}">
+                <div class="loading">자막 불러오는 중...</div>
+              </div>
+            </div>`;
+        }
 
       // ── 자막 토글 ──────────────────────────────────
       const loaded = {};
@@ -381,6 +388,39 @@
           area.innerHTML = '<div class="empty">자막 없음</div>';
         }
       }
+    
+      // ── AI 오케스트레이터 실행 함수 ──────────────────────
+async function runOrchestrator(videoId, event) {
+  event.stopPropagation(); // 1. 카드 클릭 시 자막 창이 같이 열리는 것을 방지합니다.
+  
+  const area = document.getElementById(`transcript-${videoId}`);
+  const hint = document.getElementById(`hint-${videoId}`);
+  
+  // UI 상태 업데이트
+  area.classList.add("open");
+  hint.textContent = "▲ 분석 중";
+  area.innerHTML = '<div class="loading">AI 오케스트레이터 가동 중... (광고 탐지 및 RAG 분석)</div>';
+
+  try {
+    // 2. 검색창의 키워드를 쿼리로 함께 보냅니다.
+    const query = document.getElementById("search-input").value;
+    const res = await fetch(`${API}/ai_analyze/${videoId}?query=${encodeURIComponent(query)}`);
+    
+    if (!res.ok) throw new Error();
+    
+    const data = await res.json();
+    area.innerHTML = `
+      <div style="background:#2a2a2a; padding:15px; border-radius:8px; border-left:4px solid #007bff; margin-bottom:10px;">
+          <h4 style="color:#007bff; margin-bottom:10px;">🤖 AI 분석 리포트</h4>
+          <p style="font-size:0.85rem; color:#aaa;">⚠️ 광고 의심 점수: <span style="color:#ff6666;">${data.ad_score}점</span></p>
+          <hr style="border:0.5px solid #444; margin:10px 0;">
+          <div class="txt" style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6;">${data.final_analysis}</div>
+      </div>
+    `;
+  } catch (error) {
+    area.innerHTML = '<div class="empty">분석 중 오류가 발생했습니다. 백엔드 서버를 확인하세요.</div>';
+  }
+}
 
       function formatTime(sec) {
         const m = Math.floor(sec / 60)
