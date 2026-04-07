@@ -1,9 +1,10 @@
 import os
-from datetime import datetime
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from typing import List
 from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
 
@@ -12,9 +13,7 @@ from youtube_service import get_subscriptions
 from youtube_search import search_videos
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
-from orchestrator import orchestrator_app, add_chunks_to_vectorstore
-import baseline
-import evaluator
+from orchestrator import run_pipeline
 
 load_dotenv()
 
@@ -36,9 +35,18 @@ _temp_session: dict = {}
 _transcript_cache: dict = {}
 
 
+# ── 정적 파일 서빙 ────────────────────────────────────────────────────────────
+
 @app.get("/")
 def root():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+
+# ── 헬스체크 ──────────────────────────────────────────────────────────────────
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -111,155 +119,43 @@ def search(
     return JSONResponse({"count": len(results), "videos": results})
 
 
-# ── 트렌드 분석 ──────────────────────────────────────────────────────────────
+# ── AI 분석 메인 엔드포인트 ───────────────────────────────────────────────────
 
-@app.get("/analyze")
-def analyze(
-    keyword: str = Query(..., description="분석할 키워드"),
-    max_results: int = Query(10, ge=1, le=50),
-):
+class AnalyzeRequest(BaseModel):
+    keyword: str
+    subscribed_channel_ids: List[str] = []
+
+
+@app.post("/analyze_search")
+def analyze_search(req: AnalyzeRequest):
     """
-    키워드로 영상 검색 → view_rate(조회수/경과일) 계산 → 상위 5개 반환
-    AI파트 연동용
+    유튜브 검색어를 받아 4단계 AI 파이프라인을 실행하고 대시보드 데이터를 반환.
+
+    body:
+        keyword               (str)  검색 키워드
+        subscribed_channel_ids (list) 사용자 구독 채널 ID 목록 (옵션)
+
+    response:
+        keyword, category, layout,
+        summary_lines, common_conclusion,
+        common_facts, controversies,
+        recommended_videos
     """
-    videos = search_videos(keyword, max_results)
-    if not videos:
-        return JSONResponse({"top_videos": [], "message": "검색 결과가 없습니다"})
+    keyword = req.keyword.strip()
+    if not keyword:
+        raise HTTPException(status_code=422, detail="keyword는 비어 있을 수 없습니다")
 
-    now = datetime.now()
-    results = []
-    for v in videos:
-        pub_str = v.get("published_at", "")
-        try:
-            published_at = datetime.fromisoformat(pub_str.replace("Z", "+00:00")).replace(tzinfo=None)
-            days = max((now - published_at).days, 1)
-        except Exception:
-            days = 1
-
-        view_rate = round(v.get("view_count", 0) / days, 2)
-        results.append({**v, "days_old": days, "view_rate": view_rate})
-
-    top5 = sorted(results, key=lambda x: x["view_rate"], reverse=True)[:5]
-    return JSONResponse({"keyword": keyword, "top_videos": top5})
-
-# ── AI 오케스트레이터  ─────────────────────────────────────────────────────────────────
-@app.get("/ai_analyze/{video_id}")
-async def ai_analyze_video(
-    video_id: str,
-    query: str = Query(...),
-    channel_id: str = Query("unknown"),
-    chunk_size: int = Query(500, ge=100, le=2000),
-    subscribed_channels: str = Query(""),
-    recent_searches: str = Query(""),
-    mode: str = Query("orchestrator", pattern="^(orchestrator|baseline|compare)$"),
-):
-    print(f"\n>>> [AI 분석 요청] 영상 ID: {video_id}, 질문: {query}")
- 
     try:
-        raw = get_transcript(video_id)
-        if raw is None:
-            return JSONResponse(status_code=404, content={"message": "자막이 없습니다."})
- 
-        formatted = format_transcript_with_timestamps(raw)
-        chunks = chunk_transcript(formatted, video_id, channel_id, chunk_size)
- 
-        add_chunks_to_vectorstore(video_id, chunks)
-
-        if mode == "baseline":
-            result = baseline.analyze(query, chunks)
-            return JSONResponse(result)
-
-        inputs = {
-            "query": query,
-            "video_id": video_id,
-            "chunks": chunks,
-            "ad_score": 0,
-            "final_analysis": "",
-            "steps": [],
-            "step_count": 0,
-            "user_context": {
-                "subscribed_channels": [c for c in subscribed_channels.split(",") if c],
-                "recent_searches": [s for s in recent_searches.split(",") if s],
-            },
-        }
-
-        if mode == "compare":
-            orchestrator_result = orchestrator_app.invoke(inputs)
-            baseline_result = baseline.analyze(query, chunks)
-            return JSONResponse({
-                "orchestrator": {
-                    "ad_score": orchestrator_result["ad_score"],
-                    "final_analysis": orchestrator_result["final_analysis"],
-                    "steps": orchestrator_result["steps"],
-                },
-                "baseline": baseline_result,
-            })
-
-        result = orchestrator_app.invoke(inputs)
-        return JSONResponse({
-            "ad_score": result["ad_score"],
-            "final_analysis": result["final_analysis"],
-            "steps": result["steps"]
-        })
- 
+        result = run_pipeline(
+            keyword=keyword,
+            subscribed_channel_ids=req.subscribed_channel_ids,
+        )
+        return JSONResponse(result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        print(f"!!! [AI 에러] {str(e)}")
+        print(f"!!! [analyze_search 오류] {e}")
         raise HTTPException(status_code=500, detail=f"분석 중 오류 발생: {str(e)}")
- 
-# ── 평가 ──────────────────────────────────────────────────────────────────────
-
-@app.get("/ai_evaluate/{video_id}")
-async def ai_evaluate_video(
-    video_id: str,
-    query: str = Query(...),
-    channel_id: str = Query("unknown"),
-    chunk_size: int = Query(500, ge=100, le=2000),
-):
-    print(f"\n>>> [평가 요청] 영상 ID: {video_id}, 질문: {query}")
-
-    try:
-        raw = get_transcript(video_id)
-        if raw is None:
-            return JSONResponse(status_code=404, content={"message": "자막이 없습니다."})
-
-        formatted = format_transcript_with_timestamps(raw)
-        chunks = chunk_transcript(formatted, video_id, channel_id, chunk_size)
-        add_chunks_to_vectorstore(video_id, chunks)
-
-        inputs = {
-            "query": query,
-            "video_id": video_id,
-            "chunks": chunks,
-            "ad_score": 0,
-            "final_analysis": "",
-            "steps": [],
-            "step_count": 0,
-            "user_context": {},
-        }
-
-        orch_result = orchestrator_app.invoke(inputs)
-        base_result = baseline.analyze(query, chunks)
-
-        orch_scores = evaluator.score_analysis(query, orch_result["final_analysis"], chunks)
-        base_scores = evaluator.score_analysis(query, base_result["final_analysis"], chunks)
-        ad_eval = evaluator.score_ad_detection(orch_result["ad_score"], chunks)
-
-        return JSONResponse({
-            "orchestrator": {
-                "ad_score": orch_result["ad_score"],
-                "steps": orch_result["steps"],
-                "quality": orch_scores,
-            },
-            "baseline": {
-                "steps": base_result["steps"],
-                "quality": base_scores,
-            },
-            "ad_detection_eval": ad_eval,
-        })
-
-    except Exception as e:
-        print(f"!!! [평가 에러] {str(e)}")
-        raise HTTPException(status_code=500, detail=f"평가 중 오류 발생: {str(e)}")
 
 
 # ── 자막 수집 ─────────────────────────────────────────────────────────────────
@@ -295,10 +191,7 @@ def preprocess(
     channel_id: str = Query("unknown"),
     chunk_size: int = Query(500, ge=100, le=2000),
 ):
-    """
-    자막 수집 → 노이즈 제거 → 청크 분할 → 메타데이터 태깅
-    DB파트에게 넘길 청크 데이터 반환
-    """
+    """자막 수집 → 노이즈 제거 → 청크 분할 → 메타데이터 태깅"""
     if video_id in _transcript_cache:
         formatted = _transcript_cache[video_id]["transcript"]
     else:
@@ -306,10 +199,13 @@ def preprocess(
         if raw is None:
             raise HTTPException(status_code=404, detail="자막을 찾을 수 없습니다")
         formatted = format_transcript_with_timestamps(raw)
-        _transcript_cache[video_id] = {"video_id": video_id, "count": len(formatted), "transcript": formatted}
+        _transcript_cache[video_id] = {
+            "video_id": video_id,
+            "count": len(formatted),
+            "transcript": formatted,
+        }
 
     chunks = chunk_transcript(formatted, video_id, channel_id, chunk_size)
-
     return JSONResponse({
         "video_id": video_id,
         "total_chunks": len(chunks),

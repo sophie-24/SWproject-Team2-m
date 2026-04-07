@@ -129,6 +129,6 @@ iOSInjectionProject/
 ### Xcode config file ###
 *.xcconfig
 .build/*
-
+CLAUDE.md
 
 # End of https://www.toptal.com/developers/gitignore/api/xcode,macos,swift,swiftpackagemanager,cocoapods

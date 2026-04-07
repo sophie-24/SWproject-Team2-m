@@ -3,12 +3,13 @@ import json
 import re
 from typing import Dict, Any, List
 from dotenv import load_dotenv
-from google import genai
+import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
 load_dotenv()
 
-_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+_model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
 
 @retry(
@@ -17,11 +18,14 @@ _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     retry=retry_if_exception(lambda e: "429" in str(e)),
 )
 def _call_gemini(prompt: str) -> str:
-    return _client.models.generate_content(
-        model="gemini-2.0-flash-lite",
-        contents=prompt,
-        config={"temperature": 0},
-    ).text
+    response = _model.generate_content(
+        prompt,
+        generation_config={"temperature": 0},
+    )
+    if response.text is None:
+        finish = response.candidates[0].finish_reason if response.candidates else "UNKNOWN"
+        raise ValueError(f"Gemini 응답 없음 (finish_reason: {finish})")
+    return response.text
 
 QUALITY_CRITERIA = ["relevance", "completeness", "accuracy", "clarity"]
 
@@ -56,7 +60,7 @@ def score_analysis(query: str, analysis: str, chunks: List[Dict[str, Any]]) -> D
 응답 형식:
 {{"relevance": 0, "completeness": 0, "accuracy": 0, "clarity": 0, "reason": "한 줄 평"}}"""
 
-    response = _client.models.generate_content(
+    response = _model.generate_content(
         model="gemini-2.0-flash-lite",
         contents=prompt,
         config={"temperature": 0},
@@ -85,7 +89,7 @@ def score_ad_detection(ad_score: int, chunks: List[Dict[str, Any]]) -> Dict[str,
 - ad_phrases_found: 광고로 의심되는 문장 최대 3개 리스트
 - confidence: 판단 신뢰도 (high / medium / low)"""
 
-    response = _client.models.generate_content(
+    response = _model.generate_content(
         model="gemini-2.0-flash-lite",
         contents=prompt,
         config={"temperature": 0},
