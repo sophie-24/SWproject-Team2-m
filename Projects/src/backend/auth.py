@@ -6,6 +6,9 @@
 import os
 import jwt
 import datetime
+import hashlib
+import base64
+import secrets
 from dotenv import load_dotenv
 from google_auth_oauthlib.flow import Flow
 from google.oauth2 import id_token
@@ -35,6 +38,27 @@ CLIENT_CONFIG = {
     }
 }
 
+JWT_SECRET    = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise ValueError("JWT_SECRET이 .env에 없습니다")
+JWT_ALGORITHM    = "HS256"
+JWT_EXPIRE_HOURS = 24 * 7
+
+def _generate_pkce() -> tuple[str, str]:
+    """
+    PKCE code_verifier + code_challenge 생성
+    code_verifier: 랜덤 문자열
+    code_challenge: SHA256(code_verifier) → base64url 인코딩
+    """
+    code_verifier = base64.urlsafe_b64encode(
+        secrets.token_bytes(32)
+    ).rstrip(b"=").decode("utf-8")
+
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode("utf-8")).digest()
+    ).rstrip(b"=").decode("utf-8")
+
+    return code_verifier, code_challenge
 
 def create_flow() -> Flow:
     flow = Flow.from_client_config(
@@ -44,38 +68,62 @@ def create_flow() -> Flow:
     )
     return flow
 
-#수정필요
-JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-this")
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_HOURS = 24 * 7 
+def create_auth_url() -> tuple[str, str, str]:
+    """
+    구글 OAuth 로그인 URL 생성
+    Returns: (auth_url, state, code_verifier)
+    """
+    code_verifier, code_challenge = _generate_pkce()
 
-def exchange_code_for_tokens(code: str):
+    flow = create_flow()
+    auth_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+        code_challenge=code_challenge,
+        code_challenge_method="S256",
+    )
+    return auth_url, state, code_verifier
+
+def exchange_code_for_tokens(code: str, code_verifier: str) -> dict:
     """
     구글이 준 code → access_token + id_token 교환
-    main.py의 /auth/callback 에서 호출
+    PKCE code_verifier 포함
     """
-    flow = create_flow()
-    flow.fetch_token(code=code)
-    credentials = flow.credentials
+    import requests
+    token_response = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "code":          code,
+            "client_id":     CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "redirect_uri":  REDIRECT_URI,
+            "grant_type":    "authorization_code",
+            "code_verifier": code_verifier,
+        }
+    )
+    token_data = token_response.json()
 
-    # 구글 id_token에서 사용자 정보 추출
+    if "error" in token_data:
+        raise ValueError(f"토큰 교환 실패: {token_data}")
+
+    # id_token에서 사용자 정보 추출
     id_info = id_token.verify_oauth2_token(
-        credentials.id_token,
+        token_data["id_token"],
         grequests.Request(),
         CLIENT_ID,
     )
-
     return {
         "google_id": id_info["sub"],
         "email":     id_info["email"],
         "name":      id_info.get("name", ""),
         "credentials": {
-            "token":         credentials.token,
-            "refresh_token": credentials.refresh_token,
-            "token_uri":     credentials.token_uri,
-            "client_id":     credentials.client_id,
-            "client_secret": credentials.client_secret,
-            "scopes":        list(credentials.scopes or []),
+            "token":         token_data.get("access_token"),
+            "refresh_token": token_data.get("refresh_token"),
+            "token_uri":     "https://oauth2.googleapis.com/token",
+            "client_id":     CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "scopes":        SCOPES,
         }
     }
 
