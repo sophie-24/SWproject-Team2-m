@@ -1,24 +1,22 @@
 import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
-from google import genai
+import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
 load_dotenv()
 
-_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-
+genai.configure(api_key=os.environ["GEMINI_API_KEY"]) 
+_model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=2, max=60),
-    retry=retry_if_exception(lambda e: "429" in str(e)),
 )
 def _call_gemini(prompt: str) -> str:
-    response = _client.models.generate_content( 
-        model="gemini-2.0-flash-lite",         
-        contents=prompt,
-        config={"temperature": 0.3},
+    response = _model.generate_content( 
+        prompt,
+        generation_config={"temperature": 0.3},
     )
     if response.text is None:                   
         finish = response.candidates[0].finish_reason if response.candidates else "UNKNOWN"
