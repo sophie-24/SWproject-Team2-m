@@ -132,7 +132,7 @@ backend/
 ├── main.py               # FastAPI 서버, 모든 엔드포인트
 ├── orchestrator.py       # 4개 AI 연결 파이프라인
 ├── selector_ai.py        # [AI 1] 영상 후보 선정
-├── analyzer_ai.py        # [AI 2] 5개 영상 동시 분석
+├── analyzer_ai.py        # 광고 탐지, 자막 분석, 공통 사실/쟁점 추출, 신뢰도 계산
 ├── category_ai.py        # [AI 3] 검색 의도 분류
 ├── dashboard_ai.py       # [AI 4] 대시보드 생성
 ├── auth.py               # Google OAuth 설정

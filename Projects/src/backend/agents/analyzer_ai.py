@@ -10,13 +10,14 @@
 - 신뢰도 계산 (반복 등장 → 상승, 광고 포함 → 하락)
 """
 
-import os
+import sys, os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional
 
 import google.generativeai as genai
 from dotenv import load_dotenv
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from transcript_service import get_transcript, format_transcript_with_timestamps
 from preprocessing import clean_transcript

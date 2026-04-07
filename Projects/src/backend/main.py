@@ -1,20 +1,26 @@
 import os
-from fastapi import FastAPI, HTTPException, Query, Depends, Request
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional
 from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from auth import create_flow, exchange_code_for_tokens, create_jwt, verify_jwt
+from auth import create_auth_url, exchange_code_for_tokens, create_jwt, verify_jwt
 from youtube_service import get_subscriptions
 from youtube_search import search_videos
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
-from orchestrator import run_pipeline
+from database import init_db, get_db, Newsletter
+from collector.behavior_store import save_behavior, get_today_logs
+from collector.trigger import get_triggered_topics
+from agents.orchestrator import run_pipeline
+from scheduler import start_scheduler, stop_scheduler
 
 load_dotenv()
 
@@ -23,6 +29,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8000")
 
 app = FastAPI(title="TechVisibility Backend")
 security = HTTPBearer()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,30 +37,49 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 테스트용 임시 세션 저장 (실제 서비스에선 Redis 등으로 교체)
-_temp_session: dict = {}
+# 정적 파일 서빙 (frontend/ 폴더)
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
-# 자막 인메모리 캐시 (video_id → 결과)
+# 임시 세션 (Redis로 교체 예정)
+_temp_session: dict = {}
 _transcript_cache: dict = {}
 
 
 # ── JWT 인증 의존성 ────────────────────────────────────────────────────────────
 
 def get_current_user(token=Depends(security)):
-    """
-    Authorization: Bearer <JWT> 헤더 검증
-    익스텐션의 /collect 등 보호된 엔드포인트에서 사용
-    """
     user = verify_jwt(token.credentials)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    return user  # {"user_id": ..., "email": ...}
+    return user
 
-# ── 정적 파일 서빙 ────────────────────────────────────────────────────────────
+
+# ── 서버 시작/종료 ─────────────────────────────────────────────────────────────
+
+@app.on_event("startup")
+async def startup():
+    await init_db()
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    stop_scheduler()
+
+
+# ── 정적 파일 ─────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def root():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+@app.get("/onboarding.html")
+def onboarding():
+    return FileResponse(os.path.join(FRONTEND_DIR, "onboarding.html"))
+
+@app.get("/dashboard.html")
+def dashboard():
+    return FileResponse(os.path.join(FRONTEND_DIR, "dashboard.html"))
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────
@@ -67,44 +93,32 @@ def health():
 
 @app.get("/auth/login")
 def login():
-    """구글 OAuth 로그인 URL → 브라우저에서 접속"""
-    from auth import create_flow
-    flow = create_flow()
-    auth_url, state = flow.authorization_url(
-        access_type="offline",
-        include_granted_scopes="true",
-        prompt="consent",
-    )
-    _temp_session["state"] = state
-    _temp_session["code_verifier"] = flow.code_verifier
+    auth_url, state, code_verifier = create_auth_url()
+    _temp_session["state"]         = state
+    _temp_session["code_verifier"] = code_verifier
+    print(f"[login] state 저장: {state}")           
+    print(f"[login] code_verifier 저장: {code_verifier}")
     return RedirectResponse(auth_url)
 
 
 @app.get("/auth/callback")
 def callback(code: str, state: str):
-    """
-    구글 OAuth 콜백
-    1. code → 구글 토큰 교환 (exchange_code_for_tokens 한 번만 호출)
-    2. 우리 서버 JWT 발급
-    3. 프론트로 리다이렉트 (쿼리스트링에 JWT 포함)
-    """
+    print(f"[callback] state 수신: {state}")
+    print(f"[callback] 세션 state: {_temp_session.get('state')}")
+    print(f"[callback] code_verifier: {_temp_session.get('code_verifier')}")
+
     if state != _temp_session.get("state"):
         raise HTTPException(status_code=400, detail="Invalid state parameter")
-
-    # ★ exchange_code_for_tokens 안에서 flow.fetch_token까지 처리
-    #    (기존 코드의 중복 fetch_token 제거)
-    user_info = exchange_code_for_tokens(code)
-
-    # 구글 credentials를 세션에 저장 (유튜브 API 호출용)
+    code_verifier = _temp_session.get("code_verifier")
+    if not code_verifier:
+        raise HTTPException(status_code=400, detail="code_verifier 없음")
+    user_info = exchange_code_for_tokens(code, code_verifier)
     _temp_session["credentials"] = user_info.get("credentials")
-    _temp_session["user_info"] = user_info
 
-    # ★ JWT 발급
     jwt_token = create_jwt(
         user_id=user_info["google_id"],
         email=user_info["email"],
     )
-     # ★ 프론트로 리다이렉트 — onboarding.html이 토큰을 받아 익스텐션에 전달
     return RedirectResponse(
         url=f"{FRONTEND_URL}/onboarding.html?token={jwt_token}"
     )
@@ -112,34 +126,63 @@ def callback(code: str, state: str):
 
 @app.get("/auth/me")
 def me(user=Depends(get_current_user)):
-    """현재 로그인된 사용자 정보 확인 (JWT 검증 테스트용)"""
     return {"user_id": user["user_id"], "email": user["email"]}
 
-# ── 행동 데이터 수집 (익스텐션 → 백엔드) ──────────────────────────────────────
+
+# ── 행동 데이터 수집 ───────────────────────────────────────────────────────────
 
 class CollectData(BaseModel):
-    event_type: str          # "search" | "watch"
+    event_type: str        # "search" | "watch"
     keyword: str
     video_id: Optional[str] = None
 
-@app.post("/collect")
-def collect(data: CollectData, user=Depends(get_current_user)):
-    """
-    크롬 익스텐션이 유튜브 검색/시청 이벤트를 전송
-    Authorization: Bearer <JWT> 헤더 필수
-    """
-    print(f"[collect] user={user['user_id']} | {data.event_type} | {data.keyword}")
-    # TODO: behavior_store.save() 연결 (세션 1에서 구현)
-    return {"saved": True, "user_id": user["user_id"]}
 
-# ── YouTube 사용자 데이터 ────────────────────────────────────────────────────
+@app.post("/collect")
+async def collect(
+    data: CollectData,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await save_behavior(
+        db=db,
+        user_id=user["user_id"],
+        event_type=data.event_type,
+        keyword=data.keyword,
+        video_id=data.video_id,
+    )
+    return result
+
+
+# ── 구독 설정 ─────────────────────────────────────────────────────────────────
+
+class SubscribeData(BaseModel):
+    delivery_type: str     # "kakao" | "email"
+    email: Optional[str] = None
+    kakao_uuid: Optional[str] = None
+
+
+@app.post("/subscribe")
+async def subscribe(
+    data: SubscribeData,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    onboarding.html에서 수신 방법 저장
+    TODO: users 테이블 업데이트 구현
+    """
+    # TODO: DB users 테이블에 delivery_type, email, kakao_uuid 저장
+    print(f"[subscribe] {user['user_id']} → {data.delivery_type}")
+    return {"success": True}
+
+
+# ── YouTube ───────────────────────────────────────────────────────────────────
 
 @app.get("/subscriptions")
 def subscriptions():
-    """로그인 사용자의 YouTube 구독 채널 목록"""
     creds_data = _temp_session.get("credentials")
     if not creds_data:
-        raise HTTPException(status_code=401, detail="로그인 필요: /auth/login 먼저 방문하세요")
+        raise HTTPException(status_code=401, detail="로그인 필요")
 
     creds = Credentials(
         token=creds_data["token"],
@@ -153,55 +196,75 @@ def subscriptions():
     return JSONResponse({"count": len(subs), "subscriptions": subs})
 
 
-# ── YouTube 검색 ─────────────────────────────────────────────────────────────
-
 @app.get("/search")
 def search(
-    keyword: str = Query(..., description="검색 키워드"),
+    keyword: str = Query(...),
     max_results: int = Query(10, ge=1, le=50),
 ):
-    """키워드로 YouTube 영상 검색 + 메타데이터 반환"""
     results = search_videos(keyword, max_results)
     return JSONResponse({"count": len(results), "videos": results})
 
 
-# ── AI 분석 메인 엔드포인트 ───────────────────────────────────────────────────
+# ── 뉴스레터 ──────────────────────────────────────────────────────────────────
 
-class AnalyzeRequest(BaseModel):
-    keyword: str
-    subscribed_channel_ids: List[str] = []
+@app.get("/newsletter/history")
+async def newsletter_history(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """내 뉴스레터 히스토리 조회 (dashboard.html에서 사용)"""
+    result = await db.execute(
+        select(Newsletter)
+        .where(Newsletter.user_id == user["user_id"])
+        .order_by(Newsletter.delivered_at.desc())
+        .limit(20)
+    )
+    newsletters = result.scalars().all()
+
+    return JSONResponse({
+        "newsletters": [
+            {
+                "id":            str(n.id),
+                "subject":       n.subject,
+                "content_json":  n.content_json,
+                "delivered_at":  n.delivered_at.isoformat(),
+                "delivery_type": n.delivery_type,
+            }
+            for n in newsletters
+        ]
+    })
 
 
-@app.post("/analyze_search")
-def analyze_search(req: AnalyzeRequest):
-    keyword = req.keyword.strip()
-    if not keyword:
-        raise HTTPException(status_code=422, detail="keyword는 비어 있을 수 없습니다")
+@app.post("/newsletter/send-now")
+async def send_now(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """즉시 발송 테스트용"""
+    today_logs = await get_today_logs(db, user_id=user["user_id"])
+    triggered  = get_triggered_topics(today_logs)
 
-    try:
-        result = run_pipeline(
-            keyword=keyword,
-            subscribed_channel_ids=req.subscribed_channel_ids,
-        )
-        return JSONResponse(result)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        print(f"!!! [analyze_search 오류] {e}")
-        raise HTTPException(status_code=500, detail=f"분석 중 오류 발생: {str(e)}")
+    if not triggered:
+        raise HTTPException(status_code=404, detail="트리거된 주제 없음 — 유튜브에서 검색해보세요")
 
-# ── 자막 수집 ─────────────────────────────────────────────────────────────────
+    newsletter = run_pipeline(
+        user_id=user["user_id"],
+        raw_keywords=triggered,
+        delivery_type="email",
+    )
+    return JSONResponse(newsletter)
+
+
+# ── 자막 ──────────────────────────────────────────────────────────────────────
 
 @app.get("/transcript/available/{video_id}")
 def transcript_available(video_id: str):
-    """영상에서 사용 가능한 자막 언어 목록 확인"""
     langs = list_available_transcripts(video_id)
     return JSONResponse({"video_id": video_id, "available": langs})
 
 
 @app.get("/transcript/{video_id}")
 def transcript(video_id: str):
-    """영상 자막 + timestamp 반환. 자막 없으면 404. 캐시 히트 시 즉시 반환."""
     if video_id in _transcript_cache:
         return JSONResponse(_transcript_cache[video_id])
 
@@ -215,7 +278,7 @@ def transcript(video_id: str):
     return JSONResponse(result)
 
 
-# ── 전처리 파이프라인 ──────────────────────────────────────────────────────────
+# ── 전처리 ────────────────────────────────────────────────────────────────────
 
 @app.get("/preprocess/{video_id}")
 def preprocess(
@@ -223,7 +286,6 @@ def preprocess(
     channel_id: str = Query("unknown"),
     chunk_size: int = Query(500, ge=100, le=2000),
 ):
-    """자막 수집 → 노이즈 제거 → 청크 분할 → 메타데이터 태깅"""
     if video_id in _transcript_cache:
         formatted = _transcript_cache[video_id]["transcript"]
     else:
