@@ -102,7 +102,11 @@ def login():
 
 
 @app.get("/auth/callback")
-def callback(code: str, state: str):
+async def callback(
+    code: str, 
+    state: str,
+    db : AsyncSession = Depends(get_db)
+):
     print(f"[callback] state 수신: {state}")
     print(f"[callback] 세션 state: {_temp_session.get('state')}")
     print(f"[callback] code_verifier: {_temp_session.get('code_verifier')}")
@@ -114,6 +118,25 @@ def callback(code: str, state: str):
         raise HTTPException(status_code=400, detail="code_verifier 없음")
     user_info = exchange_code_for_tokens(code, code_verifier)
     _temp_session["credentials"] = user_info.get("credentials")
+    from database import User
+    from sqlalchemy import select
+
+    result = await db.execute(
+        select(User).where(User.google_id == user_info["google_id"])
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        user = User(
+            google_id=user_info["google_id"],
+            email=user_info["email"],
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        print(f"[callback] 신규 유저 생성: {user_info['email']}")
+    else:
+        print(f"[callback] 기존 유저 로그인: {user_info['email']}")
 
     jwt_token = create_jwt(
         user_id=user_info["google_id"],
@@ -152,7 +175,19 @@ async def collect(
     )
     return result
 
-
+@app.get("/collect/today")
+async def today_logs(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """오늘 수집된 행동 로그 확인용"""
+    logs = await get_today_logs(db, user_id=user["user_id"])
+    triggered = get_triggered_topics(logs)
+    return {
+        "total_logs": len(logs),
+        "logs": logs,
+        "triggered_topics": triggered,
+    }
 # ── 구독 설정 ─────────────────────────────────────────────────────────────────
 
 class SubscribeData(BaseModel):
