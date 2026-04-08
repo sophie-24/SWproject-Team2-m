@@ -1,6 +1,6 @@
 # TechVisibility
 
-> 유튜브 검색 결과 상단에 AI 요약 대시보드를 오버레이로 표시하는 크롬 익스텐션
+> 유튜브 알고리즘 대신, 오늘 내가 관심 가진 주제를 AI가 분석해 뉴스레터로 보내주는 서비스
 
 ---
 
@@ -9,6 +9,7 @@
 - [팀원](#팀원)
 - [기술 스택](#기술-스택)
 - [주요 기능](#주요-기능)
+- [서비스 플로우](#서비스-플로우)
 - [실행 방법](#실행-방법)
 - [폴더 구조](#폴더-구조)
 - [브랜치 전략](#브랜치-전략)
@@ -18,9 +19,11 @@
 
 ## 소개
 
-> 프로젝트 목적과 주요 기능을 간단히 설명해주세요.
+유튜브 알고리즘은 내가 보고 싶은 걸 주는 게 아니라 계속 보게 만듭니다.
+TechVisibility는 사용자가 오늘 관심 가진 주제를 정리해서, 광고를 걸러내고,
+핵심만 뉴스레터(카톡/이메일)로 보내줍니다.
 
-**프로젝트 기간:** `YYYY.MM.DD - YYYY.MM.DD`
+**프로젝트 기간:** `2025.XX.XX - 2025.XX.XX`
 
 ---
 
@@ -35,50 +38,133 @@
 
 ## 기술 스택
 
-- **Frontend:**
-- **Backend:**
-- **Database:**
-- **기타 도구:** Figma, Notion, GitHub Projects
+- **Frontend:** HTML, CSS, JavaScript
+- **Backend:** FastAPI, Python
+- **Database:** PostgreSQL, SQLAlchemy (asyncpg)
+- **AI:** Google Gemini 2.5 Flash Lite (google-generativeai)
+- **크롬 익스텐션:** Manifest V3
+- **인증:** Google OAuth 2.0 + JWT
+- **스케줄러:** APScheduler
+- **기타 도구:** yt-dlp (자막 수집), YouTube Data API v3
 
 ---
 
 ## 주요 기능
 
-- 기능 1
-- 기능 2
-- 기능 3
+- **행동 수집** — 크롬 익스텐션이 유튜브 검색/시청 기록을 실시간 수집
+- **주제 클러스터링** — AI가 오늘 수집된 키워드를 의미 단위로 그룹핑
+- **영상 선정** — View Rate 기반으로 주제별 상위 5개 영상 선정
+- **자막 분석** — yt-dlp로 자막 수집 후 AI가 핵심 내용 추출
+- **광고 탐지** — AI가 협찬/광고 포함 영상 자동 감지 및 필터링
+- **뉴스레터 생성** — 주제별 요약 + 장단점 + 출처 링크 포함
+- **자동 발송** — 매일 저녁 9시 카카오톡 또는 이메일로 발송
+
+---
+
+## 서비스 플로우
+1. 웹사이트 접속 → 구글 로그인
+→ 카톡/이메일 선택 → 개인정보 동의
+        ↓
+2. 크롬 익스텐션 설치
+→ 유튜브에서 검색/시청 시 백엔드로 실시간 전송
+        ↓
+3. 백엔드가 수집 (같은 주제 2회 이상 검색/시청 시 트리거)
+        ↓
+4. 저녁 9시 배치 실행
+→ 멀티 에이전트 파이프라인 실행
+→ cluster_ai → selector_ai → analyzer_ai → newsletter_ai
+        ↓
+5. 카톡/이메일로 뉴스레터 발송
+→ 각 내용마다 출처 영상 링크 포함
 
 ---
 
 ## 실행 방법
-
 ```bash
 git clone https://github.com/yijuuuun/SWproject-Team2.git
 cd SWproject-Team2
+```
 
 #가상환경 설치
+```bash
 python -m venv venv
 .\venv\Scripts\activate
 
 pip install -r requirements.txt (백엔드)
 uvicorn main:app --reload --port 8000(서버 실행-> 백엔드)
-
-# 의존성 설치
-npm install
-
-# 개발 서버 실행
-npm run dev
 ```
 
----
+# 의존성 설치
+```bash
+npm install
+```
+
+# PostgreSQL DB 생성
+```bash
+psql -U postgres
+CREATE DATABASE techvisibility;
+```
+
+# 서버 실행
+```bash
+cd Projects/src/backend
+uvicorn main:app --reload
+```
+
+# 크롬 익스텐션 로드
+```bash
+chrome://extensions/ → 개발자 모드 ON
+→ 압축해제된 확장 프로그램 로드
+→ Projects/src/extension/ 폴더 선택
+```
+
+# API 문서
+```bash
+chrome://extensions/ → 개발자 모드 ON
+→ 압축해제된 확장 프로그램 로드
+→ Projects/src/extension/ 폴더 선택
+```
 
 ## 폴더 구조
 
 ```
-📦SWproject-Team2
-┣ 📂src
-┣ 📂public
-┗ 📜README.md
+SWproject-Team2/Projects/src/
+├── backend/
+│   ├── main.py                   # FastAPI 서버
+│   ├── auth.py                   # Google OAuth + JWT
+│   ├── database.py               # DB 연결 + 모델
+│   ├── scheduler.py              # 배치 스케줄러 (저녁 9시)
+│   ├── preprocessing.py          # 자막 전처리 (수정 금지)
+│   ├── transcript_service.py     # 자막 수집 (yt-dlp)
+│   ├── youtube_search.py         # 유튜브 검색
+│   ├── youtube_service.py        # 구독 채널 목록
+│   │
+│   ├── collector/
+│   │   ├── behavior_store.py     # 행동 로그 저장
+│   │   └── trigger.py            # 주제 트리거 판단
+│   │
+│   ├── agents/
+│   │   ├── cluster_ai.py         # [AI 1] 주제 클러스터링
+│   │   ├── selector_ai.py        # [AI 2] 영상 선정
+│   │   ├── analyzer_ai.py        # [AI 3] 자막 분석 + 광고 탐지
+│   │   ├── newsletter_ai.py      # [AI 4] 뉴스레터 생성
+│   │   └── orchestrator.py       # 파이프라인 총괄
+│   │
+│   └── delivery/
+│       ├── kakao.py              # 카카오 친구톡 발송
+│       └── email.py              # 이메일 발송
+│
+├── extension/
+│   ├── manifest.json
+│   ├── background.js
+│   ├── content.js
+│   ├── popup.html
+│   └── popup.js
+│
+└── frontend/
+├── index.html
+├── onboarding.html
+└── dashboard.html
 ```
 
 ---

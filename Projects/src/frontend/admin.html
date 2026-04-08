@@ -1,0 +1,79 @@
+# main.py에 추가
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "admin1234")
+
+def get_admin(token=Depends(security)):
+    if token.credentials != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="관리자 권한 없음")
+    return True
+
+@app.get("/admin/users")
+async def admin_users(
+    admin=Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """전체 유저 목록"""
+    from database import User
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+    return {
+        "total": len(users),
+        "users": [
+            {
+                "id":            str(u.id),
+                "email":         u.email,
+                "delivery_type": u.delivery_type,
+                "created_at":    u.created_at.isoformat(),
+            }
+            for u in users
+        ]
+    }
+
+@app.get("/admin/logs")
+async def admin_logs(
+    admin=Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """오늘 전체 행동 로그"""
+    from database import BehaviorLog
+    import datetime
+    today = datetime.datetime.utcnow().replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    result = await db.execute(
+        select(BehaviorLog)
+        .where(BehaviorLog.logged_at >= today)
+        .order_by(BehaviorLog.logged_at.desc())
+    )
+    logs = result.scalars().all()
+    return {
+        "total": len(logs),
+        "logs": [
+            {
+                "user_id":    l.user_id,
+                "event_type": l.event_type,
+                "keyword":    l.keyword,
+                "logged_at":  l.logged_at.isoformat(),
+            }
+            for l in logs
+        ]
+    }
+
+@app.post("/admin/pipeline/run")
+async def admin_run_pipeline(
+    user_id: str,
+    admin=Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """특정 유저 파이프라인 즉시 실행"""
+    logs     = await get_today_logs(db, user_id=user_id)
+    triggered = get_triggered_topics(logs)
+
+    if not triggered:
+        raise HTTPException(status_code=404, detail="트리거된 주제 없음")
+
+    newsletter = run_pipeline(
+        user_id=user_id,
+        raw_keywords=triggered,
+        delivery_type="email",
+    )
+    return JSONResponse(newsletter)

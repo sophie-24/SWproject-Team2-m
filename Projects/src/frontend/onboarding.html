@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TechVisibility — 설정</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #0f0f0f;
+      color: #f1f1f1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .container { width: 100%; max-width: 480px; }
+
+    .logo {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #ff4444;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .step-indicator {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+
+    .step {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #333;
+    }
+    .step.active { background: #ff4444; }
+    .step.done   { background: #44cc44; }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 16px;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      font-size: 0.85rem;
+      color: #888;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .option-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: #111;
+      border: 2px solid #2a2a2a;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      text-align: left;
+      width: 100%;
+      color: #f1f1f1;
+    }
+    .option-btn:hover  { border-color: #555; }
+    .option-btn.selected { border-color: #ff4444; }
+
+    .option-icon { font-size: 1.5rem; }
+
+    .option-text strong {
+      display: block;
+      font-size: 0.95rem;
+      margin-bottom: 2px;
+    }
+
+    .option-text span {
+      font-size: 0.8rem;
+      color: #888;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 0.82rem;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 12px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      color: #f1f1f1;
+      font-size: 0.9rem;
+    }
+    .input-group input:focus {
+      outline: none;
+      border-color: #ff4444;
+    }
+
+    .btn-primary {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      background: #ff4444;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary:hover { background: #cc2222; }
+    .btn-primary:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .hidden { display: none !important; }
+
+    #msg {
+      font-size: 0.82rem;
+      color: #cc4444;
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">✦ TechVisibility</div>
+
+    <div class="step-indicator">
+      <div class="step active" id="step1-dot"></div>
+      <div class="step" id="step2-dot"></div>
+      <div class="step" id="step3-dot"></div>
+    </div>
+
+    <!-- Step 1: 수신 방법 선택 -->
+    <div id="step1">
+      <div class="card">
+        <h2>뉴스레터 수신 방법</h2>
+        <p>매일 저녁 9시, 어떤 방법으로 받으시겠어요?</p>
+
+        <div class="options">
+          <button class="option-btn" id="opt-email" onclick="selectDelivery('email')">
+            <span class="option-icon">📧</span>
+            <div class="option-text">
+              <strong>이메일</strong>
+              <span>HTML 형식으로 상세하게 받아보기</span>
+            </div>
+          </button>
+          <button class="option-btn" id="opt-kakao" onclick="selectDelivery('kakao')">
+            <span class="option-icon">💬</span>
+            <div class="option-text">
+              <strong>카카오톡</strong>
+              <span>간결하게 핵심만 받아보기</span>
+            </div>
+          </button>
+        </div>
+
+        <button class="btn-primary" id="btn-step1" onclick="goStep2()" disabled>
+          다음
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2: 연락처 입력 -->
+    <div id="step2" class="hidden">
+      <div class="card">
+        <h2 id="step2-title">이메일 주소 입력</h2>
+        <p id="step2-desc">뉴스레터를 받을 이메일 주소를 입력해주세요.</p>
+
+        <div class="input-group" id="email-input-group">
+          <label>이메일 주소</label>
+          <input type="email" id="input-email" placeholder="your@email.com">
+        </div>
+
+        <div class="input-group hidden" id="kakao-input-group">
+          <label>카카오 UUID</label>
+          <input type="text" id="input-kakao" placeholder="카카오 로그인 후 자동 입력됩니다">
+        </div>
+
+        <button class="btn-primary" onclick="goStep3()">다음</button>
+        <div id="msg"></div>
+      </div>
+    </div>
+
+    <!-- Step 3: 익스텐션 설치 안내 -->
+    <div id="step3" class="hidden">
+      <div class="card">
+        <h2>크롬 익스텐션 설치</h2>
+        <p>
+          유튜브 검색/시청 기록을 수집하려면<br>
+          크롬 익스텐션이 필요합니다.
+        </p>
+
+        <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:24px;">
+          <div style="font-size:0.85rem; color:#aaa; line-height:1.8;">
+            <strong style="color:#ff4444;">현재 베타 테스트 중입니다.</strong><br><br>
+            1. 아래 링크에서 익스텐션 파일을 다운로드하세요.<br>
+            2. 크롬 주소창에 <code style="color:#ff4444;">chrome://extensions/</code> 입력<br>
+            3. 우측 상단 <strong>개발자 모드</strong> 켜기<br>
+            4. <strong>압축해제된 확장 프로그램을 로드합니다</strong> 클릭<br>
+            5. 다운로드한 폴더 선택
+          </div>
+          <a href="/static/extension.zip" 
+            style="color:#6699ff; font-size:0.85rem;">
+            📦 익스텐션 다운로드
+          </a>
+        </div>
+
+        <button class="btn-primary" onclick="finish()">
+          설정 완료 →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selectedDelivery = null;
+    const EXTENSION_ID = "joenialikeamihcfkhcoliafnfpgdagn";
+
+    // ── URL에서 JWT 추출 → 저장 → 익스텐션으로 전달 ──
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    if (token) {
+      localStorage.setItem("access_token", token);
+
+      // 익스텐션으로 JWT 전달
+      if (typeof chrome !== "undefined" && chrome.runtime) {
+        chrome.runtime.sendMessage(
+          EXTENSION_ID,
+          { type: "SET_TOKEN", token: token },
+          (response) => {
+            if (response?.success) {
+              console.log("익스텐션에 토큰 전달 완료");
+            }
+          }
+        );
+      }
+    }
+
+    // ── Step 1 ────────────────────────────────────────
+    function selectDelivery(type) {
+      selectedDelivery = type;
+      document.getElementById("opt-email").classList.remove("selected");
+      document.getElementById("opt-kakao").classList.remove("selected");
+      document.getElementById(`opt-${type}`).classList.add("selected");
+      document.getElementById("btn-step1").disabled = false;
+    }
+
+    function goStep2() {
+      document.getElementById("step1").classList.add("hidden");
+      document.getElementById("step2").classList.remove("hidden");
+      document.getElementById("step1-dot").classList.remove("active");
+      document.getElementById("step1-dot").classList.add("done");
+      document.getElementById("step2-dot").classList.add("active");
+
+      if (selectedDelivery === "kakao") {
+        document.getElementById("step2-title").textContent = "카카오톡 설정";
+        document.getElementById("step2-desc").textContent =
+          "카카오 채널을 친구 추가한 후 진행해주세요.";
+        document.getElementById("email-input-group").classList.add("hidden");
+        document.getElementById("kakao-input-group").classList.remove("hidden");
+      }
+    }
+
+    // ── Step 2 ────────────────────────────────────────
+    async function goStep3() {
+      const msgEl = document.getElementById("msg");
+
+      const contactValue = selectedDelivery === "email"
+        ? document.getElementById("input-email").value.trim()
+        : document.getElementById("input-kakao").value.trim();
+
+      if (!contactValue) {
+        msgEl.textContent = "입력값을 확인해주세요.";
+        return;
+      }
+
+      // TODO: /subscribe 엔드포인트로 저장
+      // const res = await fetch("/subscribe", { ... })
+
+      document.getElementById("step2").classList.add("hidden");
+      document.getElementById("step3").classList.remove("hidden");
+      document.getElementById("step2-dot").classList.remove("active");
+      document.getElementById("step2-dot").classList.add("done");
+      document.getElementById("step3-dot").classList.add("active");
+    }
+
+    // ── Step 3 ────────────────────────────────────────
+    function finish() {
+      window.location.href = "/dashboard.html";
+    }
+  </script>
+</body>
+</html>

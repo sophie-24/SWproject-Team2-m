@@ -18,7 +18,24 @@ GOOGLE_CLIENT_SECRET=발급받은_클라이언트_시크릿
 REDIRECT_URI=http://localhost:8000/auth/callback
 YOUTUBE_API_KEY=발급받은_유튜브_API_키
 GEMINI_API_KEY=발급받은_Gemini_API_키
+JWT_SECRET=랜덤_문자열
+DATABASE_URL=postgresql+asyncpg://postgres:비밀번호@localhost:5432/techvisibility
+FRONTEND_URL=http://localhost:8000
+EMAIL_SENDER=your@gmail.com
+EMAIL_PASSWORD=구글_앱_비밀번호
+KAKAO_ACCESS_TOKEN=카카오_액세스_토큰
 ```
+> JWT_SECRET 생성: `python -c "import secrets; print(secrets.token_hex(32))"`
+> `.env` 파일은 gitignore 처리 — 절대 커밋하지 말 것
+
+### PostgreSQL DB 생성
+```bash
+psql -U postgres
+CREATE DATABASE techvisibility;
+\q
+```
+
+> 테이블은 서버 시작 시 자동 생성됨
 
 > `.env` 파일은 톡으로 받은거 설정해서 gitignore 처리하고 커밋하지말기.
 
@@ -29,7 +46,7 @@ uvicorn main:app --reload --port 8000
 ```
 
 서버 주소: `http://localhost:8000`
-
+API 문서: `http://localhost:8000/docs`
 > 프론트엔드도 `http://localhost:8000` 에서 같이 서빙됨. Live Server 불필요.
 
 ### 4. 크롬 익스텐션 로드
@@ -38,26 +55,28 @@ uvicorn main:app --reload --port 8000
 2. 우측 상단 **개발자 모드** 활성화
 3. **압축 해제된 확장 프로그램 로드** 클릭
 4. `Projects/src/extension` 폴더 선택
+5. 익스텐션 ID 확인 → `extension/background.js`의 EXTENSION_ID에 입력
 
 ---
 
 ## AI 파이프라인
+사용자의 오늘 행동 로그를 기반으로 저녁 9시에 자동 실행됩니다.
+[수집] 익스텐션 → /collect → behavior_logs DB 저장
+↓
+[트리거] 같은 주제 2회 이상 → trigger.py 판단
+↓
+[AI 1] cluster_ai.py    키워드 의미 단위로 클러스터링
+↓
+[AI 2] selector_ai.py   주제별 영상 후보 선정 (View Rate 기반 상위 5개)
+↓
+[AI 3] analyzer_ai.py   자막 분석 + 광고 탐지 + 공통 사실/쟁점 추출
+↓
+[AI 4] newsletter_ai.py 뉴스레터 생성 (요약 + 장단점 + 출처)
+↓
+[발송] 카카오 친구톡 / 이메일
 
-검색어 입력 시 4단계 AI가 순차/병렬 실행됩니다.
-
-```
-[AI 1] selector_ai.py   영상 후보 10개 수집 → 쇼츠 제거 → 점수 계산 → 상위 5개 선정
-         ↓                    ↘
-[AI 2] analyzer_ai.py        [AI 3] category_ai.py   (병렬 실행)
-  5개 영상 동시 분석               검색 의도 분류
-  자막 수집, 광고 탐지              정보탐색형 / 비교구매형 / 학습튜토리얼형
-  공통 사실 / 쟁점 추출
-         ↓                    ↙
-[AI 4] dashboard_ai.py  핵심 요약 3줄 + 공통 결론 + 추천 영상 순위 생성
-```
-
-**Gemini API 호출 수 (검색 1회 기준): 최대 8회**
-
+**Gemini API 호출 수 (주제 1개 기준): 최대 7회**
+> 무료 티어 하루 20회 제한 → 테스트 최소화
 ---
 
 ## API 엔드포인트
@@ -70,58 +89,74 @@ uvicorn main:app --reload --port 8000
 
 ### 인증
 
-| 메서드 | 경로             | 설명                                       |
-| ------ | ---------------- | ------------------------------------------ |
-| GET    | `/auth/login`    | 구글 OAuth 로그인 시작 (브라우저에서 접속) |
-| GET    | `/auth/callback` | 로그인 완료 후 자동 호출됨                 |
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/auth/login` | 구글 OAuth 로그인 시작 |
+| GET | `/auth/callback` | 로그인 완료 후 JWT 발급 |
+| GET | `/auth/me` | 현재 로그인 사용자 확인 |
 
-### AI 분석 (메인)
 
-| 메서드 | 경로              | 설명                              |
-| ------ | ----------------- | --------------------------------- |
-| POST   | `/analyze_search` | 4단계 AI 파이프라인 실행, 대시보드 반환 |
+### 행동 수집 (익스텐션 → 백엔드)
 
-**`/analyze_search` 요청 예시**
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/collect` | 검색/시청 이벤트 수집 (JWT 필요) |
+| GET | `/collect/today` | 오늘 수집된 로그 + 트리거 주제 확인 (JWT 필요) |
 
+**`/collect` 요청 예시**
 ```json
 {
-  "keyword": "파이썬 입문",
-  "subscribed_channel_ids": ["UCxxxx", "UCyyyy"]
+  "event_type": "search",
+  "keyword": "지성 피부 세럼",
+  "video_id": null
 }
 ```
+### 구독 설정
 
-**`/analyze_search` 응답 예시**
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/subscribe` | 수신 방법 설정 (kakao/email) |
+| GET | `/subscriptions` | 유튜브 구독 채널 목록 |
 
-```json
-{
-  "keyword": "파이썬 입문",
-  "category": "학습튜토리얼형",
-  "layout": { "layout": "step_guide", "primary_section": "common_facts", ... },
-  "summary_lines": ["파이썬은 ...", "초보자에게 ...", "주요 라이브러리로 ..."],
-  "common_conclusion": "파이썬은 진입 장벽이 낮고 ...",
-  "common_facts": ["문법이 간결하다", "라이브러리가 풍부하다"],
-  "controversies": ["IDE 선택 기준에 대해 의견이 갈림"],
-  "recommended_videos": [
-    {
-      "video_id": "abc123",
-      "title": "파이썬 입문 강의",
-      "final_score": 0.82,
-      "is_subscribed": false,
-      "ad_detected": false,
-      ...
-    }
-  ]
-}
-```
+### 뉴스레터
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/newsletter/history` | 내 뉴스레터 히스토리 (JWT 필요) |
+| POST | `/newsletter/send-now` | 즉시 발송 테스트 (JWT 필요) |
 
 ### 데이터
 
-| 메서드 | 경로                                   | 설명                              |
-| ------ | -------------------------------------- | --------------------------------- |
-| GET    | `/subscriptions`                       | 로그인 유저의 유튜브 구독 채널 목록 |
-| GET    | `/search?keyword=파이썬&max_results=5` | 키워드로 영상 검색                 |
-| GET    | `/transcript/{video_id}`               | 영상 자막 + timestamp             |
-| GET    | `/preprocess/{video_id}`               | 자막 수집 → 정제 → 청크 분할      |
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/search?keyword=파이썬` | 키워드로 영상 검색 |
+| GET | `/transcript/{video_id}` | 영상 자막 + timestamp |
+| GET | `/preprocess/{video_id}` | 자막 수집 → 정제 → 청크 분할 |
+
+### 관리자 (ADMIN_SECRET 필요)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/admin/users` | 전체 유저 목록 |
+| GET | `/admin/logs` | 오늘 전체 행동 로그 |
+| POST | `/admin/pipeline/run` | 특정 유저 파이프라인 즉시 실행 |
+
+---
+
+## DB 테이블
+
+| 테이블 | 설명 |
+|--------|------|
+| `users` | 유저 정보 (google_id, email, delivery_type) |
+| `behavior_logs` | 익스텐션 수집 로그 (검색어, 시청 기록) |
+| `newsletters` | 발송된 뉴스레터 히스토리 |
+
+**DB 직접 확인 (pgAdmin 권장):**
+```sql
+SELECT * FROM users;
+SELECT * FROM behavior_logs ORDER BY logged_at DESC LIMIT 10;
+SELECT * FROM newsletters ORDER BY delivered_at DESC LIMIT 10;
+```
 
 ---
 
@@ -129,27 +164,29 @@ uvicorn main:app --reload --port 8000
 
 ```
 backend/
-├── main.py               # FastAPI 서버, 모든 엔드포인트
-├── orchestrator.py       # 4개 AI 연결 파이프라인
-├── selector_ai.py        # [AI 1] 영상 후보 선정
-├── analyzer_ai.py        # 광고 탐지, 자막 분석, 공통 사실/쟁점 추출, 신뢰도 계산
-├── category_ai.py        # [AI 3] 검색 의도 분류
-├── dashboard_ai.py       # [AI 4] 대시보드 생성
-├── auth.py               # Google OAuth 설정
-├── youtube_service.py    # 구독 채널 목록
-├── youtube_search.py     # 키워드 영상 검색
-├── transcript_service.py # 자막 수집 (yt-dlp)
-├── preprocessing.py      # 자막 정제 + 청크 분할 (수정 금지)
-└── requirements.txt
-
-extension/
-├── manifest.json         # 크롬 익스텐션 설정 (manifest v3)
-├── content.js            # 유튜브 검색어 감지 + 오버레이 삽입
-├── popup.html            # 팝업 UI
-└── popup.js              # OAuth 로그인 + 구독 채널 수집
-
-frontend/
-└── index.html            # 테스트용 웹 UI
+├── main.py                   # FastAPI 서버, 모든 엔드포인트
+├── auth.py                   # Google OAuth + JWT 발급/검증
+├── database.py               # DB 연결 + 테이블 모델
+├── scheduler.py              # 배치 스케줄러 (매일 21:00 KST)
+├── preprocessing.py          # 자막 전처리
+├── transcript_service.py     # 자막 수집 (yt-dlp)
+├── youtube_search.py         # 키워드 영상 검색
+├── youtube_service.py        # 구독 채널 목록
+│
+├── collector/
+│   ├── behavior_store.py     # 행동 로그 저장 + 조회
+│   └── trigger.py            # 2회 이상 주제 트리거 판단
+│
+├── agents/
+│   ├── cluster_ai.py         # [AI 1] 주제 클러스터링
+│   ├── selector_ai.py        # [AI 2] View Rate 기반 영상 선정
+│   ├── analyzer_ai.py        # [AI 3] 자막 분석 + 광고 탐지
+│   ├── newsletter_ai.py      # [AI 4] 뉴스레터 생성
+│   └── orchestrator.py       # 4개 AI 파이프라인 총괄
+│
+└── delivery/
+    ├── kakao.py              # 카카오 친구톡 발송
+    └── email.py              # 이메일 발송 (Gmail SMTP)
 ```
 
 ---
@@ -159,4 +196,5 @@ frontend/
 - 자막 수집을 위해 `cookies.txt` 파일이 `backend/` 폴더 안에 있어야 함 → 톡으로 직접 받은 거 넣기! (깃에 올리면 안 됨)
 - 서버 재시작하면 로그인 세션 초기화됨 (다시 로그인 필요)
 - Gemini 무료 티어 하루 20회 제한 → 테스트 최소화 (검색 1회당 최대 8회 소모)
-- `preprocessing.py` 수정 금지 (팀원 코드)
+- `google.genai` 패키지 사용 금지 → `google.generativeai` 사용
+- ChromaDB, RAG 방식 사용 금지
