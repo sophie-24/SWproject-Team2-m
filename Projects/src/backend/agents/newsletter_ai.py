@@ -7,40 +7,9 @@
 - 주제별 3줄 요약, 장단점, 출처 링크 포함
 """
 
-import os
-import re
 from typing import List, Dict, Any
 
-import google.generativeai as genai
-from dotenv import load_dotenv
-
-load_dotenv()
-
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-_model = genai.GenerativeModel("gemini-2.5-flash-lite")
-
-
-def _call_gemini(prompt: str) -> str:
-    response = _model.generate_content(
-        prompt,
-        generation_config={"temperature": 0.3},
-    )
-    if response.text is None:
-        finish = response.candidates[0].finish_reason if response.candidates else "UNKNOWN"
-        raise ValueError(f"Gemini 응답 없음 (finish_reason: {finish})")
-    return response.text
-
-
-def _parse_section(text: str, section_name: str) -> str:
-    pattern = rf"\[{section_name}\]\s*(.*?)(?=\[|\Z)"
-    match = re.search(pattern, text, re.DOTALL)
-    return match.group(1).strip() if match else ""
-
-
-def _parse_bullet_list(text: str, section_name: str) -> List[str]:
-    section = _parse_section(text, section_name)
-    items = re.findall(r"^-\s+(.+)", section, re.MULTILINE)
-    return [item.strip() for item in items if item.strip()]
+from agents.gemini_client import call_gemini, parse_bullet_list
 
 
 def _generate_topic_content(
@@ -111,7 +80,7 @@ def _generate_topic_content(
 """
 
     try:
-        text = _call_gemini(prompt)
+        text = call_gemini(prompt)
     except Exception as e:
         print(f"[newsletter_ai] '{topic}' 생성 오류: {e}")
         return {
@@ -122,9 +91,9 @@ def _generate_topic_content(
             "sources": sources,
         }
 
-    summary = _parse_bullet_list(text, "요약")
-    pros    = _parse_bullet_list(text, "장점")
-    cons    = _parse_bullet_list(text, "단점")
+    summary = parse_bullet_list(text, "요약")
+    pros    = parse_bullet_list(text, "장점")
+    cons    = parse_bullet_list(text, "단점")
 
     # 요약 정확히 3줄 보장
     while len(summary) < 3:

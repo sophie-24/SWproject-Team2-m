@@ -43,7 +43,7 @@ TechVisibility는 사용자가 오늘 관심 가진 주제를 정리해서, 광�
 - **Database:** PostgreSQL, SQLAlchemy (asyncpg)
 - **AI:** Google Gemini 2.5 Flash Lite (google-generativeai)
 - **크롬 익스텐션:** Manifest V3
-- **인증:** Google OAuth 2.0 + JWT
+- **인증:** Google OAuth 2.0 + PKCE + JWT
 - **스케줄러:** APScheduler
 - **기타 도구:** yt-dlp (자막 수집), YouTube Data API v3
 
@@ -54,7 +54,7 @@ TechVisibility는 사용자가 오늘 관심 가진 주제를 정리해서, 광�
 - **행동 수집** — 크롬 익스텐션이 유튜브 검색/시청 기록을 실시간 수집
 - **주제 클러스터링** — AI가 오늘 수집된 키워드를 의미 단위로 그룹핑
 - **영상 선정** — View Rate 기반으로 주제별 상위 5개 영상 선정
-- **자막 분석** — yt-dlp로 자막 수집 후 AI가 핵심 내용 추출
+- **자막 분석** — yt-dlp로 자막 수집 후 AI가 핵심 내용 추출 (5개 병렬 처리)
 - **광고 탐지** — AI가 협찬/광고 포함 영상 자동 감지 및 필터링
 - **뉴스레터 생성** — 주제별 요약 + 장단점 + 출처 링크 포함
 - **자동 발송** — 매일 저녁 9시 카카오톡 또는 이메일로 발송
@@ -62,76 +62,103 @@ TechVisibility는 사용자가 오늘 관심 가진 주제를 정리해서, 광�
 ---
 
 ## 서비스 플로우
+
+```
 1. 웹사이트 접속 → 구글 로그인
-→ 카톡/이메일 선택 → 개인정보 동의
-        ↓
+   → 카톡/이메일 선택 → 개인정보 동의
+         ↓
 2. 크롬 익스텐션 설치
-→ 유튜브에서 검색/시청 시 백엔드로 실시간 전송
-        ↓
+   → 유튜브에서 검색/시청 시 백엔드로 실시간 전송
+         ↓
 3. 백엔드가 수집 (같은 주제 2회 이상 검색/시청 시 트리거)
-        ↓
+         ↓
 4. 저녁 9시 배치 실행
-→ 멀티 에이전트 파이프라인 실행
-→ cluster_ai → selector_ai → analyzer_ai → newsletter_ai
-        ↓
-5. 카톡/이메일로 뉴스레터 발송
-→ 각 내용마다 출처 영상 링크 포함
+   → 멀티 에이전트 파이프라인 실행
+   → cluster_ai → selector_ai → analyzer_ai → newsletter_ai
+         ↓
+5. 뉴스레터 DB 저장 → 카톡/이메일로 발송
+   → 각 내용마다 출처 영상 링크 포함
+```
 
 ---
 
 ## 실행 방법
+
 ```bash
 git clone https://github.com/yijuuuun/SWproject-Team2.git
 cd SWproject-Team2
 ```
 
-#가상환경 설치
+### 가상환경 설치
+
 ```bash
 python -m venv venv
 .\venv\Scripts\activate
 
-pip install -r requirements.txt (백엔드)
-uvicorn main:app --reload --port 8000(서버 실행-> 백엔드)
+pip install -r requirements.txt
 ```
 
-# 의존성 설치
-```bash
-npm install
+### 환경변수 설정
+
+`Projects/src/backend/.env` 파일 생성:
+
+```
+GOOGLE_CLIENT_ID=발급받은_클라이언트_ID
+GOOGLE_CLIENT_SECRET=발급받은_클라이언트_시크릿
+REDIRECT_URI=http://localhost:8000/auth/callback
+YOUTUBE_API_KEY=발급받은_유튜브_API_키
+GEMINI_API_KEY=발급받은_Gemini_API_키
+JWT_SECRET=랜덤_문자열
+DATABASE_URL=postgresql+asyncpg://postgres:비밀번호@localhost:5432/techvisibility
+FRONTEND_URL=http://localhost:8000
+EMAIL_SENDER=your@gmail.com
+EMAIL_PASSWORD=구글_앱_비밀번호
+KAKAO_ACCESS_TOKEN=카카오_액세스_토큰
 ```
 
-# PostgreSQL DB 생성
+> JWT_SECRET 생성: `python -c "import secrets; print(secrets.token_hex(32))"`
+> `.env` 파일은 gitignore 처리 — 절대 커밋하지 말 것
+
+### PostgreSQL DB 생성
+
 ```bash
 psql -U postgres
 CREATE DATABASE techvisibility;
+\q
 ```
 
-# 서버 실행
+> 테이블은 서버 시작 시 자동 생성됨
+
+### 서버 실행
+
 ```bash
 cd Projects/src/backend
-uvicorn main:app --reload
+uvicorn main:app --reload --port 8000
 ```
 
-# 크롬 익스텐션 로드
-```bash
+서버 주소: `http://localhost:8000`
+API 문서: `http://localhost:8000/docs`
+
+> 프론트엔드도 `http://localhost:8000`에서 같이 서빙됨. Live Server 불필요.
+
+### 크롬 익스텐션 로드
+
+```
 chrome://extensions/ → 개발자 모드 ON
 → 압축해제된 확장 프로그램 로드
 → Projects/src/extension/ 폴더 선택
+→ 익스텐션 ID 확인 → extension/background.js의 EXTENSION_ID에 입력
 ```
 
-# API 문서
-```bash
-chrome://extensions/ → 개발자 모드 ON
-→ 압축해제된 확장 프로그램 로드
-→ Projects/src/extension/ 폴더 선택
-```
+---
 
 ## 폴더 구조
 
 ```
 SWproject-Team2/Projects/src/
 ├── backend/
-│   ├── main.py                   # FastAPI 서버
-│   ├── auth.py                   # Google OAuth + JWT
+│   ├── main.py                   # FastAPI 서버 (lifespan 패턴)
+│   ├── auth.py                   # Google OAuth + PKCE + JWT
 │   ├── database.py               # DB 연결 + 모델
 │   ├── scheduler.py              # 배치 스케줄러 (저녁 9시)
 │   ├── preprocessing.py          # 자막 전처리 (수정 금지)
@@ -144,6 +171,7 @@ SWproject-Team2/Projects/src/
 │   │   └── trigger.py            # 주제 트리거 판단
 │   │
 │   ├── agents/
+│   │   ├── gemini_client.py      # Gemini 공통 클라이언트 ★
 │   │   ├── cluster_ai.py         # [AI 1] 주제 클러스터링
 │   │   ├── selector_ai.py        # [AI 2] 영상 선정
 │   │   ├── analyzer_ai.py        # [AI 3] 자막 분석 + 광고 탐지
@@ -162,9 +190,9 @@ SWproject-Team2/Projects/src/
 │   └── popup.js
 │
 └── frontend/
-├── index.html
-├── onboarding.html
-└── dashboard.html
+    ├── index.html
+    ├── onboarding.html
+    └── dashboard.html
 ```
 
 ---

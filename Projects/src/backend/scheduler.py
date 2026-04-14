@@ -15,6 +15,7 @@
 """
 
 import os
+import json
 import asyncio
 from datetime import datetime, timezone
 from typing import List, Dict, Any
@@ -25,7 +26,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import select
 from dotenv import load_dotenv
 
-from database import AsyncSessionLocal, User, BehaviorLog
+from database import AsyncSessionLocal, User, BehaviorLog, Newsletter
 from collector.behavior_store import get_today_logs
 from collector.trigger import get_triggered_topics
 from agents.orchestrator import run_pipeline
@@ -52,6 +53,22 @@ async def _get_subscribed_channel_ids(user_id: str) -> List[str]:
           현재는 빈 리스트 반환
     """
     return []
+
+
+async def _save_newsletter(
+    db,
+    user: User,
+    newsletter: Dict[str, Any],
+) -> None:
+    """뉴스레터를 DB에 저장"""
+    record = Newsletter(
+        user_id=user.google_id,
+        subject=newsletter.get("subject", ""),
+        content_json=json.dumps(newsletter, ensure_ascii=False),
+        delivery_type=user.delivery_type,
+    )
+    db.add(record)
+    await db.commit()
 
 
 async def _deliver_newsletter(
@@ -101,17 +118,21 @@ async def daily_batch():
                 print(f"  [처리] {user.email} — 주제 {len(triggered_topics)}개: {triggered_topics}")
 
                 # 3. 구독 채널 조회
-                subscribed_channel_ids = await _get_subscribed_channel_ids(str(user.id))
+                subscribed_channel_ids = await _get_subscribed_channel_ids(str(user.google_id))
 
-                # 4. 파이프라인 실행
-                newsletter = run_pipeline(
-                    user_id=str(user.id),
+                # 4. 파이프라인 실행 (sync → 이벤트 루프 블로킹 방지)
+                newsletter = await asyncio.to_thread(
+                    run_pipeline,
+                    user_id=str(user.google_id),
                     raw_keywords=triggered_topics,
                     subscribed_channel_ids=subscribed_channel_ids,
                     delivery_type=user.delivery_type,
                 )
 
-                # 5. 뉴스레터 발송
+                # 5. 뉴스레터 DB 저장
+                await _save_newsletter(db, user, newsletter)
+
+                # 6. 뉴스레터 발송
                 await _deliver_newsletter(user, newsletter)
                 print(f"  [완료] {user.email} — 발송 성공")
 

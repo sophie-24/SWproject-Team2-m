@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,7 +28,17 @@ load_dotenv()
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "../frontend")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8000")
 
-app = FastAPI(title="TechVisibility Backend")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """서버 시작/종료 시 실행 (on_event 대체)"""
+    await init_db()
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+
+app = FastAPI(title="TechVisibility Backend", lifespan=lifespan)
 security = HTTPBearer()
 
 app.add_middleware(
@@ -40,8 +51,11 @@ app.add_middleware(
 # 정적 파일 서빙 (frontend/ 폴더)
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
-# 임시 세션 (Redis로 교체 예정)
-_temp_session: dict = {}
+# OAuth 진행 중인 요청별 PKCE 데이터 (state → code_verifier)
+# Redis 도입 전 임시 구현 — 단일 워커 환경에서만 안전
+_oauth_sessions: dict[str, str] = {}  # {state: code_verifier}
+_oauth_credentials: dict[str, dict] = {}  # {state: credentials}
+
 _transcript_cache: dict = {}
 
 
@@ -52,19 +66,6 @@ def get_current_user(token=Depends(security)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return user
-
-
-# ── 서버 시작/종료 ─────────────────────────────────────────────────────────────
-
-@app.on_event("startup")
-async def startup():
-    await init_db()
-    start_scheduler()
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    stop_scheduler()
 
 
 # ── 정적 파일 ─────────────────────────────────────────────────────────────────
@@ -94,10 +95,8 @@ def health():
 @app.get("/auth/login")
 def login():
     auth_url, state, code_verifier = create_auth_url()
-    _temp_session["state"]         = state
-    _temp_session["code_verifier"] = code_verifier
-    print(f"[login] state 저장: {state}")           
-    print(f"[login] code_verifier 저장: {code_verifier}")
+    _oauth_sessions[state] = code_verifier  # state별로 분리 저장
+    print(f"[login] state 저장: {state}")
     return RedirectResponse(auth_url)
 
 
@@ -108,16 +107,13 @@ async def callback(
     db : AsyncSession = Depends(get_db)
 ):
     print(f"[callback] state 수신: {state}")
-    print(f"[callback] 세션 state: {_temp_session.get('state')}")
-    print(f"[callback] code_verifier: {_temp_session.get('code_verifier')}")
 
-    if state != _temp_session.get("state"):
-        raise HTTPException(status_code=400, detail="Invalid state parameter")
-    code_verifier = _temp_session.get("code_verifier")
+    code_verifier = _oauth_sessions.pop(state, None)  # 사용 후 즉시 제거
     if not code_verifier:
-        raise HTTPException(status_code=400, detail="code_verifier 없음")
+        raise HTTPException(status_code=400, detail="Invalid state parameter")
+
     user_info = exchange_code_for_tokens(code, code_verifier)
-    _temp_session["credentials"] = user_info.get("credentials")
+    _oauth_credentials[state] = user_info.get("credentials")
     from database import User
     from sqlalchemy import select
 
@@ -202,22 +198,35 @@ async def subscribe(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    onboarding.html에서 수신 방법 저장
-    TODO: users 테이블 업데이트 구현
-    """
-    # TODO: DB users 테이블에 delivery_type, email, kakao_uuid 저장
-    print(f"[subscribe] {user['user_id']} → {data.delivery_type}")
+    """onboarding.html에서 수신 방법 저장 — users 테이블 업데이트"""
+    from database import User
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    db_user.delivery_type = data.delivery_type
+    if data.delivery_type == "kakao" and data.kakao_uuid:
+        db_user.kakao_uuid = data.kakao_uuid
+    if data.delivery_type == "email" and data.email:
+        db_user.email = data.email
+
+    await db.commit()
+    print(f"[subscribe] {user['user_id']} → {data.delivery_type} 저장 완료")
     return {"success": True}
 
 
 # ── YouTube ───────────────────────────────────────────────────────────────────
 
 @app.get("/subscriptions")
-def subscriptions():
-    creds_data = _temp_session.get("credentials")
+def subscriptions(user=Depends(get_current_user)):
+    # 가장 최근 OAuth credentials 탐색 (단일 워커 환경 한정)
+    creds_data = next(iter(_oauth_credentials.values()), None) if _oauth_credentials else None
     if not creds_data:
-        raise HTTPException(status_code=401, detail="로그인 필요")
+        raise HTTPException(status_code=401, detail="OAuth 재로그인 필요 (구독 목록 조회용)")
 
     creds = Credentials(
         token=creds_data["token"],
@@ -276,17 +285,41 @@ async def send_now(
     db: AsyncSession = Depends(get_db),
 ):
     """즉시 발송 테스트용"""
+    import asyncio
+    from database import User, Newsletter
+    import json
+
     today_logs = await get_today_logs(db, user_id=user["user_id"])
     triggered  = get_triggered_topics(today_logs)
 
     if not triggered:
         raise HTTPException(status_code=404, detail="트리거된 주제 없음 — 유튜브에서 검색해보세요")
 
-    newsletter = run_pipeline(
+    # 사용자 delivery_type 조회
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    delivery_type = db_user.delivery_type if db_user else "email"
+
+    # sync 함수 → 이벤트 루프 블로킹 방지
+    newsletter = await asyncio.to_thread(
+        run_pipeline,
         user_id=user["user_id"],
         raw_keywords=triggered,
-        delivery_type="email",
+        delivery_type=delivery_type,
     )
+
+    # DB 저장
+    record = Newsletter(
+        user_id=user["user_id"],
+        subject=newsletter.get("subject", ""),
+        content_json=json.dumps(newsletter, ensure_ascii=False),
+        delivery_type=delivery_type,
+    )
+    db.add(record)
+    await db.commit()
+
     return JSONResponse(newsletter)
 
 

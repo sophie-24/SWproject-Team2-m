@@ -1,5 +1,5 @@
 # backend/collector/behavior_store.py
-import datetime
+from datetime import datetime, timezone
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import BehaviorLog
@@ -34,7 +34,7 @@ async def save_behavior(
     await db.commit()
 
     # 오늘 같은 키워드 횟수 카운트
-    today_start = datetime.datetime.utcnow().replace(
+    today_start = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     result = await db.execute(
@@ -53,7 +53,7 @@ async def get_today_logs(db: AsyncSession, user_id: str) -> list[dict]:
     오늘 해당 유저의 행동 로그 전체 조회
     → trigger.py에서 사용
     """
-    today_start = datetime.datetime.utcnow().replace(
+    today_start = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     result = await db.execute(

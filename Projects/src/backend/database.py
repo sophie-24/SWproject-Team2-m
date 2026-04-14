@@ -1,11 +1,11 @@
 # backend/database.py
 import os
+import uuid
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy import Column, String, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
-import uuid
-import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -35,7 +35,7 @@ class User(Base):
     email         = Column(String(255), unique=True, nullable=False)
     kakao_uuid    = Column(String(255), nullable=True)
     delivery_type = Column(String(10), nullable=False, default="email")  # 'kakao' | 'email'
-    created_at    = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class BehaviorLog(Base):
@@ -46,7 +46,7 @@ class BehaviorLog(Base):
     event_type = Column(String(10), nullable=False)    # 'search' | 'watch'
     keyword    = Column(String(500), nullable=False)
     video_id   = Column(String(50), nullable=True)
-    logged_at  = Column(DateTime, default=datetime.datetime.utcnow)
+    logged_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Newsletter(Base):
@@ -56,7 +56,7 @@ class Newsletter(Base):
     user_id       = Column(String(255), nullable=False)
     subject       = Column(String(500), nullable=True)
     content_json  = Column(Text, nullable=False)       # newsletter_ai 출력값 JSON 문자열
-    delivered_at  = Column(DateTime, default=datetime.datetime.utcnow)
+    delivered_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     delivery_type = Column(String(10), nullable=True)  # 'kakao' | 'email'
 
 

@@ -7,9 +7,6 @@ from typing import List, Dict, Any
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from youtube_search import search_videos
 
 load_dotenv()

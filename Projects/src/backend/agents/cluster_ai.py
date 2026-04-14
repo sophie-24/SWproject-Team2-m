@@ -8,29 +8,11 @@
 - orchestrator.py의 Step 1에서 호출
 """
 
-import os
 import json
 import re
 from typing import List, Dict, Any
 
-import google.generativeai as genai
-from dotenv import load_dotenv
-
-load_dotenv()
-
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-_model = genai.GenerativeModel("gemini-2.5-flash-lite")
-
-
-def _call_gemini(prompt: str) -> str:
-    response = _model.generate_content(
-        prompt,
-        generation_config={"temperature": 0.2},
-    )
-    if response.text is None:
-        finish = response.candidates[0].finish_reason if response.candidates else "UNKNOWN"
-        raise ValueError(f"Gemini 응답 없음 (finish_reason: {finish})")
-    return response.text
+from agents.gemini_client import call_gemini
 
 
 def cluster_topics(raw_keywords: List[str]) -> List[Dict[str, Any]]:
@@ -86,7 +68,7 @@ def cluster_topics(raw_keywords: List[str]) -> List[Dict[str, Any]]:
 """
 
     try:
-        text = _call_gemini(prompt)
+        text = call_gemini(prompt, temperature=0.2)
         clusters = _parse_clusters(text)
     except Exception as e:
         print(f"[cluster_ai] Gemini 오류 — 폴백 실행: {e}")
