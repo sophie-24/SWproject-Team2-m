@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 cookies.txt
 Pods/
+venv/
 
 ###python###
 __pycache__/
