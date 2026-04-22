@@ -11,10 +11,10 @@ Tubify는 사용자가 오늘 관심 가진 주제를 AI가 분석해 광고를 
 
 | 이름 | 전공 | 역할 | GitHub |
 |------|------|------|--------|
-| 김규리 | 컴퓨터공학 | 백엔드 / AI 파이프라인 | [@id](https://github.com/id) |
-| 김이준 | 컴퓨터공학 | 백엔드 / DB | [@id](https://github.com/id) |
-| 조민선 | 경영정보학 | 프론트엔드 | [@id](https://github.com/id) |
-| 최유민 | 데이터사이언스 | 크롬 익스텐션 | [@id](https://github.com/id) |
+| 김규리 | 컴퓨터공학 | 백엔드 팀장 | [@id](https://github.com/id) |
+| 김이준 | 컴퓨터공학 | 프론트엔드 팀장 & 백엔드 보조 | [@id](https://github.com/id) |
+| 조민선 | 경영정보학 | 기획 & 팀장 | [@id](https://github.com/id) |
+| 최유민 | 데이터사이언스 | 기획 & UI/UX 디자인 | [@id](https://github.com/id) |
 
 ---
 
