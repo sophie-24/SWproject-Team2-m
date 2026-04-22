@@ -1,28 +1,15 @@
-# backend/agents/gemini_client.py
-"""
-Gemini API 공통 클라이언트
-
-- _call_gemini   : Gemini 호출 + 응답 검증
-- _parse_section : [섹션명] 블록 텍스트 추출
-- _parse_bullet_list : "- " 항목 리스트 추출
-
-사용 규칙 (CLAUDE.md):
-  - google.generativeai 패키지만 사용 (google.genai 금지)
-  - model=, contents= 인자 사용 금지
-  - 무료 티어 하루 20회 제한 → 호출 최소화
-"""
-
 import os
 import re
 from typing import List
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-_model = genai.GenerativeModel("gemini-2.5-flash-lite")
+_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+_MODEL  = "gemini-2.5-flash-lite"
 
 
 def call_gemini(prompt: str, temperature: float = 0.3) -> str:
@@ -39,11 +26,12 @@ def call_gemini(prompt: str, temperature: float = 0.3) -> str:
     Raises:
         ValueError: 응답이 비어 있거나 안전 필터에 걸린 경우
     """
-    response = _model.generate_content(
-        prompt,
-        generation_config={"temperature": temperature},
+    response = _client.models.generate_content(
+        model=_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=temperature),
     )
-    if response.text is None:
+    if not response.text:
         finish = response.candidates[0].finish_reason if response.candidates else "UNKNOWN"
         raise ValueError(f"Gemini 응답 없음 (finish_reason: {finish})")
     return response.text
