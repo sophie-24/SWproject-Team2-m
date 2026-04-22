@@ -1,4 +1,3 @@
-# backend/collector/trigger.py
 from collections import Counter
 
 
