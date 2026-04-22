@@ -1,122 +1,91 @@
-# TechVisibility
+# Tubify
 
-> 유튜브 알고리즘 대신, 오늘 내가 관심 가진 주제를 AI가 분석해 뉴스레터로 보내주는 서비스
+> 멀티에이전트 기반 실시간 유튜브 정보 분석 및 메일링 서비스
 
----
-
-## 목차
-- [소개](#소개)
-- [팀원](#팀원)
-- [기술 스택](#기술-스택)
-- [주요 기능](#주요-기능)
-- [서비스 플로우](#서비스-플로우)
-- [실행 방법](#실행-방법)
-- [폴더 구조](#폴더-구조)
-- [브랜치 전략](#브랜치-전략)
-- [커밋 컨벤션](#커밋-컨벤션)
-
----
-
-## 소개
-
-유튜브 알고리즘은 내가 보고 싶은 걸 주는 게 아니라 계속 보게 만듭니다.
-TechVisibility는 사용자가 오늘 관심 가진 주제를 정리해서, 광고를 걸러내고,
-핵심만 뉴스레터(카톡/이메일)로 보내줍니다.
-
-**프로젝트 기간:** `2025.XX.XX - 2025.XX.XX`
+유튜브 알고리즘은 내가 보고 싶은 걸 주는 게 아니라 계속 보게 만든다.
+Tubify는 사용자가 오늘 관심 가진 주제를 AI가 분석해 광고를 걸러내고, 핵심만 뉴스레터로 보내준다.
 
 ---
 
 ## 팀원
 
-| 이름 | 역할 | GitHub |
-|------|------|--------|
-| 이름1 | 역할 | [@id](https://github.com/id) |
-| 이름2 | 역할 | [@id](https://github.com/id) |
+| 이름 | 전공 | 역할 | GitHub |
+|------|------|------|--------|
+| 김규리 | 컴퓨터공학 | 백엔드 / AI 파이프라인 | [@id](https://github.com/id) |
+| 김이준 | 컴퓨터공학 | 백엔드 / DB | [@id](https://github.com/id) |
+| 조민선 | 경영정보학 | 프론트엔드 | [@id](https://github.com/id) |
+| 최유민 | 데이터사이언스 | 크롬 익스텐션 | [@id](https://github.com/id) |
 
 ---
 
 ## 기술 스택
 
-- **Frontend:** HTML, CSS, JavaScript
-- **Backend:** FastAPI, Python
-- **Database:** PostgreSQL, SQLAlchemy (asyncpg)
-- **AI:** Google Gemini 2.5 Flash Lite (google-generativeai)
-- **크롬 익스텐션:** Manifest V3
-- **인증:** Google OAuth 2.0 + PKCE + JWT
-- **스케줄러:** APScheduler
-- **기타 도구:** yt-dlp (자막 수집), YouTube Data API v3
+| 영역 | 기술 |
+|------|------|
+| Backend | FastAPI, Python, APScheduler |
+| Database | PostgreSQL (asyncpg/SQLAlchemy), Redis |
+| AI | Google Gemini 2.5 Flash Lite (`google.genai`) |
+| 인증 | Google OAuth 2.0 + PKCE + JWT |
+| 크롬 익스텐션 | Manifest V3 |
+| 이메일 발송 | Resend API |
+| 자막 수집 | yt-dlp, youtube-transcript-api |
 
 ---
 
-## 주요 기능
+## 서비스 구조
 
-- **행동 수집** — 크롬 익스텐션이 유튜브 검색/시청 기록을 실시간 수집
-- **주제 클러스터링** — AI가 오늘 수집된 키워드를 의미 단위로 그룹핑
-- **영상 선정** — View Rate 기반으로 주제별 상위 5개 영상 선정
-- **자막 분석** — yt-dlp로 자막 수집 후 AI가 핵심 내용 추출 (5개 병렬 처리)
-- **광고 탐지** — AI가 협찬/광고 포함 영상 자동 감지 및 필터링
-- **뉴스레터 생성** — 주제별 요약 + 장단점 + 출처 링크 포함
-- **자동 발송** — 매일 저녁 9시 카카오톡 또는 이메일로 발송
-
----
-
-## 서비스 플로우
+두 개의 독립 파이프라인으로 구성된다.
 
 ```
-1. 웹사이트 접속 → 구글 로그인
-   → 카톡/이메일 선택 → 개인정보 동의
-         ↓
-2. 크롬 익스텐션 설치
-   → 유튜브에서 검색/시청 시 백엔드로 실시간 전송
-         ↓
-3. 백엔드가 수집 (같은 주제 2회 이상 검색/시청 시 트리거)
-         ↓
-4. 저녁 9시 배치 실행
-   → 멀티 에이전트 파이프라인 실행
-   → cluster_ai → selector_ai → analyzer_ai → newsletter_ai
-         ↓
-5. 뉴스레터 DB 저장 → 카톡/이메일로 발송
-   → 각 내용마다 출처 영상 링크 포함
+Pipeline A — 라이브 서치 (실시간)
+유튜브 검색 → 익스텐션 팝업/버튼 → /analyze_search → selector_ai + analyzer_ai → Side Panel 렌더링
+
+Pipeline B — 뉴스레터 (배치)
+익스텐션 행동 수집 → behavior_logs → 사용자 설정 시간 배치
+→ cluster_ai → selector_ai → analyzer_ai → newsletter_ai → Resend 이메일 발송
 ```
 
 ---
 
 ## 실행 방법
 
+### 1. 저장소 클론
+
 ```bash
 git clone https://github.com/yijuuuun/SWproject-Team2.git
 cd SWproject-Team2
 ```
 
-### 가상환경 설치
+### 2. 가상환경 설정
 
 ```bash
 python -m venv venv
 .\venv\Scripts\activate
-
 pip install -r requirements.txt
 ```
 
-### 환경변수 설정
+### 3. 환경변수 설정
 
-```
-GOOGLE_CLIENT_ID=발급받은_클라이언트_ID
-GOOGLE_CLIENT_SECRET=발급받은_클라이언트_시크릿
+`Projects/src/backend/.env` 파일 생성 (팀 톡방에서 값 받기):
+
+```env
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 REDIRECT_URI=http://localhost:8000/auth/callback
-YOUTUBE_API_KEY=발급받은_유튜브_API_키
-GEMINI_API_KEY=발급받은_Gemini_API_키
-JWT_SECRET=랜덤_문자열
+YOUTUBE_API_KEY=
+GEMINI_API_KEY=
+JWT_SECRET=
 DATABASE_URL=postgresql+asyncpg://postgres:비밀번호@localhost:5432/techvisibility
 FRONTEND_URL=http://localhost:8000
-EMAIL_SENDER=your@gmail.com
-EMAIL_PASSWORD=구글_앱_비밀번호
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=curator@tubify.com
+ADMIN_SECRET=
 ```
 
 > JWT_SECRET 생성: `python -c "import secrets; print(secrets.token_hex(32))"`
-> `.env` 파일은 gitignore 처리 — 절대 커밋하지 말 것
+> `.env`는 절대 커밋하지 말 것 (gitignore 처리됨)
 
-### PostgreSQL DB 생성
+### 4. DB 생성
 
 ```bash
 psql -U postgres
@@ -125,27 +94,37 @@ CREATE DATABASE techvisibility;
 ```
 
 > 테이블은 서버 시작 시 자동 생성됨
+> 단, 기존 테이블에 컬럼 추가 시 아래 SQL을 pgAdmin에서 직접 실행:
 
-### 서버 실행
+```sql
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS initial_intent      VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS interest_categories TEXT,
+  ADD COLUMN IF NOT EXISTS send_time           VARCHAR(5) DEFAULT '21:00';
+```
+
+### 5. 서버 실행
 
 ```bash
 cd Projects/src/backend
 uvicorn main:app --reload --port 8000
 ```
 
-서버 주소: `http://localhost:8000`
-API 문서: `http://localhost:8000/docs`
+- 서버: `http://localhost:8000`
+- API 문서: `http://localhost:8000/docs`
 
-> 프론트엔드도 `http://localhost:8000`에서 같이 서빙됨. Live Server 불필요.
+> 프론트엔드도 동일 주소에서 서빙됨. Live Server 불필요.
 
-### 크롬 익스텐션 로드
+### 6. 크롬 익스텐션 로드
 
-```
-chrome://extensions/ → 개발자 모드 ON
-→ 압축해제된 확장 프로그램 로드
-→ Projects/src/extension/ 폴더 선택
-→ 익스텐션 ID 확인 → extension/background.js의 EXTENSION_ID에 입력
-```
+1. `chrome://extensions` 접속
+2. 개발자 모드 ON
+3. 압축 해제된 확장 프로그램 로드 → `Projects/src/extension` 선택
+4. 익스텐션 ID 확인 → `extension/background.js`의 `EXTENSION_ID`에 입력
+
+### 7. cookies.txt 설정
+
+자막 수집을 위해 `backend/` 폴더에 `cookies.txt` 파일 필요 → 팀 톡방에서 받기 (깃에 올리면 안 됨)
 
 ---
 
@@ -154,41 +133,40 @@ chrome://extensions/ → 개발자 모드 ON
 ```
 SWproject-Team2/Projects/src/
 ├── backend/
-│   ├── main.py                   # FastAPI 서버 (lifespan 패턴)
+│   ├── main.py                   # FastAPI 서버
 │   ├── auth.py                   # Google OAuth + PKCE + JWT
 │   ├── database.py               # DB 연결 + 모델
-│   ├── scheduler.py              # 배치 스케줄러 (저녁 9시)
-│   ├── preprocessing.py          # 자막 전처리 (수정 금지)
+│   ├── scheduler.py              # 배치 스케줄러
+│   ├── preprocessing.py          # 자막 전처리 (수정 금지 ⚠️)
 │   ├── transcript_service.py     # 자막 수집 (yt-dlp)
 │   ├── youtube_search.py         # 유튜브 검색
 │   ├── youtube_service.py        # 구독 채널 목록
-│   │
 │   ├── collector/
 │   │   ├── behavior_store.py     # 행동 로그 저장
 │   │   └── trigger.py            # 주제 트리거 판단
-│   │
 │   ├── agents/
 │   │   ├── gemini_client.py      # Gemini 공통 클라이언트 ★
+│   │   ├── intent_ai.py          # 검색 의도 분류
+│   │   ├── format_ai.py          # 뉴스레터 포맷 결정
 │   │   ├── cluster_ai.py         # [AI 1] 주제 클러스터링
 │   │   ├── selector_ai.py        # [AI 2] 영상 선정
 │   │   ├── analyzer_ai.py        # [AI 3] 자막 분석 + 광고 탐지
 │   │   ├── newsletter_ai.py      # [AI 4] 뉴스레터 생성
 │   │   └── orchestrator.py       # 파이프라인 총괄
-│   │
 │   └── delivery/
-│       └── email.py              # 이메일 발송
-│
+│       └── email.py              # 이메일 발송 (Resend)
 ├── extension/
 │   ├── manifest.json
 │   ├── background.js
 │   ├── content.js
-│   ├── popup.html
-│   └── popup.js
-│
+│   ├── popup.html / popup.js
+│   └── side_panel.html
 └── frontend/
     ├── index.html
     ├── onboarding.html
-    └── dashboard.html
+    ├── dashboard.html
+    ├── search_dashboard.html
+    └── admin.html
 ```
 
 ---
@@ -200,15 +178,12 @@ SWproject-Team2/Projects/src/
 - `feature/*`: 기능 개발
 - `bugfix/*`: 버그 수정
 
----
-
 ## 커밋 컨벤션
 
 ```
-feat: 새로운 기능 추가
-fix: 버그 수정
+feat:     새로운 기능 추가
+fix:      버그 수정
 refactor: 코드 리팩토링
-style: 스타일 변경
-docs: 문서 수정
-chore: 빌드/설정 변경
+docs:     문서 수정
+chore:    빌드/설정 변경
 ```
