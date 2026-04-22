@@ -1,8 +1,3 @@
-# 추가한 내용
-# 1. OAuth 콜백 처리 → access_token 교환
-# 2. JWT 발급 (우리 서버용 세션 토큰)
-# 3. JWT 검증 함수
-
 import os
 import jwt
 import datetime

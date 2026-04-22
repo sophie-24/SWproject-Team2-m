@@ -21,9 +21,9 @@ GEMINI_API_KEY=발급받은_Gemini_API_키
 JWT_SECRET=랜덤_문자열
 DATABASE_URL=postgresql+asyncpg://postgres:비밀번호@localhost:5432/techvisibility
 FRONTEND_URL=http://localhost:8000
-EMAIL_SENDER=your@gmail.com
-EMAIL_PASSWORD=구글_앱_비밀번호
-KAKAO_ACCESS_TOKEN=카카오_액세스_토큰
+RESEND_API_KEY=re_xxxxxxxx                    # Resend 대시보드에서 발급
+RESEND_FROM_EMAIL=curator@tubify.com          # 발신자 주소 (기본값)
+ADMIN_SECRET=관리자_시크릿_문자열
 ```
 
 > JWT_SECRET 생성: `python -c "import secrets; print(secrets.token_hex(32))"`
@@ -62,28 +62,60 @@ API 문서: `http://localhost:8000/docs`
 
 ## AI 파이프라인
 
-사용자의 오늘 행동 로그를 기반으로 저녁 9시에 자동 실행됩니다.
+두 가지 독립 파이프라인이 존재한다. orchestrator는 **Pipeline B(뉴스레터)에서만** 사용한다.
+
+### Pipeline A — 라이브 서치 (실시간 즉석 분석, 메인)
+
+```
+[팝업 / 플로팅 버튼 클릭]
+↓
+background.js → chrome.sidePanel.open()
+↓
+side_panel.html (Chrome Side Panel)
+↓
+GET /analyze_search?keyword=xxx  (JWT 필요)
+↓
+selector_ai   영상 후보 선정 (상위 5개, ViewRate×개인화 공식)
+↓
+analyzer_ai   자막 분석 + 광고 탐지 + 교차 분석
+↓
+_search_analysis_cache 저장 (동일 키워드 재호출 시 Gemini 생략)
+↓
+side_panel.html 렌더링 (영상 카드, 공통사실, 쟁점)
+```
+
+**Gemini 호출 수: 최대 6회** / orchestrator · cluster_ai · intent_ai · newsletter_ai 사용 안 함
+
+### Pipeline B — 뉴스레터 (배치 발송, 서브)
 
 ```
 [수집] 익스텐션 → /collect → behavior_logs DB 저장
 ↓
-[트리거] 같은 주제 2회 이상 → trigger.py 판단
+[합산] 오늘 로그(triggered_topics) + 온보딩 프로필(interest_categories) → merged_topics
 ↓
-[AI 1] cluster_ai.py     키워드 의미 단위로 클러스터링
+[스케줄] 08:00 또는 21:00 KST (users.send_time 기준)
+[orchestrator.run_pipeline()]
 ↓
-[AI 2] selector_ai.py    주제별 영상 후보 선정 (View Rate 기반 상위 5개)
-↓
-[AI 3] analyzer_ai.py    자막 분석 + 광고 탐지 + 공통 사실/쟁점 추출 (5개 병렬)
-↓
-[AI 4] newsletter_ai.py  뉴스레터 생성 (요약 + 장단점 + 출처)
-↓
-[저장] newsletters 테이블 DB 저장
-↓
-[발송] 카카오 친구톡 / 이메일
+Step 0  intent_ai     검색 의도 분류 (유희형 / 지식형 / 구매형)
+          ↓
+        format_ai     의도 타입 → 뉴스레터 스타일 결정 (Gemini 호출 없음)
+          ↓
+Step 1  cluster_ai    키워드 의미 단위 클러스터링
+          ↓
+Step 2  selector_ai   주제별 영상 후보 선정 (ViewRate×개인화 기반 상위 5개)
+          ↓
+Step 3  analyzer_ai   자막 분석 + 광고 탐지 + 교차 분석
+          ↓
+Step 4  newsletter_ai 의도 맞춤 뉴스레터 생성
+          ↓
+[DB 저장] newsletters 테이블
+          ↓
+[발송] Resend API (curator@tubify.com)
 ```
 
-**Gemini API 호출 수 (주제 1개 기준): 최대 7회**
-> 무료 티어 하루 20회 제한 → 테스트 최소화
+**Gemini 호출 수 (주제 1개 기준): 최대 9회**
+
+> 무료 티어 하루 20회 제한 → 뉴스레터 1주제 + 검색 분석 1회면 15회 소모
 
 ---
 
@@ -109,6 +141,7 @@ API 문서: `http://localhost:8000/docs`
 |--------|------|------|
 | POST | `/collect` | 검색/시청 이벤트 수집 (JWT 필요) |
 | GET | `/collect/today` | 오늘 수집된 로그 + 트리거 주제 확인 (JWT 필요) |
+| GET | `/my/logs?limit=50` | **내 행동 로그 투명성** — triggered+profile+merged 전체 반환 (JWT 필요) |
 
 **`/collect` 요청 예시**
 ```json
@@ -119,28 +152,20 @@ API 문서: `http://localhost:8000/docs`
 }
 ```
 
+### 즉석 검색 분석 Pipeline A ★
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/analyze_search?keyword=xxx` | selector_ai + analyzer_ai 즉시 실행 (JWT 필요) |
+
+> keyword 기준 인메모리 캐시(`_search_analysis_cache`) — 동일 키워드 재호출 시 Gemini 생략
+
 ### 구독 설정
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
 | POST | `/subscribe` | 수신 방법 설정 (users 테이블 실제 저장, JWT 필요) |
-| GET | `/subscriptions` | 유튜브 구독 채널 목록 (JWT 필요, OAuth 세션 유지 시) |
-
-**`/subscribe` 요청 예시 (이메일)**
-```json
-{
-  "delivery_type": "email",
-  "email": "user@example.com"
-}
-```
-
-**`/subscribe` 요청 예시 (카카오)**
-```json
-{
-  "delivery_type": "kakao",
-  "kakao_uuid": "카카오_uuid_값"
-}
-```
+| GET | `/subscriptions` | 유튜브 구독 채널 목록 (JWT 필요) |
 
 ### 뉴스레터
 
@@ -153,10 +178,20 @@ API 문서: `http://localhost:8000/docs`
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET | `/search?keyword=파이썬` | 키워드로 영상 검색 |
+| GET | `/search?keyword=파이썬` | 키워드로 영상 검색 (YouTube API, Gemini 없음) |
 | GET | `/transcript/{video_id}` | 영상 자막 + timestamp |
 | GET | `/transcript/available/{video_id}` | 사용 가능한 자막 언어 목록 |
 | GET | `/preprocess/{video_id}` | 자막 수집 → 정제 → 청크 분할 |
+
+### 페이지
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/` | index.html |
+| GET | `/onboarding.html` | 온보딩 페이지 |
+| GET | `/dashboard.html` | 뉴스레터 히스토리 대시보드 |
+| GET | `/search_dashboard.html` | 즉석 검색 분석 대시보드 ★ NEW |
+| GET | `/admin.html` | 관리자 대시보드 |
 
 ### 관리자 (ADMIN_SECRET 필요)
 
@@ -164,7 +199,7 @@ API 문서: `http://localhost:8000/docs`
 |--------|------|------|
 | GET | `/admin/users` | 전체 유저 목록 |
 | GET | `/admin/logs` | 오늘 전체 행동 로그 |
-| POST | `/admin/pipeline/run` | 특정 유저 파이프라인 즉시 실행 |
+| POST | `/admin/pipeline/run?user_id=xxx` | 특정 유저 파이프라인 즉시 실행 |
 
 ---
 
@@ -172,7 +207,7 @@ API 문서: `http://localhost:8000/docs`
 
 | 테이블 | 설명 |
 |--------|------|
-| `users` | 유저 정보 (google_id, email, delivery_type, kakao_uuid) |
+| `users` | 유저 정보 (google_id, email, delivery_type) |
 | `behavior_logs` | 익스텐션 수집 로그 (user_id = google_id) |
 | `newsletters` | 발송된 뉴스레터 히스토리 (user_id = google_id) |
 
@@ -190,31 +225,49 @@ SELECT * FROM newsletters ORDER BY delivered_at DESC LIMIT 10;
 ## 파일 구조
 
 ```
-backend/
-├── main.py                   # FastAPI 서버, lifespan 패턴으로 시작/종료 관리
-├── auth.py                   # Google OAuth + PKCE + JWT 발급/검증
-├── database.py               # DB 연결 + 테이블 모델 (datetime.now(timezone.utc) 사용)
-├── scheduler.py              # 배치 스케줄러 (매일 21:00 KST, asyncio.to_thread 사용)
-├── preprocessing.py          # 자막 전처리 (수정 금지)
-├── transcript_service.py     # 자막 수집 (yt-dlp)
-├── youtube_search.py         # 키워드 영상 검색
-├── youtube_service.py        # 구독 채널 목록
+Projects/src/
 │
-├── collector/
-│   ├── behavior_store.py     # 행동 로그 저장 + 조회
-│   └── trigger.py            # 2회 이상 주제 트리거 판단
+├── backend/
+│   ├── main.py                   # FastAPI 서버, lifespan 패턴
+│   ├── auth.py                   # Google OAuth + PKCE + JWT
+│   ├── database.py               # DB 연결 + 테이블 모델
+│   ├── scheduler.py              # 배치 스케줄러 (매일 21:00 KST)
+│   ├── preprocessing.py          # 자막 전처리 (수정 금지)
+│   ├── transcript_service.py     # 자막 수집 (yt-dlp)
+│   ├── youtube_search.py         # 키워드 영상 검색
+│   ├── youtube_service.py        # 구독 채널 목록
+│   │
+│   ├── collector/
+│   │   ├── behavior_store.py     # 행동 로그 저장 + 조회
+│   │   └── trigger.py            # 2회 이상 주제 트리거 판단
+│   │
+│   ├── agents/
+│   │   ├── gemini_client.py      # ★ Gemini 공통 클라이언트
+│   │   ├── intent_ai.py          # 검색 의도 분류 (Pipeline A)
+│   │   ├── format_ai.py          # 뉴스레터 포맷 결정 (Pipeline A)
+│   │   ├── cluster_ai.py         # [AI 1] 주제 클러스터링 (Pipeline A)
+│   │   ├── selector_ai.py        # [AI 2] 영상 선정 (Pipeline A + B 공유)
+│   │   ├── analyzer_ai.py        # [AI 3] 자막 분석 (Pipeline A + B 공유)
+│   │   ├── newsletter_ai.py      # [AI 4] 뉴스레터 생성 (Pipeline A)
+│   │   └── orchestrator.py       # Pipeline A 총괄
+│   │
+│   └── delivery/
+│       └── email.py              # 이메일 발송 (Resend API)
 │
-├── agents/
-│   ├── gemini_client.py      # ★ Gemini 공통 클라이언트 (call_gemini, parse_section, parse_bullet_list)
-│   ├── cluster_ai.py         # [AI 1] 주제 클러스터링
-│   ├── selector_ai.py        # [AI 2] View Rate 기반 영상 선정
-│   ├── analyzer_ai.py        # [AI 3] 자막 분석 + 광고 탐지 (ThreadPoolExecutor 병렬)
-│   ├── newsletter_ai.py      # [AI 4] 뉴스레터 생성
-│   └── orchestrator.py       # 4개 AI 파이프라인 총괄
+├── frontend/
+│   ├── index.html                # 랜딩 페이지
+│   ├── onboarding.html           # 온보딩 (수신 방법 설정)
+│   ├── dashboard.html            # 뉴스레터 히스토리
+│   ├── search_dashboard.html     # ★ 즉석 검색 분석 결과 페이지
+│   └── admin.html                # 관리자 대시보드
 │
-└── delivery/
-    ├── kakao.py              # 카카오 친구톡 발송
-    └── email.py              # 이메일 발송 (Gmail SMTP)
+└── extension/
+    ├── manifest.json             # Manifest V3 (permissions: storage, activeTab, tabs, sidePanel)
+    ├── background.js             # JWT 수신 + storage / sidePanel.open 중개
+    ├── content.js                # 유튜브 플로팅 버튼 + /collect 행동 로그
+    ├── popup.html                # 익스텐션 팝업 UI
+    ├── popup.js                  # 검색 요약 + 사이드 패널 이동
+    └── side_panel.html           # ★ Chrome Side Panel — Pipeline A 결과
 ```
 
 ---
@@ -222,8 +275,8 @@ backend/
 ## 주의사항
 
 - 자막 수집을 위해 `cookies.txt` 파일이 `backend/` 폴더 안에 있어야 함 → 톡으로 직접 받은 거 넣기! (깃에 올리면 안 됨)
-- 서버 재시작하면 OAuth credentials 초기화됨 → `/subscriptions` 사용 시 재로그인 필요
-- Gemini 무료 티어 하루 20회 제한 → 테스트 최소화 (주제 1개당 최대 7회 소모)
+- 서버 재시작하면 OAuth credentials, `_search_analysis_cache` 초기화됨 → 재로그인 필요
+- Gemini 무료 티어 하루 20회 제한 → 뉴스레터 1주제(9회) + 검색 분석(6회) = 15회
 - `google.genai` 패키지 사용 금지 → `agents/gemini_client.py`의 `call_gemini()` 사용
 - 새 AI 모듈 추가 시 `gemini_client.py` import 필수 — 모듈별 직접 genai 초기화 금지
 - ChromaDB, RAG 방식 사용 금지

@@ -100,8 +100,6 @@ pip install -r requirements.txt
 
 ### 환경변수 설정
 
-`Projects/src/backend/.env` 파일 생성:
-
 ```
 GOOGLE_CLIENT_ID=발급받은_클라이언트_ID
 GOOGLE_CLIENT_SECRET=발급받은_클라이언트_시크릿
@@ -113,7 +111,6 @@ DATABASE_URL=postgresql+asyncpg://postgres:비밀번호@localhost:5432/techvisib
 FRONTEND_URL=http://localhost:8000
 EMAIL_SENDER=your@gmail.com
 EMAIL_PASSWORD=구글_앱_비밀번호
-KAKAO_ACCESS_TOKEN=카카오_액세스_토큰
 ```
 
 > JWT_SECRET 생성: `python -c "import secrets; print(secrets.token_hex(32))"`
@@ -179,7 +176,6 @@ SWproject-Team2/Projects/src/
 │   │   └── orchestrator.py       # 파이프라인 총괄
 │   │
 │   └── delivery/
-│       ├── kakao.py              # 카카오 친구톡 발송
 │       └── email.py              # 이메일 발송
 │
 ├── extension/

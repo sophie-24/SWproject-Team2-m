@@ -2,20 +2,19 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TechVisibility</title>
     <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
       body {
-        width: 320px;
-        font-family: "Segoe UI", sans-serif;
+        width: 340px;
+        font-family: "Segoe UI", system-ui, sans-serif;
         background: #0f0f0f;
         color: #f1f1f1;
         font-size: 14px;
       }
 
-      /* ── 헤더 ── */
+      /* 헤더 */
       .header {
         display: flex;
         align-items: center;
@@ -24,70 +23,117 @@
         background: #1a1a1a;
         border-bottom: 1px solid #2a2a2a;
       }
-      .header .logo {
-        font-size: 1rem;
-        font-weight: 700;
-        color: #ff4444;
-      }
-      .header .sub {
-        font-size: 0.75rem;
-        color: #888;
-        margin-left: auto;
-      }
+      .logo { font-size: 1rem; font-weight: 700; color: #ff4444; }
+      .sub  { font-size: 0.75rem; color: #666; margin-left: auto; }
 
-      /* ── 상태 배지 ── */
+      /* 서버 상태 */
       .status-row {
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 12px 16px;
+        padding: 10px 16px;
         border-bottom: 1px solid #1e1e1e;
       }
-      .dot {
-        width: 8px; height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-      }
+      .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
       .dot.on  { background: #44cc44; }
-      .dot.off { background: #888; }
-      .status-text { font-size: 0.82rem; color: #ccc; }
+      .dot.off { background: #666; }
+      .status-text { font-size: 0.78rem; color: #888; }
 
-      /* ── 섹션 ── */
+      /* 섹션 공통 */
       .section {
         padding: 12px 16px;
         border-bottom: 1px solid #1e1e1e;
       }
       .section-title {
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         font-weight: 700;
-        color: #666;
+        color: #555;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         margin-bottom: 8px;
       }
 
-      /* ── 버튼 ── */
-      .btn {
-        display: block;
+      /* 검색어 배지 */
+      .keyword-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #1e1e1e;
+        border: 1px solid #333;
+        border-radius: 20px;
+        padding: 4px 12px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #f1f1f1;
+        margin-bottom: 10px;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .keyword-chip span { color: #ff4444; }
+
+      /* 영상 미리보기 */
+      .video-preview {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+      .video-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 0;
+        border-bottom: 1px solid #1a1a1a;
+      }
+      .video-row:last-child { border-bottom: none; }
+      .video-num { font-size: 0.75rem; font-weight: 700; color: #ff4444; min-width: 14px; }
+      .video-name {
+        font-size: 0.78rem;
+        color: #ccc;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+      }
+      .ad-dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: #cc4444;
+        flex-shrink: 0;
+        title: "광고 포함";
+      }
+
+      /* 대시보드 이동 버튼 */
+      .btn-dashboard {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         width: 100%;
-        padding: 10px 0;
+        padding: 10px 14px;
+        background: #ff4444;
+        color: #fff;
         border: none;
         border-radius: 8px;
         font-size: 0.88rem;
-        font-weight: 600;
+        font-weight: 700;
         cursor: pointer;
-        text-align: center;
-        text-decoration: none;
+        text-align: left;
       }
-      .btn-primary   { background: #ff4444; color: #fff; }
-      .btn-primary:hover { background: #cc2222; }
-      .btn-secondary {
-        background: transparent;
-        color: #aaa;
-        border: 1px solid #333;
-      }
-      .btn-secondary:hover { border-color: #666; color: #f1f1f1; }
+      .btn-dashboard:hover { background: #cc2222; }
+      .btn-dashboard .arrow { font-size: 1rem; }
 
+      /* 비유튜브 안내 */
+      .not-youtube {
+        font-size: 0.8rem;
+        color: #555;
+        line-height: 1.5;
+        text-align: center;
+        padding: 8px 0;
+      }
+
+      /* 로그인 */
       .btn-google {
         display: flex;
         align-items: center;
@@ -96,62 +142,82 @@
         background: #fff;
         color: #333;
         border-radius: 8px;
-        padding: 10px 0;
-        font-size: 0.88rem;
+        padding: 9px 0;
+        font-size: 0.85rem;
         font-weight: 600;
         cursor: pointer;
         border: none;
         width: 100%;
       }
       .btn-google:hover { background: #f0f0f0; }
-      .btn-google img  { width: 18px; }
+      .btn-google img { width: 16px; }
 
-      /* ── 구독 채널 목록 ── */
+      /* 구독 채널 */
       #channel-list {
-        max-height: 140px;
+        max-height: 120px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 3px;
       }
       .channel-item {
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         color: #bbb;
-        padding: 4px 0;
+        padding: 3px 0;
         border-bottom: 1px solid #1a1a1a;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      .channel-count {
-        font-size: 0.75rem;
-        color: #666;
-        margin-top: 6px;
-      }
+      .channel-count { font-size: 0.72rem; color: #555; margin-top: 5px; }
 
-      /* ── 하단 ── */
-      .footer {
-        padding: 10px 16px;
-        font-size: 0.72rem;
-        color: #444;
-        text-align: center;
+      /* 버튼 공통 */
+      .btn-sm {
+        padding: 7px 0;
+        border: 1px solid #333;
+        border-radius: 7px;
+        background: transparent;
+        color: #888;
+        font-size: 0.82rem;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 8px;
       }
+      .btn-sm:hover { border-color: #555; color: #f1f1f1; }
+
+      /* 스피너 */
+      .spinner {
+        display: inline-block;
+        width: 10px; height: 10px;
+        border: 2px solid #333;
+        border-top-color: #ff4444;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        margin-right: 5px;
+        vertical-align: middle;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* 메시지 */
+      #msg { font-size: 0.75rem; color: #666; text-align: center; padding: 4px 16px; }
+      #msg.error { color: #cc4444; }
 
       .hidden { display: none !important; }
 
-      #msg {
-        font-size: 0.8rem;
-        color: #888;
+      .footer {
+        padding: 8px 16px;
+        font-size: 0.7rem;
+        color: #333;
         text-align: center;
-        padding: 6px 0;
       }
-      #msg.error { color: #cc4444; }
     </style>
   </head>
   <body>
+
+    <!-- 헤더 -->
     <div class="header">
       <span class="logo">✦ TechVisibility</span>
-      <span class="sub">AI 요약 대시보드</span>
+      <span class="sub">AI 검색 요약</span>
     </div>
 
     <!-- 서버 상태 -->
@@ -160,37 +226,60 @@
       <span class="status-text" id="server-status">서버 확인 중...</span>
     </div>
 
-    <!-- 비로그인 상태 -->
-    <div class="section" id="section-login">
-      <div class="section-title">Google 로그인</div>
-      <p style="font-size:0.82rem;color:#888;margin-bottom:10px;line-height:1.5;">
-        로그인하면 구독 채널 정보를 반영하여<br>더 정확한 영상 추천을 받을 수 있습니다.
-      </p>
-      <button class="btn-google" id="btn-login">
-        <img src="https://www.google.com/favicon.ico" alt="">
-        Google 계정으로 로그인
+    <!-- ① 검색 요약 (유튜브 검색 중일 때) -->
+    <div class="section hidden" id="section-search">
+      <div class="section-title">현재 검색어</div>
+      <div class="keyword-chip"><span>🔍</span><span id="keyword-text"></span></div>
+      <div class="video-preview" id="video-preview">
+        <div style="font-size:0.78rem;color:#444;padding:4px 0;">
+          <span class="spinner"></span>영상 목록 로딩 중...
+        </div>
+      </div>
+      <button class="btn-dashboard" id="btn-dashboard">
+        <span>AI 분석 대시보드 보기</span>
+        <span class="arrow">→</span>
       </button>
     </div>
 
-    <!-- 로그인 상태 -->
+    <!-- ② 유튜브지만 검색어 없을 때 -->
+    <div class="section hidden" id="section-youtube-idle">
+      <p class="not-youtube">유튜브에서 검색하면<br>요약이 이곳에 표시됩니다.</p>
+    </div>
+
+    <!-- ③ 유튜브 아닐 때 -->
+    <div class="section hidden" id="section-not-youtube">
+      <p class="not-youtube">유튜브 페이지에서 사용하세요.</p>
+    </div>
+
+    <!-- ④ 비로그인 -->
+    <div class="section hidden" id="section-login">
+      <div class="section-title">Google 로그인</div>
+      <p style="font-size:0.8rem;color:#666;margin-bottom:10px;line-height:1.5;">
+        로그인하면 구독 채널 기반<br>정확한 영상 추천을 받을 수 있습니다.
+      </p>
+      <button class="btn-google" id="btn-login">
+        <img src="https://www.google.com/favicon.ico" alt=""> Google 계정으로 로그인
+      </button>
+    </div>
+
+    <!-- ⑤ 로그인 상태 — 구독 채널 -->
     <div class="section hidden" id="section-loggedin">
       <div class="section-title">구독 채널</div>
       <div id="channel-list">
-        <span style="color:#666;font-size:0.8rem;">채널 목록 로딩 중...</span>
+        <span style="color:#555;font-size:0.78rem;">채널 목록 로딩 중...</span>
       </div>
       <p class="channel-count" id="channel-count"></p>
-      <button class="btn btn-secondary" id="btn-refresh" style="margin-top:10px;">채널 목록 새로고침</button>
+      <button class="btn-sm" id="btn-refresh">채널 목록 새로고침</button>
     </div>
 
-    <!-- 메시지 -->
     <div id="msg"></div>
 
     <!-- 로그아웃 -->
     <div class="section hidden" id="section-logout">
-      <button class="btn btn-secondary" id="btn-logout">로그아웃</button>
+      <button class="btn-sm" id="btn-logout">로그아웃</button>
     </div>
 
-    <div class="footer">유튜브에서 검색하면 자동으로 AI 분석이 실행됩니다.</div>
+    <div class="footer">TechVisibility — 유튜브 AI 뉴스레터</div>
 
     <script src="popup.js"></script>
   </body>

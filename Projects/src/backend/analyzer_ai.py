@@ -1,13 +1,44 @@
+"""
+[AI 2] analyzer_ai.py — 5개 영상 동시 분석
+
+역할:
+- 자막 수집 및 전처리
+- 광고/협찬 탐지
+- 영상별 핵심 주장 추출
+- 공통 사실 추출 (3개 이상 영상에서 언급)
+- 쟁점 추출 (영상마다 다른 주장)
+- 신뢰도 계산 (반복 등장 → 상승, 광고 포함 → 하락)
+"""
+
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional
 
+import google.generativeai as genai
+from dotenv import load_dotenv
+
 from transcript_service import get_transcript, format_transcript_with_timestamps
 from preprocessing import clean_transcript
-from agents.gemini_client import call_gemini, parse_section, parse_bullet_list
+
+load_dotenv()
+
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+_model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
 # 자막 최대 길이 (Gemini 1M 토큰 활용, 안전 마진 포함)
 MAX_TRANSCRIPT_CHARS = 80_000
+
+
+def _call_gemini(prompt: str, temperature: float = 0.3) -> str:
+    response = _model.generate_content(
+        prompt,
+        generation_config={"temperature": temperature},
+    )
+    if response.text is None:
+        finish = response.candidates[0].finish_reason if response.candidates else "UNKNOWN"
+        raise ValueError(f"Gemini 응답 없음 (finish_reason: {finish})")
+    return response.text
 
 
 def _collect_transcript(video_id: str) -> Optional[str]:
@@ -82,7 +113,7 @@ def _analyze_single_video(video: Dict[str, Any]) -> Dict[str, Any]:
 """
 
     try:
-        text = call_gemini(prompt, temperature=0.3)
+        text = _call_gemini(prompt, temperature=0.3)
     except Exception as e:
         print(f"  [분석 오류] {video_id}: {e}")
         return {
@@ -100,8 +131,8 @@ def _analyze_single_video(video: Dict[str, Any]) -> Dict[str, Any]:
 
     # 파싱
     ad_score = _parse_ad_score(text)
-    summary = parse_section(text, "요약")
-    key_claims = parse_bullet_list(text, "핵심주장")
+    summary = _parse_section(text, "요약")
+    key_claims = _parse_bullet_list(text, "핵심주장")
 
     return {
         "video_id": video_id,
@@ -119,13 +150,27 @@ def _analyze_single_video(video: Dict[str, Any]) -> Dict[str, Any]:
 
 def _parse_ad_score(text: str) -> int:
     """[광고점수] 섹션에서 숫자 추출"""
-    section = parse_section(text, "광고점수")
+    section = _parse_section(text, "광고점수")
     match = re.search(r"\d+", section)
     if match:
         return max(0, min(100, int(match.group())))
     # 섹션이 없으면 전체 텍스트에서 첫 숫자 탐색
     match = re.search(r"\d+", text[:50])
     return max(0, min(100, int(match.group()))) if match else 0
+
+
+def _parse_section(text: str, section_name: str) -> str:
+    """[섹션명] ~ 다음 [섹션] 사이 텍스트 추출"""
+    pattern = rf"\[{section_name}\]\s*(.*?)(?=\[|\Z)"
+    match = re.search(pattern, text, re.DOTALL)
+    return match.group(1).strip() if match else ""
+
+
+def _parse_bullet_list(text: str, section_name: str) -> List[str]:
+    """[섹션명] 내부의 "- " 항목들 리스트로 반환"""
+    section = _parse_section(text, section_name)
+    items = re.findall(r"^-\s+(.+)", section, re.MULTILINE)
+    return [item.strip() for item in items if item.strip()]
 
 
 def _cross_analyze(
@@ -167,13 +212,13 @@ def _cross_analyze(
 """
 
     try:
-        text = call_gemini(prompt, temperature=0.3)
+        text = _call_gemini(prompt, temperature=0.3)
     except Exception as e:
         print(f"  [교차분석 오류]: {e}")
         return {"common_facts": [], "controversies": []}
 
-    common_facts = parse_bullet_list(text, "공통사실")
-    controversies = parse_bullet_list(text, "쟁점")
+    common_facts = _parse_bullet_list(text, "공통사실")
+    controversies = _parse_bullet_list(text, "쟁점")
 
     # "없음" 제거
     common_facts = [f for f in common_facts if f != "없음"]

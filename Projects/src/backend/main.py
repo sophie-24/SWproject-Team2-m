@@ -1,4 +1,5 @@
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
@@ -11,7 +12,7 @@ from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
+from agents.cluster_ai import cluster_topics
 from auth import create_auth_url, exchange_code_for_tokens, create_jwt, verify_jwt
 from youtube_service import get_subscriptions
 from youtube_search import search_videos
@@ -27,6 +28,7 @@ load_dotenv()
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "../frontend")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8000")
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "admin1234")
 
 
 @asynccontextmanager
@@ -57,6 +59,7 @@ _oauth_sessions: dict[str, str] = {}  # {state: code_verifier}
 _oauth_credentials: dict[str, dict] = {}  # {state: credentials}
 
 _transcript_cache: dict = {}
+_search_analysis_cache: dict = {}  # {keyword: analysis_result} — 동일 키워드 Gemini 재호출 방지
 
 
 # ── JWT 인증 의존성 ────────────────────────────────────────────────────────────
@@ -82,6 +85,10 @@ def onboarding():
 def dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "dashboard.html"))
 
+@app.get("/search_dashboard.html")
+def search_dashboard():
+    return FileResponse(os.path.join(FRONTEND_DIR, "search_dashboard.html"))
+
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────
 
@@ -102,7 +109,7 @@ def login():
 
 @app.get("/auth/callback")
 async def callback(
-    code: str, 
+    code: str,
     state: str,
     db : AsyncSession = Depends(get_db)
 ):
@@ -184,12 +191,85 @@ async def today_logs(
         "logs": logs,
         "triggered_topics": triggered,
     }
+
+
+@app.get("/my/logs")
+async def my_logs(
+    limit: int = Query(50, ge=1, le=200),
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    내 행동 로그 투명성 엔드포인트 (검색어 로그 공개).
+    사용자가 자신의 수집된 행동 데이터를 직접 확인할 수 있도록 제공.
+
+    OUTPUT:
+      {
+        "total": int,
+        "logs": [
+          { "event_type": "search"|"watch", "keyword": str,
+            "video_id": str|null, "logged_at": ISO8601 }
+        ],
+        "triggered_topics": [str, ...],   -- 뉴스레터 주제로 사용될 키워드
+        "profile_categories": [str, ...], -- 온보딩 프로필 관심사
+        "merged_topics": [str, ...]        -- 합산 결과 (실제 사용 키워드)
+      }
+    """
+    import json as _json
+    from database import BehaviorLog, User
+
+    # 행동 로그 조회 (최신순)
+    result = await db.execute(
+        select(BehaviorLog)
+        .where(BehaviorLog.user_id == user["user_id"])
+        .order_by(BehaviorLog.logged_at.desc())
+        .limit(limit)
+    )
+    logs = result.scalars().all()
+
+    # 오늘 로그로 triggered_topics 계산
+    today_logs_list = await get_today_logs(db, user_id=user["user_id"])
+    triggered_topics = get_triggered_topics(today_logs_list)
+
+    # 프로필 카테고리 조회
+    user_result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = user_result.scalar_one_or_none()
+    profile_categories: list = []
+    if db_user and db_user.interest_categories:
+        try:
+            profile_categories = _json.loads(db_user.interest_categories)
+        except Exception:
+            profile_categories = []
+
+    # 합산 (scheduler와 동일 로직)
+    from scheduler import _merge_keywords
+    merged_topics = _merge_keywords(triggered_topics, profile_categories)
+
+    return {
+        "total": len(logs),
+        "logs": [
+            {
+                "event_type": log.event_type,
+                "keyword":    log.keyword,
+                "video_id":   log.video_id,
+                "logged_at":  log.logged_at.isoformat(),
+            }
+            for log in logs
+        ],
+        "triggered_topics":  triggered_topics,
+        "profile_categories": profile_categories,
+        "merged_topics":      merged_topics,
+    }
+
+
 # ── 구독 설정 ─────────────────────────────────────────────────────────────────
 
 class SubscribeData(BaseModel):
-    delivery_type: str     # "kakao" | "email"
+    delivery_type: str = "email"
     email: Optional[str] = None
-    kakao_uuid: Optional[str] = None
+    send_time: Optional[str] = None   # "HH:MM" 형식 (예: "08:00", "21:00")
 
 
 @app.post("/subscribe")
@@ -208,14 +288,18 @@ async def subscribe(
     if not db_user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
 
-    db_user.delivery_type = data.delivery_type
-    if data.delivery_type == "kakao" and data.kakao_uuid:
-        db_user.kakao_uuid = data.kakao_uuid
-    if data.delivery_type == "email" and data.email:
+    db_user.delivery_type = "email"
+    if data.email:
         db_user.email = data.email
+    if data.send_time:
+        # HH:MM 형식 검증
+        import re as _re
+        if not _re.match(r"^\d{2}:\d{2}$", data.send_time):
+            raise HTTPException(status_code=400, detail="send_time은 HH:MM 형식이어야 합니다")
+        db_user.send_time = data.send_time
 
     await db.commit()
-    print(f"[subscribe] {user['user_id']} → {data.delivery_type} 저장 완료")
+    print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
     return {"success": True}
 
 
@@ -295,19 +379,11 @@ async def send_now(
     if not triggered:
         raise HTTPException(status_code=404, detail="트리거된 주제 없음 — 유튜브에서 검색해보세요")
 
-    # 사용자 delivery_type 조회
-    result = await db.execute(
-        select(User).where(User.google_id == user["user_id"])
-    )
-    db_user = result.scalar_one_or_none()
-    delivery_type = db_user.delivery_type if db_user else "email"
-
     # sync 함수 → 이벤트 루프 블로킹 방지
     newsletter = await asyncio.to_thread(
         run_pipeline,
         user_id=user["user_id"],
         raw_keywords=triggered,
-        delivery_type=delivery_type,
     )
 
     # DB 저장
@@ -315,12 +391,42 @@ async def send_now(
         user_id=user["user_id"],
         subject=newsletter.get("subject", ""),
         content_json=json.dumps(newsletter, ensure_ascii=False),
-        delivery_type=delivery_type,
+        delivery_type="email",
     )
     db.add(record)
     await db.commit()
 
     return JSONResponse(newsletter)
+
+
+# ── 즉석 검색 분석 ────────────────────────────────────────────────────────────
+
+@app.get("/analyze_search")
+async def analyze_search(
+    keyword: str = Query(..., min_length=1),
+    user=Depends(get_current_user),
+):
+    """
+    검색어 기반 즉석 분석 — popup/search_dashboard에서 호출.
+    selector_ai + analyzer_ai만 실행 (cluster/newsletter 생략).
+    keyword 기준 인메모리 캐시로 Gemini 중복 호출 방지.
+    """
+    import asyncio
+    from agents.selector_ai import select_top_videos
+    from agents.analyzer_ai import analyze_videos
+
+    if keyword in _search_analysis_cache:
+        return JSONResponse(_search_analysis_cache[keyword])
+
+    def _run():
+        videos = select_top_videos(topic=keyword, subscribed_channel_ids=[])
+        if not videos:
+            return {"keyword": keyword, "videos": [], "common_facts": [], "controversies": []}
+        return analyze_videos(keyword=keyword, videos=videos)
+
+    result = await asyncio.to_thread(_run)
+    _search_analysis_cache[keyword] = result
+    return JSONResponse(result)
 
 
 # ── 자막 ──────────────────────────────────────────────────────────────────────
@@ -373,3 +479,176 @@ def preprocess(
         "total_chunks": len(chunks),
         "chunks": chunks,
     })
+
+
+# ── 관리자 ────────────────────────────────────────────────────────────────────
+
+def get_admin(token=Depends(security)):
+    """ADMIN_SECRET 검증 의존성"""
+    if token.credentials != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="관리자 권한 없음")
+    return True
+
+
+@app.get("/admin.html")
+def admin_page():
+    return FileResponse(os.path.join(FRONTEND_DIR, "admin.html"))
+
+
+@app.get("/admin/users")
+async def admin_users(
+    admin=Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """전체 유저 목록"""
+    from database import User
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+    return {
+        "total": len(users),
+        "users": [
+            {
+                "id":            str(u.id),
+                "google_id":     u.google_id,
+                "email":         u.email,
+                "delivery_type": u.delivery_type,
+                "created_at":    u.created_at.isoformat(),
+            }
+            for u in users
+        ],
+    }
+
+
+@app.get("/admin/logs")
+async def admin_logs(
+    admin=Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """오늘 전체 행동 로그"""
+    from database import BehaviorLog
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    result = await db.execute(
+        select(BehaviorLog)
+        .where(BehaviorLog.logged_at >= today)
+        .order_by(BehaviorLog.logged_at.desc())
+    )
+    logs = result.scalars().all()
+    return {
+        "total": len(logs),
+        "logs": [
+            {
+                "user_id":    l.user_id,
+                "event_type": l.event_type,
+                "keyword":    l.keyword,
+                "video_id":   l.video_id,
+                "logged_at":  l.logged_at.isoformat(),
+            }
+            for l in logs
+        ],
+    }
+
+
+@app.post("/admin/pipeline/run")
+async def admin_run_pipeline(
+    user_id: str,
+    admin=Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """특정 유저 파이프라인 즉시 실행 (google_id 기준)"""
+    import asyncio, json
+    from database import User, Newsletter
+
+    logs      = await get_today_logs(db, user_id=user_id)
+    triggered = get_triggered_topics(logs)
+
+    if not triggered:
+        raise HTTPException(status_code=404, detail="트리거된 주제 없음")
+
+    # sync 함수 → 이벤트 루프 블로킹 방지
+    newsletter = await asyncio.to_thread(
+        run_pipeline,
+        user_id=user_id,
+        raw_keywords=triggered,
+    )
+
+    # DB 저장
+    record = Newsletter(
+        user_id=user_id,
+        subject=newsletter.get("subject", ""),
+        content_json=json.dumps(newsletter, ensure_ascii=False),
+        delivery_type="email",
+    )
+    db.add(record)
+    await db.commit()
+
+    return JSONResponse(newsletter)
+
+
+# ── 프로필 초기화 (PHASE 1) ───────────────────────────────────────────────────
+
+class ProfileInitData(BaseModel):
+    initial_intent: str                    # '유희형' | '지식형' | '구매형'
+    interest_categories: list[str] = []   # 관심사 카테고리 목록
+
+
+class HistoryAnalysisRequest(BaseModel):
+    keywords: list[str]
+
+
+@app.post("/profile/init")
+async def profile_init(
+    data: ProfileInitData,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    온보딩 완료 시 초기 관심사 프로필 저장.
+    initial_intent와 interest_categories를 users 테이블에 저장한다.
+    """
+    import json as _json
+    from database import User
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    if data.initial_intent not in ("유희형", "지식형", "구매형"):
+        raise HTTPException(status_code=400, detail="initial_intent는 유희형|지식형|구매형 중 하나여야 합니다")
+
+    db_user.initial_intent      = data.initial_intent
+    db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
+    await db.commit()
+
+    print(f"[profile/init] {user['user_id']} → 의도={data.initial_intent}, 카테고리={data.interest_categories}")
+    return {"success": True}
+
+
+@app.post("/profile/analyze-history")
+async def analyze_history(
+    data: HistoryAnalysisRequest,
+    user=Depends(get_current_user),
+):
+    """
+    익스텐션이 chrome.history API로 수집한 유튜브 검색어를 받아
+    cluster_ai + intent_ai로 초기 관심사 프로필을 추론한다.
+
+    INPUT:  {"keywords": ["파이썬 강의", "아이폰 16 리뷰", ...]}
+    OUTPUT: {"intent_type": "지식형", "categories": ["파이썬", "스마트폰"]}
+    """
+    from agents.cluster_ai import cluster_topics
+    from agents.intent_ai import classify_intent
+
+    keywords = [k.strip() for k in data.keywords if k.strip()]
+    if not keywords:
+        raise HTTPException(status_code=400, detail="keywords가 비어 있습니다")
+
+    clusters      = await asyncio.to_thread(cluster_topics, keywords, 5)
+    categories    = [c["topic"] for c in clusters]
+    intent_result = await asyncio.to_thread(classify_intent, keywords, [])
+    intent_type   = intent_result.get("intent_type", "지식형")
+
+    return {"intent_type": intent_type, "categories": categories}

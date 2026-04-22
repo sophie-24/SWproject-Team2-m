@@ -6,12 +6,18 @@
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
   "files.encoding": "utf8",
-  "editor.rulers": [100],
+  "editor.rulers": [
+    100
+  ],
   "editor.wordWrap": "off",
   "liveServer.settings.ignoreFiles": [
     "**/__pycache__/**",
     "**/*.pyc",
     "**/*.py",
     "**/backend/**"
+  ],
+  "python.defaultInterpreterPath": "${workspaceFolder}/venv/Scripts/python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/venv/Lib/site-packages"
   ]
 }
