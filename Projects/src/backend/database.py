@@ -1,4 +1,3 @@
-# backend/database.py
 import os
 import uuid
 from datetime import datetime, timezone
@@ -30,12 +29,16 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    google_id     = Column(String(255), unique=True, nullable=False)
-    email         = Column(String(255), unique=True, nullable=False)
-    kakao_uuid    = Column(String(255), nullable=True)
-    delivery_type = Column(String(10), nullable=False, default="email")  # 'kakao' | 'email'
-    created_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id                   = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    google_id            = Column(String(255), unique=True, nullable=False)
+    email                = Column(String(255), unique=True, nullable=False)
+    delivery_type        = Column(String(10), nullable=False, default="email")
+    # PHASE 1: 온보딩 프로파일링
+    initial_intent       = Column(String(20), nullable=True)   # '유희형'|'지식형'|'구매형'
+    interest_categories  = Column(Text, nullable=True)         # JSON 문자열 — 관심사 카테고리 목록
+    # PHASE 4: 사용자 설정 발송 시간
+    send_time            = Column(String(5), nullable=True, default="21:00")  # "HH:MM" KST
+    created_at           = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class BehaviorLog(Base):
@@ -57,7 +60,7 @@ class Newsletter(Base):
     subject       = Column(String(500), nullable=True)
     content_json  = Column(Text, nullable=False)       # newsletter_ai 출력값 JSON 문자열
     delivered_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    delivery_type = Column(String(10), nullable=True)  # 'kakao' | 'email'
+    delivery_type = Column(String(10), nullable=True)   # 'email'
 
 
 # ── DB 초기화 (테이블 생성) ────────────────────────────────────────────────────
