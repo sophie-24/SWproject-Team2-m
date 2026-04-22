@@ -6,8 +6,15 @@
 
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "tabs",
+    "history",
+    "sidePanel"
   ],
+
+  "side_panel": {
+    "default_path": "side_panel.html"
+  },
 
   "host_permissions": [
     "http://localhost:8000/*",
