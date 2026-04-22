@@ -1,15 +1,3 @@
-"""
-[AI 2] analyzer_ai.py — 5개 영상 동시 분석
-
-역할:
-- 자막 수집 및 전처리
-- 광고/협찬 탐지
-- 영상별 핵심 주장 추출
-- 공통 사실 추출 (3개 이상 영상에서 언급)
-- 쟁점 추출 (영상마다 다른 주장)
-- 신뢰도 계산 (반복 등장 → 상승, 광고 포함 → 하락)
-"""
-
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional
