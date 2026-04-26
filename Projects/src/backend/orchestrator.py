@@ -12,7 +12,7 @@ orchestrator.py — 4개 AI 연결 파이프라인
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_EXCEPTION
 from typing import List, Dict, Any
 
-from selector_ai import select_top_videos
+from agents.selector_ai import select_top_videos
 from analyzer_ai import analyze_videos
 from category_ai import classify_category
 from dashboard_ai import generate_dashboard
@@ -43,10 +43,9 @@ def run_pipeline(
     if subscribed_channel_ids is None:
         subscribed_channel_ids = []
 
-    # ── Step 1: 영상 후보 선정 ──────────────────────────────
     print(f"[orchestrator] Step 1 — 영상 선정: '{keyword}'")
     videos = select_top_videos(
-        keyword=keyword,
+        topic=keyword,
         subscribed_channel_ids=subscribed_channel_ids,
     )
     if not videos:
@@ -54,7 +53,6 @@ def run_pipeline(
 
     video_titles = [v["title"] for v in videos]
 
-    # ── Step 2 & 3: 병렬 실행 ──────────────────────────────
     print("[orchestrator] Step 2+3 — 영상 분석 & 카테고리 분류 (병렬)")
     analyzer_result: Dict[str, Any] = {}
     category_result: Dict[str, Any] = {}
@@ -68,7 +66,7 @@ def run_pipeline(
             return_when=FIRST_EXCEPTION,
         )
 
-        # 예외가 있으면 즉시 전파
+
         for f in done:
             if f.exception():
                 raise f.exception()
@@ -76,7 +74,6 @@ def run_pipeline(
         analyzer_result = future_analyzer.result()
         category_result = future_category.result()
 
-    # ── Step 4: 대시보드 생성 ──────────────────────────────
     print("[orchestrator] Step 4 — 대시보드 생성")
     dashboard = generate_dashboard(
         keyword=keyword,
