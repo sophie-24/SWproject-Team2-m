@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TechVisibility 검색 분석</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
@@ -27,7 +32,13 @@
       top: 0;
       z-index: 10;
     }
-    .logo { font-weight: 800; color: #ff4444; font-size: 0.95rem; }
+
+    .logo {
+      font-weight: 800;
+      color: #ff4444;
+      font-size: 0.95rem;
+    }
+
     .keyword-badge {
       background: #2a2a2a;
       border: 1px solid #3a3a3a;
@@ -46,7 +57,13 @@
       padding: 32px 16px;
       text-align: center;
     }
-    .loading-steps { display: flex; flex-direction: column; gap: 14px; }
+
+    .loading-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
     .step-row {
       display: flex;
       align-items: center;
@@ -57,17 +74,46 @@
       border-radius: 8px;
       transition: all 0.3s;
     }
-    .step-row.active  { border-color: #ff4444; background: #1f1010; }
-    .step-row.done    { border-color: #44cc66; background: #0f1f14; }
-    .step-icon { font-size: 1rem; width: 20px; text-align: center; }
-    .step-label { font-size: 0.82rem; color: #aaa; }
-    .step-row.active .step-label { color: #ff4444; }
-    .step-row.done  .step-label { color: #44cc66; }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .step-row.active {
+      border-color: #ff4444;
+      background: #1f1010;
+    }
+
+    .step-row.done {
+      border-color: #44cc66;
+      background: #0f1f14;
+    }
+
+    .step-icon {
+      font-size: 1rem;
+      width: 20px;
+      text-align: center;
+    }
+
+    .step-label {
+      font-size: 0.82rem;
+      color: #aaa;
+    }
+
+    .step-row.active .step-label {
+      color: #ff4444;
+    }
+
+    .step-row.done .step-label {
+      color: #44cc66;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     .spinner {
       display: inline-block;
-      width: 14px; height: 14px;
+      width: 14px;
+      height: 14px;
       border: 2px solid #333;
       border-top-color: #ff4444;
       border-radius: 50%;
@@ -83,9 +129,24 @@
       padding: 16px;
       text-align: center;
     }
-    .error-box .err-icon { font-size: 1.8rem; margin-bottom: 8px; }
-    .error-box .err-msg  { color: #ff6666; font-size: 0.85rem; line-height: 1.6; }
-    .error-box .err-sub  { color: #666; font-size: 0.75rem; margin-top: 6px; }
+
+    .error-box .err-icon {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+    }
+
+    .error-box .err-msg {
+      color: #ff6666;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    .error-box .err-sub {
+      color: #666;
+      font-size: 0.75rem;
+      margin-top: 6px;
+    }
+
     .btn-retry {
       margin-top: 12px;
       padding: 8px 20px;
@@ -96,10 +157,16 @@
       cursor: pointer;
       font-size: 0.82rem;
     }
-    .btn-retry:hover { background: #cc2222; }
+
+    .btn-retry:hover {
+      background: #cc2222;
+    }
 
     /* ── 결과 영역 ── */
-    #results { display: none; padding: 12px; }
+    #results {
+      display: none;
+      padding: 12px;
+    }
 
     /* 영상 카드 */
     .video-card {
@@ -109,12 +176,14 @@
       margin-bottom: 10px;
       overflow: hidden;
     }
+
     .video-card-header {
       display: flex;
       gap: 10px;
       padding: 10px 12px;
       align-items: flex-start;
     }
+
     .video-thumb {
       width: 72px;
       height: 46px;
@@ -123,7 +192,12 @@
       flex-shrink: 0;
       background: #222;
     }
-    .video-meta { flex: 1; min-width: 0; }
+
+    .video-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
     .video-title {
       font-size: 0.8rem;
       font-weight: 600;
@@ -135,18 +209,46 @@
       overflow: hidden;
       margin-bottom: 5px;
     }
-    .video-title a { color: inherit; text-decoration: none; }
-    .video-title a:hover { color: #ff4444; }
-    .video-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+
+    .video-title a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .video-title a:hover {
+      color: #ff4444;
+    }
+
+    .video-badges {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
     .badge {
       font-size: 0.68rem;
       padding: 2px 6px;
       border-radius: 4px;
       font-weight: 600;
     }
-    .badge.ad       { background: #2a1010; color: #ff5555; border: 1px solid #441111; }
-    .badge.no-ad    { background: #0f1f14; color: #44cc66; border: 1px solid #1a3a22; }
-    .badge.cred     { background: #111827; color: #6699ff; border: 1px solid #1e2d4a; }
+
+    .badge.ad {
+      background: #2a1010;
+      color: #ff5555;
+      border: 1px solid #441111;
+    }
+
+    .badge.no-ad {
+      background: #0f1f14;
+      color: #44cc66;
+      border: 1px solid #1a3a22;
+    }
+
+    .badge.cred {
+      background: #111827;
+      color: #6699ff;
+      border: 1px solid #1e2d4a;
+    }
 
     .video-summary {
       font-size: 0.75rem;
@@ -163,6 +265,7 @@
       padding: 12px;
       margin-bottom: 10px;
     }
+
     .section-title {
       font-size: 0.72rem;
       font-weight: 700;
@@ -171,23 +274,43 @@
       letter-spacing: 0.5px;
       margin-bottom: 8px;
     }
-    .fact-item, .controversy-item {
+
+    .fact-item,
+    .controversy-item {
       font-size: 0.78rem;
       color: #ccc;
       padding: 5px 0;
       border-bottom: 1px solid #222;
       line-height: 1.5;
     }
-    .fact-item:last-child, .controversy-item:last-child { border-bottom: none; }
-    .fact-item::before       { content: "✓ "; color: #44cc66; }
-    .controversy-item::before { content: "⚡ "; color: #ffaa44; }
+
+    .fact-item:last-child,
+    .controversy-item:last-child {
+      border-bottom: none;
+    }
+
+    .fact-item::before {
+      content: "✓ ";
+      color: #44cc66;
+    }
+
+    .controversy-item::before {
+      content: "⚡ ";
+      color: #ffaa44;
+    }
 
     /* 로그인 필요 */
     .login-needed {
       margin: 32px 16px;
       text-align: center;
     }
-    .login-needed p { color: #888; font-size: 0.85rem; line-height: 1.8; }
+
+    .login-needed p {
+      color: #888;
+      font-size: 0.85rem;
+      line-height: 1.8;
+    }
+
     .btn-login {
       margin-top: 14px;
       padding: 10px 24px;
@@ -199,7 +322,10 @@
       font-size: 0.88rem;
       font-weight: 600;
     }
-    .btn-login:hover { background: #cc2222; }
+
+    .btn-login:hover {
+      background: #cc2222;
+    }
 
     /* 키워드 없음 */
     .no-keyword {
@@ -209,11 +335,79 @@
       font-size: 0.85rem;
       line-height: 1.8;
     }
-    .no-keyword span { font-size: 2rem; display: block; margin-bottom: 10px; }
 
-    .hidden { display: none !important; }
+    .no-keyword span {
+      font-size: 2rem;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    /* 카테고리 배지 */
+    .category-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      letter-spacing: 0.3px;
+    }
+
+    .cat-정보탐색형 {
+      background: #111827;
+      color: #6699ff;
+      border: 1px solid #1e2d4a;
+    }
+
+    .cat-비교구매형 {
+      background: #1a1200;
+      color: #ffcc44;
+      border: 1px solid #3a2a00;
+    }
+
+    .cat-학습튜토리얼형 {
+      background: #0f1f14;
+      color: #44cc66;
+      border: 1px solid #1a3a22;
+    }
+
+    /* AI 요약 블록 */
+    .summary-block {
+      background: #111;
+      border-left: 3px solid #ff4444;
+      border-radius: 0 8px 8px 0;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+
+    .summary-line {
+      font-size: 0.78rem;
+      color: #ccc;
+      line-height: 1.6;
+      padding: 3px 0;
+    }
+
+    .conclusion-block {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 0.78rem;
+      color: #aaa;
+      line-height: 1.6;
+    }
+
+    .conclusion-block .section-title {
+      margin-bottom: 6px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
   </style>
 </head>
+
 <body>
 
   <!-- 헤더 -->
@@ -263,6 +457,9 @@
 
   <!-- 결과 -->
   <div id="results">
+    <div id="category-section"></div>
+    <div id="summary-section"></div>
+    <div id="conclusion-section"></div>
     <div id="videos-section"></div>
     <div id="common-section"></div>
     <div id="controversy-section"></div>
@@ -273,24 +470,24 @@
 
     // ── 상태 변수 ──────────────────────────────────────────────
     let currentKeyword = "";
-    let currentJwt     = "";
+    let currentJwt = "";
 
     // ── 유틸 ──────────────────────────────────────────────────
     function esc(s) {
       return String(s ?? "")
-        .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-        .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
     function setStep(n, state) {
       const el = document.getElementById(`s${n}`);
       if (!el) return;
-      el.classList.remove("active","done");
+      el.classList.remove("active", "done");
       if (state) el.classList.add(state);
       const icon = el.querySelector(".step-icon");
       if (state === "active") icon.innerHTML = `<span class="spinner"></span>`;
-      if (state === "done")   icon.textContent = "✅";
-      if (!state)             icon.textContent = ["","🔍","📝","🤖"][n];
+      if (state === "done") icon.textContent = "✅";
+      if (!state) icon.textContent = ["", "🔍", "📝", "🤖"][n];
     }
 
     function showError(msg, sub = "") {
@@ -305,21 +502,21 @@
     // ── 메인 분석 ─────────────────────────────────────────────
     async function analyze(keyword, jwt) {
       currentKeyword = keyword;
-      currentJwt     = jwt;
+      currentJwt = jwt;
 
       document.getElementById("keyword-badge").textContent = `"${keyword}"`;
       document.getElementById("loading").classList.remove("hidden");
       document.getElementById("error-box").classList.add("hidden");
       document.getElementById("results").style.display = "none";
-      setStep(1,"active"); setStep(2,""); setStep(3,"");
+      setStep(1, "active"); setStep(2, ""); setStep(3, "");
 
       let data;
       try {
         // Step 1 → 2 애니메이션
         await new Promise(r => setTimeout(r, 600));
-        setStep(1,"done"); setStep(2,"active");
+        setStep(1, "done"); setStep(2, "active");
         await new Promise(r => setTimeout(r, 600));
-        setStep(2,"done"); setStep(3,"active");
+        setStep(2, "done"); setStep(3, "active");
 
         const res = await fetch(
           `${API}/analyze_search?keyword=${encodeURIComponent(keyword)}`,
@@ -341,19 +538,51 @@
         return;
       }
 
-      setStep(3,"done");
+      setStep(3, "done");
       await new Promise(r => setTimeout(r, 300));
       document.getElementById("loading").classList.add("hidden");
       renderResults(data);
     }
 
     // ── 결과 렌더링 ──────────────────────────────────────────
+    // Pipeline A 루트 orchestrator 응답 포맷:
+    // { keyword, category, layout, summary_lines[], common_conclusion,
+    //   controversies[], recommended_videos[], common_facts[] }
     function renderResults(data) {
-      const videos       = data.videos || [];
-      const commonFacts  = data.common_facts || [];
-      const controversies= data.controversies || [];
+      const videos = data.recommended_videos || data.videos || [];
+      const commonFacts = data.common_facts || [];
+      const controversies = data.controversies || [];
+      const summaryLines = data.summary_lines || [];
+      const category = data.category || "";
+      const conclusion = data.common_conclusion || "";
 
-      // ── 영상 카드 ──
+      // ── 카테고리 배지 ──
+      if (category) {
+        const catClass = "cat-" + category.replace(/\s/g, "");
+        document.getElementById("category-section").innerHTML =
+          `<div style="padding:0 4px 4px;">
+            <span class="category-badge ${catClass}">${esc(category)}</span>
+           </div>`;
+      }
+
+      // ── AI 요약 (3줄) ──
+      if (summaryLines.length) {
+        document.getElementById("summary-section").innerHTML = `
+        <div class="summary-block">
+          ${summaryLines.map(l => `<div class="summary-line">• ${esc(l)}</div>`).join("")}
+        </div>`;
+      }
+
+      // ── 공통 결론 ──
+      if (conclusion) {
+        document.getElementById("conclusion-section").innerHTML = `
+        <div class="conclusion-block">
+          <div class="section-title">💡 AI 결론</div>
+          ${esc(conclusion)}
+        </div>`;
+      }
+
+      // ── 추천 영상 카드 ──
       const videosHTML = videos.map(v => {
         const adBadge = v.ad_detected
           ? `<span class="badge ad">광고 포함</span>`
@@ -364,6 +593,7 @@
         const thumb = v.thumbnail_url
           ? `<img class="video-thumb" src="${esc(v.thumbnail_url)}" alt="">`
           : `<div class="video-thumb" style="display:flex;align-items:center;justify-content:center;color:#444;">▶</div>`;
+        const vid = v.video_id || v.id || "";
 
         return `
         <div class="video-card">
@@ -371,7 +601,7 @@
             ${thumb}
             <div class="video-meta">
               <div class="video-title">
-                <a href="https://youtube.com/watch?v=${esc(v.video_id)}" target="_blank">${esc(v.title)}</a>
+                <a href="https://youtube.com/watch?v=${esc(vid)}" target="_blank">${esc(v.title)}</a>
               </div>
               <div class="video-badges">${adBadge}${credBadge}</div>
             </div>
@@ -380,7 +610,10 @@
         </div>`;
       }).join("");
 
-      document.getElementById("videos-section").innerHTML = videosHTML;
+      document.getElementById("videos-section").innerHTML =
+        videos.length
+          ? `<div class="section-title" style="padding:4px 4px 6px;font-size:0.7rem;color:#666;letter-spacing:.5px;">▶ 추천 영상</div>` + videosHTML
+          : "";
 
       // ── 공통 사실 ──
       if (commonFacts.length) {
@@ -415,7 +648,7 @@
     (async function init() {
       // JWT 확인
       const { jwt, loggedIn } = await new Promise(r =>
-        chrome.storage.local.get(["jwt","loggedIn"], r)
+        chrome.storage.local.get(["jwt", "loggedIn"], r)
       );
 
       if (!jwt || !loggedIn) {
@@ -431,20 +664,26 @@
       const tab = tabs[0];
       let keyword = "";
       try {
-        const u = new URL(tab?.url || "");
+        const u = new URL(tab?.url);
+        // YouTube 검색 결과 페이지: /results?search_query=...
         if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
           keyword = u.searchParams.get("search_query") || "";
         }
-      } catch {}
+      } catch (_) {
+        // URL 파싱 실패 (빈 탭 등) — keyword 빈 문자열 유지
+      }
 
-      if (!keyword) {
+      if (!keyword.trim()) {
         document.getElementById("loading").classList.add("hidden");
         document.getElementById("no-keyword").classList.remove("hidden");
+        document.getElementById("keyword-badge").textContent = "검색어 없음";
         return;
       }
 
-      analyze(keyword, jwt);
+      analyze(keyword.trim(), jwt);
     })();
   </script>
+
 </body>
+
 </html>
