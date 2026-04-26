@@ -7,7 +7,8 @@ from typing import List, Dict, Any, Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from sqlalchemy import select
+from datetime import date as date_type
+from sqlalchemy import select, func
 from dotenv import load_dotenv
 
 from database import AsyncSessionLocal, User, BehaviorLog, Newsletter
@@ -94,22 +95,48 @@ async def _deliver_newsletter(
 # ── 배치 실행 (send_time 필터) ────────────────────────────────────────────────
 
 
+async def _already_sent_today(db, user_id: str) -> bool:
+    """오늘 이미 뉴스레터를 발송했는지 확인 (중복 발송 방지)"""
+    today = date_type.today()
+    result = await db.execute(
+        select(Newsletter).where(
+            Newsletter.user_id == user_id,
+            func.date(Newsletter.delivered_at) == today,
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
 async def _run_batch_for_send_time(send_time: str) -> None:
     """
     특정 send_time(HH:MM)에 설정된 사용자들만 배치 실행.
-    daily_batch()와 동일 로직이지만 send_time 필터 적용.
+
+    필터 조건:
+    - is_subscribed = TRUE (수신 동의 유저만)
+    - send_time 정확히 일치
+
+    send_time은 DB 레벨에서 NOT NULL + server_default="21:00"로 보장되므로
+    NULL 예외 처리 불필요. 신규 유저는 항상 "21:00"으로 생성됨.
     """
     print(f"[scheduler] {send_time} 배치 시작")
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(User).where(User.send_time == send_time)
+            select(User).where(
+                User.send_time == send_time,
+                User.is_subscribed == True,  # noqa: E712 — SQLAlchemy 비교
+            )
         )
         users = result.scalars().all()
-        print(f"[scheduler] {send_time} 대상 {len(users)}명")
+        print(f"[scheduler] {send_time} 대상 {len(users)}명 (수신 동의 유저)")
 
         for user in users:
             try:
+                # ── 중복 발송 방지 ──────────────────────────────────────
+                if await _already_sent_today(db, str(user.google_id)):
+                    print(f"  [스킵] {user.email} — 오늘 이미 발송됨")
+                    continue
+
                 today_logs = await get_today_logs(db, user_id=str(user.google_id))
 
                 triggered_topics = get_triggered_topics(today_logs)
@@ -129,14 +156,12 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                 else:
                     print(f"  [프로필] {user.email} — 관심사 프로필 {len(profile_keywords)}개")
 
-                triggered_topics = merged_topics
-
                 subscribed_channel_ids = await _get_subscribed_channel_ids(str(user.google_id))
 
                 newsletter = await asyncio.to_thread(
                     run_pipeline,
                     user_id=str(user.google_id),
-                    raw_keywords=triggered_topics,
+                    raw_keywords=merged_topics,
                     subscribed_channel_ids=subscribed_channel_ids,
                     initial_intent=user.initial_intent,
                 )
