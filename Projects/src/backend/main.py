@@ -59,7 +59,8 @@ _oauth_sessions: dict[str, str] = {}  # {state: code_verifier}
 _oauth_credentials: dict[str, dict] = {}  # {state: credentials}
 
 _transcript_cache: dict = {}
-_search_analysis_cache: dict = {}  # {keyword: analysis_result} — 동일 키워드 Gemini 재호출 방지
+_search_analysis_cache: dict = {}        # {keyword: analysis_result} — 동일 키워드 Gemini 재호출 방지
+_search_analysis_lock = asyncio.Lock()   # 동일 키워드 동시 요청 시 중복 Gemini 호출 방지
 
 
 # ── JWT 인증 의존성 ────────────────────────────────────────────────────────────
@@ -133,6 +134,7 @@ async def callback(
         user = User(
             google_id=user_info["google_id"],
             email=user_info["email"],
+            send_time="21:00",   # 기본 발송 시간 — 마이페이지에서 변경 가능
         )
         db.add(user)
         await db.commit()
@@ -264,12 +266,43 @@ async def my_logs(
     }
 
 
+# ── 발송 시간 유효성 검사 유틸 ────────────────────────────────────────────────
+
+# 스케줄러가 지원하는 발송 시간 목록 (scheduler.py의 cron job과 일치해야 함)
+_VALID_SEND_TIMES = {"08:00", "21:00"}
+_DEFAULT_SEND_TIME = "21:00"
+
+
+def _validate_send_time(send_time: str) -> str:
+    """
+    발송 시간 유효성 검사 후 정규화된 값 반환.
+
+    - 형식: HH:MM (정확히 5자)
+    - 허용값: 08:00 (아침), 21:00 (저녁)
+
+    Raises:
+        HTTPException 400: 형식 오류 또는 지원하지 않는 시간
+    """
+    import re as _re
+    if not _re.match(r"^\d{2}:\d{2}$", send_time):
+        raise HTTPException(
+            status_code=400,
+            detail="send_time은 HH:MM 형식이어야 합니다 (예: '08:00', '21:00')",
+        )
+    if send_time not in _VALID_SEND_TIMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"지원하지 않는 발송 시간입니다. 허용값: {sorted(_VALID_SEND_TIMES)}",
+        )
+    return send_time
+
+
 # ── 구독 설정 ─────────────────────────────────────────────────────────────────
 
 class SubscribeData(BaseModel):
     delivery_type: str = "email"
     email: Optional[str] = None
-    send_time: Optional[str] = None   # "HH:MM" 형식 (예: "08:00", "21:00")
+    send_time: Optional[str] = None   # "HH:MM" 형식 (예: "08:00", "21:00"). 미입력 시 "21:00"
 
 
 @app.post("/subscribe")
@@ -291,16 +324,135 @@ async def subscribe(
     db_user.delivery_type = "email"
     if data.email:
         db_user.email = data.email
-    if data.send_time:
-        # HH:MM 형식 검증
-        import re as _re
-        if not _re.match(r"^\d{2}:\d{2}$", data.send_time):
-            raise HTTPException(status_code=400, detail="send_time은 HH:MM 형식이어야 합니다")
-        db_user.send_time = data.send_time
+
+    # send_time 미입력 시 기본값 보장 — NULL이 절대 저장되지 않도록 함
+    raw_time = data.send_time if data.send_time else _DEFAULT_SEND_TIME
+    db_user.send_time = _validate_send_time(raw_time)
 
     await db.commit()
     print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
-    return {"success": True}
+    return {"success": True, "send_time": db_user.send_time}
+
+
+# ── 마이페이지: 발송 시간 변경 ────────────────────────────────────────────────
+
+class SendTimeData(BaseModel):
+    send_time: str   # "08:00" | "21:00"
+
+
+@app.patch("/my/send-time")
+async def update_send_time(
+    data: SendTimeData,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    마이페이지에서 뉴스레터 발송 시간 변경.
+
+    INPUT:  { "send_time": "08:00" }  또는  { "send_time": "21:00" }
+    OUTPUT: { "success": true, "send_time": "08:00" }
+
+    허용값: "08:00" (아침 8시 KST) | "21:00" (저녁 9시 KST, 기본값)
+    변경 즉시 다음 배치부터 반영됩니다.
+    """
+    from database import User
+
+    validated_time = _validate_send_time(data.send_time)
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    prev_time = db_user.send_time
+    db_user.send_time = validated_time
+    await db.commit()
+
+    print(f"[send-time] {user['user_id']} {prev_time} → {validated_time}")
+    return {"success": True, "send_time": validated_time}
+
+
+@app.get("/my/settings")
+async def get_my_settings(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    마이페이지 설정 조회.
+    발송 시간, 수신 동의 여부, 배송 방법 반환.
+    """
+    from database import User
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    return {
+        "send_time":      db_user.send_time or _DEFAULT_SEND_TIME,
+        "is_subscribed":  db_user.is_subscribed,
+        "delivery_type":  db_user.delivery_type,
+        "email":          db_user.email,
+        "valid_send_times": sorted(_VALID_SEND_TIMES),
+    }
+
+
+@app.delete("/my/subscription")
+async def unsubscribe(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    뉴스레터 수신 해지.
+    users.is_subscribed = False + unsubscribed_at 기록.
+    이후 배치에서 완전히 제외됨.
+    """
+    from database import User
+    from datetime import datetime, timezone
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    db_user.is_subscribed   = False
+    db_user.unsubscribed_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    print(f"[unsubscribe] {user['user_id']} 수신 해지 완료")
+    return {"success": True, "message": "수신이 해지되었습니다. 언제든 다시 구독할 수 있습니다."}
+
+
+@app.post("/my/subscription")
+async def resubscribe(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    뉴스레터 수신 재신청 (해지 후 복구).
+    users.is_subscribed = True + unsubscribed_at 초기화.
+    """
+    from database import User
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    db_user.is_subscribed   = True
+    db_user.unsubscribed_at = None
+    await db.commit()
+
+    print(f"[resubscribe] {user['user_id']} 수신 재신청 완료")
+    return {"success": True, "message": "수신 신청이 완료되었습니다."}
 
 
 # ── YouTube ───────────────────────────────────────────────────────────────────
@@ -399,7 +551,7 @@ async def send_now(
     return JSONResponse(newsletter)
 
 
-# ── 즉석 검색 분석 ────────────────────────────────────────────────────────────
+# ── 즉석 검색 분석 (Pipeline A) ───────────────────────────────────────────────
 
 @app.get("/analyze_search")
 async def analyze_search(
@@ -407,25 +559,47 @@ async def analyze_search(
     user=Depends(get_current_user),
 ):
     """
-    검색어 기반 즉석 분석 — popup/search_dashboard에서 호출.
-    selector_ai + analyzer_ai만 실행 (cluster/newsletter 생략).
+    검색어 기반 즉석 분석 — Side Panel / search_dashboard에서 호출.
+    루트 orchestrator (selector→[analyzer+category]→dashboard) 실행.
     keyword 기준 인메모리 캐시로 Gemini 중복 호출 방지.
-    """
-    import asyncio
-    from agents.selector_ai import select_top_videos
-    from agents.analyzer_ai import analyze_videos
 
+    OUTPUT: {
+      keyword, category, layout,
+      summary_lines, common_conclusion,
+      controversies, recommended_videos, common_facts
+    }
+    """
+    from orchestrator import run_pipeline as run_pipeline_a
+
+    # 캐시 히트 (Lock 없이 먼저 체크 — 이미 저장된 경우 빠른 반환)
     if keyword in _search_analysis_cache:
         return JSONResponse(_search_analysis_cache[keyword])
 
-    def _run():
-        videos = select_top_videos(topic=keyword, subscribed_channel_ids=[])
-        if not videos:
-            return {"keyword": keyword, "videos": [], "common_facts": [], "controversies": []}
-        return analyze_videos(keyword=keyword, videos=videos)
+    # Lock으로 동일 키워드 동시 요청 시 중복 Gemini 호출 방지
+    async with _search_analysis_lock:
+        # Lock 진입 후 재확인 (다른 요청이 먼저 완료했을 수 있음)
+        if keyword in _search_analysis_cache:
+            return JSONResponse(_search_analysis_cache[keyword])
 
-    result = await asyncio.to_thread(_run)
-    _search_analysis_cache[keyword] = result
+        def _run():
+            try:
+                return run_pipeline_a(keyword)
+            except ValueError:
+                # 검색 결과 없음
+                return {
+                    "keyword": keyword,
+                    "category": "정보탐색형",
+                    "layout": "summary_focus",
+                    "summary_lines": [],
+                    "common_conclusion": "",
+                    "controversies": [],
+                    "recommended_videos": [],
+                    "common_facts": [],
+                }
+
+        result = await asyncio.to_thread(_run)
+        _search_analysis_cache[keyword] = result
+
     return JSONResponse(result)
 
 
@@ -624,6 +798,100 @@ async def profile_init(
     await db.commit()
 
     print(f"[profile/init] {user['user_id']} → 의도={data.initial_intent}, 카테고리={data.interest_categories}")
+    return {"success": True}
+
+
+@app.post("/profile/analyze-history")
+async def analyze_history(
+    data: HistoryAnalysisRequest,
+    user=Depends(get_current_user),
+):
+    """
+    익스텐션이 chrome.history API로 수집한 유튜브 검색어를 받아
+    cluster_ai + intent_ai로 초기 관심사 프로필을 추론한다.
+
+    INPUT:  {"keywords": ["파이썬 강의", "아이폰 16 리뷰", ...]}
+    OUTPUT: {"intent_type": "지식형", "categories": ["파이썬", "스마트폰"]}
+    """
+    from agents.cluster_ai import cluster_topics
+    from agents.intent_ai import classify_intent
+
+    keywords = [k.strip() for k in data.keywords if k.strip()]
+    if not keywords:
+        raise HTTPException(status_code=400, detail="keywords가 비어 있습니다")
+
+    clusters      = await asyncio.to_thread(cluster_topics, keywords, 5)
+    categories    = [c["topic"] for c in clusters]
+    intent_result = await asyncio.to_thread(classify_intent, keywords, [])
+    intent_type   = intent_result.get("intent_type", "지식형")
+
+    re    """특정 유저 파이프라인 즉시 실행 (google_id 기준)"""
+    import asyncio, json
+    from database import User, Newsletter
+
+    logs      = await get_today_logs(db, user_id=user_id)
+    triggered = get_triggered_topics(logs)
+
+    if not triggered:
+        raise HTTPException(status_code=404, detail="트리거된 주제 없음")
+
+    newsletter = await asyncio.to_thread(
+        run_pipeline,
+        user_id=user_id,
+        raw_keywords=triggered,
+    )
+
+    record = Newsletter(
+        user_id=user_id,
+        subject=newsletter.get("subject", ""),
+        content_json=json.dumps(newsletter, ensure_ascii=False),
+        delivery_type="email",
+    )
+    db.add(record)
+    await db.commit()
+
+    return JSONResponse(newsletter)
+
+
+# ── 프로필 초기화 (PHASE 1) ───────────────────────────────────────────────────
+
+class ProfileInitData(BaseModel):
+    initial_intent: str
+    interest_categories: list[str] = []
+
+
+class HistoryAnalysisRequest(BaseModel):
+    keywords: list[str]
+
+
+@app.post("/profile/init")
+async def profile_init(
+    data: ProfileInitData,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    온보딩 완료 시 초기 관심사 프로필 저장.
+    initial_intent와 interest_categories를 users 테이블에 저장한다.
+    """
+    import json as _json
+    from database import User
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    if data.initial_intent not in ("유희형", "지식형", "구매형"):
+        raise HTTPException(status_code=400, detail="initial_intent는 유희형|지식형|구매형 중 하나여야 합니다")
+
+    db_user.initial_intent      = data.initial_intent
+    db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
+    await db.commit()
+
+    print(f"[profile/init] {user['user_id']} -> 의도={data.initial_intent}, 카테고리={data.interest_categories}")
     return {"success": True}
 
 

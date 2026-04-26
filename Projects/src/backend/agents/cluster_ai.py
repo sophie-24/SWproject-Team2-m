@@ -67,7 +67,9 @@ def cluster_topics(
 """
 
     try:
-        text = call_gemini(prompt, temperature=0.2)
+        # json_mode=True: response_mime_type="application/json" 적용.
+        # Gemini가 마크다운 코드블록 없이 순수 JSON만 반환하도록 강제한다.
+        text = call_gemini(prompt, temperature=0.2, json_mode=True)
         clusters = _parse_clusters(text)
     except Exception as e:
         print(f"[cluster_ai] Gemini 오류 — 폴백 실행: {e}")
@@ -81,11 +83,19 @@ def cluster_topics(
 
 
 def _parse_clusters(text: str) -> List[Dict[str, Any]]:
-    """Gemini 응답에서 JSON 파싱"""
-    # JSON 배열 추출
-    match = re.search(r"\[.*\]", text, re.DOTALL)
+    """
+    Gemini 응답에서 JSON 파싱.
+
+    json_mode=True 덕분에 정상적으로는 순수 JSON이 오지만,
+    만일 마크다운 코드블록(```json ... ```)이 포함되더라도 안전하게 처리한다.
+    """
+    # 1차: 마크다운 코드블록 제거 (```json ... ``` 또는 ``` ... ```)
+    cleaned = re.sub(r"```(?:json)?\s*([\s\S]*?)```", r"\1", text).strip()
+
+    # 2차: JSON 배열 범위 추출 (코드블록 외부에 설명 텍스트가 섞인 경우 대비)
+    match = re.search(r"\[.*\]", cleaned, re.DOTALL)
     if not match:
-        raise ValueError("JSON 배열을 찾을 수 없음")
+        raise ValueError(f"JSON 배열을 찾을 수 없음. 원본 응답: {text[:200]!r}")
 
     clusters = json.loads(match.group())
 
