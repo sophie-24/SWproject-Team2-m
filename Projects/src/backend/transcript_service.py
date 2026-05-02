@@ -1,3 +1,4 @@
+# yt-dlp로 YouTube 자막 수집, 타임스탬프 포맷 변환, 언어별 자막 목록 조회
 import os
 import json
 import tempfile

@@ -1,3 +1,4 @@
+# 영상 선정 에이전트 — YouTube API 후보 수집 후 ViewRate × 개인화(키워드·구독·최신성) 공식으로 상위 5개 선정
 """
 selector_ai.py — 영상 선별 및 스코어링 (Feature 03)
 
@@ -7,7 +8,8 @@ PPT 스코어링 공식:
   ViewRate       = 조회수 / 업로드 후 경과 시간(시간 단위)  → 정규화 후 사용
   신뢰도         = 이 단계에서는 계산 불가 (자막 분석 필요)
                   analyzer_ai 단계에서 credibility_score로 반영
-  개인화 적합도  = ω₁·키워드_유사도 + ω₂·(1 - 구독여부_페널티) + ω₃·최신성
+  개인화 적합도  = ω₁·키워드_유사도 + ω₂·구독채널_보너스 + ω₃·최신성
+                  ω₁=0.5, ω₂=0.3, ω₃=0.2  (PPT Feature 03 기준)
 
   여기서는 analyzer_ai 이전 단계이므로:
     pre_score = norm_view_rate × personalization_score
@@ -25,13 +27,15 @@ from dotenv import load_dotenv
 from youtube_search import search_videos
 
 load_dotenv()
+from logger import get_logger
+logger = get_logger(__name__)
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 # ── 개인화 가중치 (PPT Feature 03) ────────────────────────────────────────────
 W_KEYWORD    = 0.5   # 키워드 유사도 (제목 내 검색어 포함 여부)
-W_SUBSCRIBED = 0.2   # 구독 채널 여부 (구독 채널이면 +bonus)
-W_RECENCY    = 0.3   # 최신성 (업로드 시점 기준)
+W_SUBSCRIBED = 0.3   # 구독 채널 여부 (구독 채널이면 +bonus)  ← PPT ω₂=0.3
+W_RECENCY    = 0.2   # 최신성 (업로드 시점 기준)              ← PPT ω₃=0.2
 
 
 def _parse_duration_seconds(iso_duration: str) -> int:
@@ -213,7 +217,7 @@ def select_top_videos(
     # 7. 점수 내림차순 정렬 후 상위 top_n개 선정
     scored.sort(key=lambda x: x["score"], reverse=True)
 
-    print(
+    logger.info(
         f"[selector] '{topic}' — 후보 {len(candidates)}개 → 상위 {top_n}개 선정"
         f" (ViewRate×개인화 공식)"
     )

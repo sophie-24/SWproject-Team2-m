@@ -1,27 +1,27 @@
+# 자막 분석 에이전트 — 배치 광고 탐지, 교차분석(공통사실·쟁점), 신뢰도 점수, 영어 자막 한국어 처리
+import asyncio
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional
 
 from transcript_service import get_transcript, format_transcript_with_timestamps
 from preprocessing import clean_transcript
-from agents.gemini_client import call_gemini, parse_section, parse_bullet_list
+from gemini_client import call_gemini_async, parse_section, parse_bullet_list
+from ad_detector import detect_ad_signals, blend_scores
 
-# 자막 최대 길이 (Gemini 1M 토큰 활용, 안전 마진 포함)
-MAX_TRANSCRIPT_CHARS = 80_000
+from logger import get_logger
+logger = get_logger(__name__)
 
-# 한글 문자 비율이 이 값 이상이면 한국어 자막으로 판별
+
+# ── 상수 ──────────────────────────────────────────────────────────────────────
+
+MAX_TRANSCRIPT_CHARS = 30_000
+
 _KO_CHAR_RATIO_THRESHOLD = 0.15
 
 
-def _detect_language(text: str) -> str:
-    """
-    자막 언어를 한글 문자 비율로 판별한다.
-    외부 라이브러리 없이 유니코드 범위(가-힣)만 사용.
+# ── 언어 감지 ─────────────────────────────────────────────────────────────────
 
-    Returns:
-        "ko" -- 한국어 자막 (한글 비율 >= 15%)
-        "en" -- 영어 또는 기타 언어
-    """
+def _detect_language(text: str) -> str:
     if not text:
         return "en"
     ko_chars = sum(1 for c in text if "\uAC00" <= c <= "\uD7A3")
@@ -29,287 +29,380 @@ def _detect_language(text: str) -> str:
 
 
 def _build_lang_instruction(lang: str) -> str:
-    """
-    자막 언어에 따라 프롬프트 앞에 삽입할 언어 지시문을 반환한다.
-
-    파서가 [광고점수] / [요약] / [핵심주장] 등 한국어 섹션 헤더에 의존하므로
-    영어 자막이 입력되더라도 응답은 반드시 한국어 형식을 유지해야 한다.
-    """
     if lang == "en":
         return (
-            "※ 아래 자막은 영어로 작성되어 있습니다. "
-            "영어 자막을 분석하되, 반드시 아래 한국어 섹션 형식으로 답변하세요. "
-            "영어로 답변하면 안 됩니다.\n"
+            "[주의] 아래 자막은 영어입니다. 영어 자막을 분석하되 "
+            "반드시 한국어 섹션 형식으로 답변하세요.\n"
         )
     return ""
 
 
+# ── 자막 수집 (동기, asyncio.to_thread로 호출) ───────────────────────────────
+
 def _collect_transcript(video_id: str) -> Optional[str]:
-    """자막 수집 -> 정제 -> 단일 문자열 반환. 실패 시 None."""
     raw = get_transcript(video_id)
     if not raw:
         return None
-
     entries = format_transcript_with_timestamps(raw)
     if not entries:
         return None
-
     full_text = " ".join(e["text"] for e in entries)
     cleaned = clean_transcript(full_text)
     return cleaned[:MAX_TRANSCRIPT_CHARS] if cleaned else None
 
 
-def _analyze_single_video(video: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    영상 1개를 분석하여 아래 필드를 반환:
-    - video_id, title, channel_id, channel_title
-    - transcript_available (bool)
-    - ad_score (0~100)
-    - ad_detected (bool: ad_score >= 60)
-    - summary (str)
-    - key_claims (List[str])
-    - credibility_score (float, 0~1) -- 이후 cross_analyze에서 보정
-    """
-    video_id = video["video_id"]
-    title = video.get("title", "")
-    channel_title = video.get("channel_title", "")
+# ── Strategy B: 배치 분석 (영상 N개 → Gemini 1회) ────────────────────────────
 
-    transcript = _collect_transcript(video_id)
-    if not transcript:
-        return {
-            "video_id": video_id,
-            "title": title,
-            "channel_id": video.get("channel_id", ""),
-            "channel_title": channel_title,
-            "transcript_available": False,
-            "ad_score": 0,
-            "ad_detected": False,
-            "summary": "자막 없음",
-            "key_claims": [],
-            "credibility_score": 0.3,
-        }
+async def _analyze_videos_batch(
+    keyword: str,
+    videos: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    영상 N개를 하나의 Gemini 호출로 일괄 분석.
 
-    lang = _detect_language(transcript)
-    lang_instruction = _build_lang_instruction(lang)
-    if lang == "en":
-        print(f"  [언어감지] {video_id}: 영어 자막 -- 한국어 응답 지시 삽입")
+    이전: _analyze_single_video() x N = N회 호출
+    이후: 1회 호출 (자막 수집은 asyncio.gather로 병렬 처리)
+    """
+    # 1. 자막 수집 — 병렬
+    transcripts: List[Optional[str]] = list(await asyncio.gather(
+        *[asyncio.to_thread(_collect_transcript, v["video_id"]) for v in videos]
+    ))
+
+    # 2. 자막 없는 영상만 있으면 Gemini 호출 생략
+    if not any(transcripts):
+        return [
+            {
+                "video_id": v["video_id"],
+                "title": v.get("title", ""),
+                "channel_id": v.get("channel_id", ""),
+                "channel_title": v.get("channel_title", ""),
+                "transcript_available": False,
+                "ad_score": 0,
+                "ad_detected": False,
+                "summary": "자막 없음",
+                "key_claims": [],
+                "credibility_score": 0.3,
+            }
+            for v in videos
+        ]
+
+    # 3. 배치 프롬프트 구성
+    video_blocks = []
+    for i, (v, t) in enumerate(zip(videos, transcripts)):
+        title = v.get("title", "")
+        channel = v.get("channel_title", "")
+        if t:
+            lang = _detect_language(t)
+            lang_inst = _build_lang_instruction(lang)
+            if lang == "en":
+                logger.info(f"  [언어감지] {v['video_id']}: 영어 자막")
+            block = (
+                f"[영상 {i + 1}] 제목: {title} / 채널: {channel}\n"
+                f"{lang_inst}"
+                f"자막:\n{t}"
+            )
+        else:
+            block = f"[영상 {i + 1}] 제목: {title} / 채널: {channel}\n자막: 없음"
+        video_blocks.append(block)
+
+    video_data = "\n\n" + ("-" * 40 + "\n").join(video_blocks)
 
     prompt = (
-        f"{lang_instruction}"
-        f"다음은 유튜브 영상의 자막입니다.\n"
-        f"영상 제목: {title}\n"
-        f"채널: {channel_title}\n"
+        f"검색 주제: {keyword}\n"
+        f"아래 {len(videos)}개 유튜브 영상을 각각 분석하세요.\n"
+        f"반드시 각 영상 분석을 ===VIDEO_N=== 구분자로 시작하고, 아래 형식을 정확히 따르세요.\n"
+        f"모든 답변은 한국어로 작성하세요.\n"
         f"\n"
-        f"아래 형식에 맞게 분석하세요. 각 항목은 정확히 지정된 형식으로만 답변하세요.\n"
-        f"\n"
+        f"[응답 형식]\n"
+        f"===VIDEO_1===\n"
         f"[광고점수]\n"
-        f"0~100 사이 정수 하나만. 기준:\n"
-        f"- 명시적 협찬/유료광고 문구 -> 80~100\n"
-        f"- 구매 유도 링크/할인코드 -> 60~80\n"
-        f"- 제품 소개 중심 (광고 문구 없음) -> 40~60\n"
-        f"- 정보/리뷰 목적 제품 언급 -> 20~40\n"
-        f"- 광고 요소 없음 -> 0~20\n"
-        f"\n"
+        f"0~100 정수 하나만 (협찬/광고 문구 -> 80~100, 구매 유도 -> 60~80, 정보/리뷰 -> 0~40)\n"
         f"[요약]\n"
-        f"영상 내용을 2~3문장으로 요약.\n"
-        f"\n"
+        f"영상 내용 2~3문장 요약\n"
         f"[핵심주장]\n"
-        f"이 영상에서 제시하는 핵심 주장이나 정보를 최대 5개 항목으로 작성.\n"
-        f"각 항목은 \"- \" 으로 시작.\n"
+        f"- 핵심 주장 1\n"
+        f"- 핵심 주장 2 (최대 5개)\n"
         f"\n"
-        f"자막:\n"
-        f"{transcript}"
+        f"===VIDEO_2===\n"
+        f"... (동일 형식 반복)\n"
+        f"\n"
+        f"[영상 데이터]"
+        f"{video_data}\n"
+        f"\n"
+        f"위 {len(videos)}개 영상을 각각 분석하세요. "
+        f"===VIDEO_1=== 부터 ===VIDEO_{len(videos)}=== 까지 모든 영상을 빠짐없이 분석하세요."
     )
 
     try:
-        text = call_gemini(prompt, temperature=0.3)
+        text = await call_gemini_async(prompt, temperature=0.3)
+        return _parse_batch_response(text, videos, transcripts)
     except Exception as e:
-        print(f"  [분석 오류] {video_id}: {e}")
-        return {
-            "video_id": video_id,
-            "title": title,
-            "channel_id": video.get("channel_id", ""),
-            "channel_title": channel_title,
-            "transcript_available": True,
-            "ad_score": 0,
-            "ad_detected": False,
-            "summary": "분석 실패",
-            "key_claims": [],
-            "credibility_score": 0.3,
-        }
+        logger.error(f"  [배치분석 오류] {keyword}: {e}")
+        # 폴백: 모든 영상 분석 실패 처리
+        return [
+            {
+                "video_id": v["video_id"],
+                "title": v.get("title", ""),
+                "channel_id": v.get("channel_id", ""),
+                "channel_title": v.get("channel_title", ""),
+                "transcript_available": transcripts[i] is not None,
+                "ad_score": 0,
+                "ad_detected": False,
+                "summary": "분석 실패",
+                "key_claims": [],
+                "credibility_score": 0.3,
+            }
+            for i, v in enumerate(videos)
+        ]
 
-    # 파싱
-    ad_score = _parse_ad_score(text)
-    summary = parse_section(text, "요약")
-    key_claims = parse_bullet_list(text, "핵심주장")
 
-    return {
-        "video_id": video_id,
-        "title": title,
-        "channel_id": video.get("channel_id", ""),
-        "channel_title": channel_title,
-        "transcript_available": True,
-        "ad_score": ad_score,
-        "ad_detected": ad_score >= 60,
-        "summary": summary,
-        "key_claims": key_claims,
-        "credibility_score": 0.5,  # cross_analyze에서 최종 보정
-    }
+def _parse_batch_response(
+    text: str,
+    videos: List[Dict[str, Any]],
+    transcripts: List[Optional[str]],
+) -> List[Dict[str, Any]]:
+    """
+    ===VIDEO_N=== 구분자로 Gemini 배치 응답을 파싱.
+    구분자가 없는 영상은 기본값으로 처리.
+    """
+    parts = re.split(r"===VIDEO_(\d+)===", text)
+    section_map: Dict[int, str] = {}
+    for i in range(1, len(parts), 2):
+        if i + 1 < len(parts):
+            section_map[int(parts[i])] = parts[i + 1]
+
+    results = []
+    for i, v in enumerate(videos):
+        content = section_map.get(i + 1, "")
+        transcript = transcripts[i]
+
+        gemini_ad_score = _parse_ad_score(content) if content else 0
+        summary = parse_section(content, "요약") if content else ""
+        key_claims = parse_bullet_list(content, "핵심주장") if content else []
+
+        # Layer 1~3 규칙 기반 탐지 (description + 자막 패턴 + API 플래그)
+        rule_result = detect_ad_signals(
+            description=v.get("description", ""),
+            transcript=transcript or "",
+            paid_flag=v.get("has_paid_placement"),  # YouTube Studio 체크박스 값
+        )
+        # Layer 4 Gemini 점수와 블렌딩
+        ad_score = blend_scores(rule_result.rule_score, gemini_ad_score)
+
+        results.append({
+            "video_id": v["video_id"],
+            "title": v.get("title", ""),
+            "channel_id": v.get("channel_id", ""),
+            "channel_title": v.get("channel_title", ""),
+            "transcript_available": transcript is not None,
+            "ad_score": ad_score,
+            "ad_detected": ad_score >= 60,
+            "ad_signals": [
+                {"rule": s.rule, "evidence": s.evidence, "score": s.score}
+                for s in rule_result.signals
+            ],
+            "summary": summary or ("자막 없음" if not transcript else "분석 실패"),
+            "key_claims": key_claims,
+            "credibility_score": 0.3 if ad_score >= 60 else 0.5,
+        })
+
+    return results
 
 
 def _parse_ad_score(text: str) -> int:
-    """[광고점수] 섹션에서 숫자 추출"""
     section = parse_section(text, "광고점수")
     match = re.search(r"\d+", section)
     if match:
         return max(0, min(100, int(match.group())))
-    # 섹션이 없으면 전체 텍스트에서 첫 숫자 탐색
     match = re.search(r"\d+", text[:50])
     return max(0, min(100, int(match.group()))) if match else 0
 
 
-def _cross_analyze(
+# ── Strategy C: 교차분석 + 뉴스레터 통합 (2회 → 1회) ────────────────────────
+
+async def _cross_and_generate(
     keyword: str,
     video_results: List[Dict[str, Any]],
+    format_style: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
-    5개 영상 분석 결과를 종합하여:
-    - common_facts: 3개 이상 영상에서 언급된 공통 사실
-    - controversies: 영상마다 다른 주장/쟁점
-    반환. 또한 각 영상의 credibility_score를 최종 보정.
+    교차분석(공통사실/쟁점)과 뉴스레터 콘텐츠(요약/장점/단점)를
+    하나의 Gemini 호출로 통합 생성.
+
+    이전: _cross_analyze() 1회 + _generate_topic_content() 1회 = 2회
+    이후: 1회
     """
-    # 자막이 있는 영상만 대상
     valid = [v for v in video_results if v["transcript_available"] and v["key_claims"]]
     if not valid:
-        return {"common_facts": [], "controversies": []}
+        return {
+            "common_facts": [],
+            "controversies": [],
+            "summary": ["분석 가능한 영상이 없습니다", "", ""],
+            "pros": [],
+            "cons": [],
+        }
 
-    claims_block = "\n\n".join(
-        f"영상{i+1} ({v['title']}):\n" + "\n".join(f"  - {c}" for c in v["key_claims"])
-        for i, v in enumerate(valid)
+    # 영상별 주장 블록 (신뢰도 + 광고 여부 포함)
+    claims_lines = []
+    for i, v in enumerate(valid):
+        ad_tag = " [광고포함]" if v["ad_detected"] else ""
+        cred = v.get("credibility_score", 0.5)
+        claims_lines.append(
+            f"영상{i + 1} [{v['channel_title']} / 신뢰도:{cred:.1f}{ad_tag}]:"
+        )
+        for c in v["key_claims"]:
+            claims_lines.append(f"  - {c}")
+    claims_block = "\n".join(claims_lines)
+
+    length_guide = (
+        "각 항목은 1줄로 간결하게"
+        if format_style and format_style.get("length") == "short"
+        else "각 항목은 2줄 이내로"
     )
+    tone_note = f"작성 스타일: {format_style['tone']}\n" if format_style and format_style.get("tone") else ""
 
     prompt = (
-        f"검색어: {keyword}\n"
+        f"검색 주제: {keyword}\n"
         f"\n"
-        f"아래는 {len(valid)}개 유튜브 영상에서 추출한 핵심 주장 목록입니다.\n"
-        f"(각 영상의 key_claims는 이미 한국어로 추출된 상태입니다.)\n"
+        f"아래는 {len(valid)}개 유튜브 영상에서 추출한 핵심 주장입니다.\n"
+        f"[광고포함] 영상의 주장은 신뢰도가 낮으므로 보조 정보로만 활용하세요.\n"
         f"\n"
         f"{claims_block}\n"
         f"\n"
-        f"다음 두 가지를 한국어로 분석하세요.\n"
+        f"위 영상 분석을 바탕으로 아래 항목들을 한국어로 작성하세요.\n"
+        f"{tone_note}"
+        f"{length_guide} 작성하세요.\n"
         f"\n"
         f"[공통사실]\n"
-        f"3개 이상의 영상에서 공통으로 언급되거나 동의하는 사실/정보를 최대 5개 작성.\n"
-        f"각 항목은 \"- \" 으로 시작. 없으면 \"- 없음\" 으로 작성.\n"
+        f"3개 이상 영상에서 공통으로 언급된 사실/정보를 최대 5개.\n"
+        f"각 항목은 \"- \"으로 시작. 없으면 \"- 없음\".\n"
         f"\n"
         f"[쟁점]\n"
-        f"영상마다 서로 다른 주장을 하거나 의견이 나뉘는 내용을 최대 5개 작성.\n"
-        f"각 항목은 \"- \" 으로 시작. 없으면 \"- 없음\" 으로 작성.\n"
+        f"영상마다 서로 다른 주장이나 의견이 갈리는 내용을 최대 5개.\n"
+        f"각 항목은 \"- \"으로 시작. 없으면 \"- 없음\".\n"
+        f"\n"
+        f"[요약]\n"
+        f"이 주제의 핵심을 정확히 3줄로 요약. 각 줄은 \"- \"으로 시작.\n"
+        f"\n"
+        f"[장점]\n"
+        f"긍정적인 점을 최대 3개. 각 항목은 \"- \"으로 시작.\n"
+        f"\n"
+        f"[단점]\n"
+        f"부정적이거나 주의할 점을 최대 3개. 각 항목은 \"- \"으로 시작.\n"
     )
 
     try:
-        text = call_gemini(prompt, temperature=0.3)
+        text = await call_gemini_async(prompt, temperature=0.3)
     except Exception as e:
-        print(f"  [교차분석 오류]: {e}")
-        return {"common_facts": [], "controversies": []}
+        logger.error(f"  [교차+생성 오류] {keyword}: {e}")
+        return {
+            "common_facts": [],
+            "controversies": [],
+            "summary": ["콘텐츠 생성 실패", "", ""],
+            "pros": [],
+            "cons": [],
+        }
 
-    common_facts = parse_bullet_list(text, "공통사실")
-    controversies = parse_bullet_list(text, "쟁점")
+    common_facts  = [f for f in parse_bullet_list(text, "공통사실") if f != "없음"]
+    controversies = [c for c in parse_bullet_list(text, "쟁점")    if c != "없음"]
+    summary       = parse_bullet_list(text, "요약")
+    pros          = parse_bullet_list(text, "장점")
+    cons          = parse_bullet_list(text, "단점")
 
-    # "없음" 제거
-    common_facts = [f for f in common_facts if f != "없음"]
-    controversies = [c for c in controversies if c != "없음"]
+    while len(summary) < 3:
+        summary.append("")
+    summary = summary[:3]
 
-    return {"common_facts": common_facts, "controversies": controversies}
+    return {
+        "common_facts":  common_facts,
+        "controversies": controversies,
+        "summary":       summary,
+        "pros":          pros,
+        "cons":          cons,
+    }
 
+
+# ── 신뢰도 보정 ───────────────────────────────────────────────────────────────
 
 def _calc_credibility(video: Dict[str, Any], common_facts: List[str]) -> float:
-    """
-    신뢰도 계산:
-    - 기본 0.5
-    - 광고 포함 -> -0.2
-    - 공통 사실과 일치하는 주장 수에 비례 -> 최대 +0.3
-    """
     score = 0.5
-
     if video["ad_detected"]:
         score -= 0.2
-
     if common_facts and video["key_claims"]:
-        # 핵심 주장 중 공통 사실 키워드와 겹치는 비율
         claim_text = " ".join(video["key_claims"]).lower()
         matched = sum(
             1 for fact in common_facts
             if any(word in claim_text for word in fact.lower().split() if len(word) > 2)
         )
-        overlap_ratio = matched / max(len(common_facts), 1)
-        score += 0.3 * overlap_ratio
-
+        score += 0.3 * (matched / max(len(common_facts), 1))
     return round(max(0.0, min(1.0, score)), 3)
 
 
-def analyze_videos(
+# ── 메인 진입점 ───────────────────────────────────────────────────────────────
+
+async def analyze_videos(
     keyword: str,
     videos: List[Dict[str, Any]],
+    format_style: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
-    5개 영상을 병렬 분석 후 교차 분석 결과를 반환.
+    영상 배치 분석 + 교차분석 + 뉴스레터 콘텐츠를 2회 Gemini 호출로 완성.
+
+    Gemini 호출 횟수 변화 (영상 5개 기준):
+      이전: 5 (개별분석) + 1 (교차분석) + 1 (뉴스레터) = 7회
+      이후: 1 (배치분석) + 1 (교차+뉴스레터 통합) = 2회
 
     Args:
-        keyword: 검색 키워드
-        videos: selector_ai.select_top_videos() 반환값 (최대 5개)
-
-    Returns:
-        {
-            "keyword": str,
-            "videos": [...],          # 영상별 분석 결과 + credibility_score
-            "common_facts": [...],    # 공통 사실
-            "controversies": [...],   # 쟁점
-        }
+        keyword:      검색 키워드
+        videos:       selector_ai 반환 영상 목록 (최대 5개)
+        format_style: intent_ai가 반환한 format_style (뉴스레터 스타일 제어)
     """
-    print(f"[analyzer] '{keyword}' 영상 {len(videos)}개 분석 시작")
+    logger.info(f"[analyzer] '{keyword}' 영상 {len(videos)}개 — 배치 분석 시작")
 
-    # 1. 영상별 병렬 분석 (자막 수집 + Gemini 호출)
-    video_results: List[Dict[str, Any]] = [None] * len(videos)
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        future_map = {
-            executor.submit(_analyze_single_video, v): i
-            for i, v in enumerate(videos)
-        }
-        for future in as_completed(future_map):
-            idx = future_map[future]
-            try:
-                video_results[idx] = future.result()
-            except Exception as e:
-                print(f"  [영상 분석 실패] index={idx}: {e}")
-                v = videos[idx]
-                video_results[idx] = {
-                    "video_id": v["video_id"],
-                    "title": v.get("title", ""),
-                    "channel_id": v.get("channel_id", ""),
-                    "channel_title": v.get("channel_title", ""),
-                    "transcript_available": False,
-                    "ad_score": 0,
-                    "ad_detected": False,
-                    "summary": "분석 실패",
-                    "key_claims": [],
-                    "credibility_score": 0.3,
-                }
+    # Step 1: 배치 분석 [1회 호출]
+    video_results = await _analyze_videos_batch(keyword, videos)
 
-    # 2. 교차 분석 (공통 사실, 쟁점)
-    cross = _cross_analyze(keyword, video_results)
-    common_facts = cross["common_facts"]
-    controversies = cross["controversies"]
+    # Step 2: 교차분석 + 뉴스레터 통합 [1회 호출]
+    content = await _cross_and_generate(keyword, video_results, format_style)
 
-    # 3. 신뢰도 최종 보정
+    # Step 3: 최종 신뢰도 보정 (공통사실 기반, 호출 없음)
+    common_facts = content["common_facts"]
     for vr in video_results:
         vr["credibility_score"] = _calc_credibility(vr, common_facts)
 
-    print(f"[analyzer] 완료 -- 공통사실 {len(common_facts)}개 / 쟁점 {len(controversies)}개")
+    # 출처 구성 (광고 제외, 없으면 전체)
+    sources = [
+        {
+            "title":         v["title"],
+            "url":           f"https://youtube.com/watch?v={v['video_id']}",
+            "channel_title": v.get("channel_title", ""),
+            "thumbnail_url": f"https://img.youtube.com/vi/{v['video_id']}/mqdefault.jpg",
+        }
+        for v in video_results
+        if not v.get("ad_detected") and v.get("transcript_available")
+    ]
+    if not sources:
+        sources = [
+            {
+                "title":         v["title"],
+                "url":           f"https://youtube.com/watch?v={v['video_id']}",
+                "channel_title": v.get("channel_title", ""),
+                "thumbnail_url": f"https://img.youtube.com/vi/{v['video_id']}/mqdefault.jpg",
+            }
+            for v in video_results
+        ]
+
+    logger.info(f"[analyzer] 완료 — 공통사실 {len(common_facts)}개 / "
+        f"쟁점 {len(content['controversies'])}개"
+    )
 
     return {
-        "keyword": keyword,
-        "videos": video_results,
-        "common_facts": common_facts,
-        "controversies": controversies,
+        "keyword":       keyword,
+        "videos":        video_results,
+        "common_facts":  common_facts,
+        "controversies": content["controversies"],
+        "summary":       content["summary"],
+        "pros":          content["pros"],
+        "cons":          content["cons"],
+        "sources":       sources,
     }

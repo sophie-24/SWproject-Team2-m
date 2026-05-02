@@ -1,3 +1,4 @@
+# Google OAuth2 PKCE 인증 흐름 + JWT 발급/검증
 import os
 import jwt
 import datetime
