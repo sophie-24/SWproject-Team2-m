@@ -16,8 +16,6 @@ logger = get_logger(__name__)
 
 MAX_TRANSCRIPT_CHARS = 30_000
 
-<<<<<<< Updated upstream
-=======
 _KO_CHAR_RATIO_THRESHOLD = 0.15
 
 
@@ -38,15 +36,10 @@ def _build_lang_instruction(lang: str) -> str:
         )
     return ""
 
->>>>>>> Stashed changes
 
 # ── 자막 수집 (동기, asyncio.to_thread로 호출) ───────────────────────────────
 
 def _collect_transcript(video_id: str) -> Optional[str]:
-<<<<<<< Updated upstream
-    """자막 수집 → 정제 → 단일 문자열 반환. 실패 시 None."""
-=======
->>>>>>> Stashed changes
     raw = get_transcript(video_id)
     if not raw:
         return None
@@ -58,24 +51,7 @@ def _collect_transcript(video_id: str) -> Optional[str]:
     return cleaned[:MAX_TRANSCRIPT_CHARS] if cleaned else None
 
 
-<<<<<<< Updated upstream
-def _analyze_single_video(video: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    영상 1개를 분석하여 아래 필드를 반환:
-    - video_id, title, channel_id, channel_title
-    - transcript_available (bool)
-    - ad_score (0~100)
-    - ad_detected (bool: ad_score >= 60)
-    - summary (str)
-    - key_claims (List[str])
-    - credibility_score (float, 0~1) — 이후 cross_analyze에서 보정
-    """
-    video_id = video["video_id"]
-    title = video.get("title", "")
-    channel_title = video.get("channel_title", "")
-=======
 # ── Strategy B: 배치 분석 (영상 N개 → Gemini 1회) ────────────────────────────
->>>>>>> Stashed changes
 
 async def _analyze_videos_batch(
     keyword: str,
@@ -84,33 +60,6 @@ async def _analyze_videos_batch(
     """
     영상 N개를 하나의 Gemini 호출로 일괄 분석.
 
-<<<<<<< Updated upstream
-    prompt = f"""
-다음은 유튜브 영상의 자막입니다.
-영상 제목: {title}
-채널: {channel_title}
-
-아래 형식에 맞게 분석하세요. 각 항목은 정확히 지정된 형식으로만 답변하세요.
-
-[광고점수]
-0~100 사이 정수 하나만. 기준:
-- 명시적 협찬/유료광고 문구 → 80~100
-- 구매 유도 링크/할인코드 → 60~80
-- 제품 소개 중심 (광고 문구 없음) → 40~60
-- 정보/리뷰 목적 제품 언급 → 20~40
-- 광고 요소 없음 → 0~20
-
-[요약]
-영상 내용을 2~3문장으로 요약.
-
-[핵심주장]
-이 영상에서 제시하는 핵심 주장이나 정보를 최대 5개 항목으로 작성.
-각 항목은 "- " 으로 시작.
-
-자막:
-{transcript}
-"""
-=======
     이전: _analyze_single_video() x N = N회 호출
     이후: 1회 호출 (자막 수집은 asyncio.gather로 병렬 처리)
     """
@@ -183,7 +132,6 @@ async def _analyze_videos_batch(
         f"위 {len(videos)}개 영상을 각각 분석하세요. "
         f"===VIDEO_1=== 부터 ===VIDEO_{len(videos)}=== 까지 모든 영상을 빠짐없이 분석하세요."
     )
->>>>>>> Stashed changes
 
     try:
         text = await call_gemini_async(prompt, temperature=0.3)
@@ -313,25 +261,6 @@ async def _cross_and_generate(
     )
     tone_note = f"작성 스타일: {format_style['tone']}\n" if format_style and format_style.get("tone") else ""
 
-<<<<<<< Updated upstream
-    prompt = f"""
-검색어: {keyword}
-
-아래는 {len(valid)}개 유튜브 영상에서 추출한 핵심 주장 목록입니다.
-
-{claims_block}
-
-다음 두 가지를 분석하세요.
-
-[공통사실]
-3개 이상의 영상에서 공통으로 언급되거나 동의하는 사실/정보를 최대 5개 작성.
-각 항목은 "- " 으로 시작. 없으면 "- 없음" 으로 작성.
-
-[쟁점]
-영상마다 서로 다른 주장을 하거나 의견이 나뉘는 내용을 최대 5개 작성.
-각 항목은 "- " 으로 시작. 없으면 "- 없음" 으로 작성.
-"""
-=======
     prompt = (
         f"검색 주제: {keyword}\n"
         f"\n"
@@ -361,7 +290,6 @@ async def _cross_and_generate(
         f"[단점]\n"
         f"부정적이거나 주의할 점을 최대 3개. 각 항목은 \"- \"으로 시작.\n"
     )
->>>>>>> Stashed changes
 
     try:
         text = await call_gemini_async(prompt, temperature=0.3)
@@ -397,15 +325,6 @@ async def _cross_and_generate(
 # ── 신뢰도 보정 ───────────────────────────────────────────────────────────────
 
 def _calc_credibility(video: Dict[str, Any], common_facts: List[str]) -> float:
-<<<<<<< Updated upstream
-    """
-    신뢰도 계산:
-    - 기본 0.5
-    - 광고 포함 → -0.2
-    - 공통 사실과 일치하는 주장 수에 비례 → 최대 +0.3
-    """
-=======
->>>>>>> Stashed changes
     score = 0.5
     if video["ad_detected"]:
         score -= 0.2
@@ -451,9 +370,6 @@ async def analyze_videos(
     for vr in video_results:
         vr["credibility_score"] = _calc_credibility(vr, common_facts)
 
-<<<<<<< Updated upstream
-    print(f"[analyzer] 완료 — 공통사실 {len(common_facts)}개 / 쟁점 {len(controversies)}개")
-=======
     # 출처 구성 (광고 제외, 없으면 전체)
     sources = [
         {
@@ -479,7 +395,6 @@ async def analyze_videos(
     logger.info(f"[analyzer] 완료 — 공통사실 {len(common_facts)}개 / "
         f"쟁점 {len(content['controversies'])}개"
     )
->>>>>>> Stashed changes
 
     return {
         "keyword":       keyword,

@@ -10,19 +10,15 @@ from zoneinfo import ZoneInfo
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-<<<<<<< Updated upstream
-from sqlalchemy import select
-=======
 from datetime import date as date_type
 from sqlalchemy import select, func, or_, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
->>>>>>> Stashed changes
 from dotenv import load_dotenv
 
 from database import AsyncSessionLocal, User, BehaviorLog, Newsletter, ReportBatch, UserInterest, UserSubscription
 from behavior_store import get_today_logs
 from trigger import get_triggered_topics
-from agents.orchestrator import run_pipeline
+from Projects.src.backend.agents.pipeB_orchestrator import run_pipeline
 from mailer import send_email
 
 load_dotenv()
@@ -125,14 +121,6 @@ async def _update_user_interests(db, user_id: str, topics: List[str]) -> None:
     await db.commit()
 
 
-<<<<<<< Updated upstream
-async def _run_batch_for_send_time(send_time: str) -> None:
-    """
-    특정 send_time(HH:MM)에 설정된 사용자들만 배치 실행.
-    daily_batch()와 동일 로직이지만 send_time 필터 적용.
-    """
-    print(f"[scheduler] {send_time} 배치 시작")
-=======
 # -- duplicate send guard --
 
 async def _already_sent_in_window(db, user_id: str, hours: int = 10) -> bool:
@@ -152,7 +140,6 @@ async def _already_sent_in_window(db, user_id: str, hours: int = 10) -> bool:
 
 async def _run_batch_for_send_time(send_time: str) -> None:
     logger.info(f"[scheduler] {send_time} batch start")
->>>>>>> Stashed changes
 
     async with AsyncSessionLocal() as db:
         if send_time == "21:00":
@@ -168,12 +155,6 @@ async def _run_batch_for_send_time(send_time: str) -> None:
             )
 
         result = await db.execute(
-<<<<<<< Updated upstream
-            select(User).where(User.send_time == send_time)
-        )
-        users = result.scalars().all()
-        print(f"[scheduler] {send_time} 대상 {len(users)}명")
-=======
             select(User).where(
                 time_filter,
                 User.is_subscribed == True,  # noqa: E712
@@ -181,14 +162,10 @@ async def _run_batch_for_send_time(send_time: str) -> None:
         )
         users = result.scalars().all()
         logger.info(f"[scheduler] {send_time} -> {len(users)} users")
->>>>>>> Stashed changes
 
         for user in users:
             batch: Optional[ReportBatch] = None
             try:
-<<<<<<< Updated upstream
-                today_logs = await get_today_logs(db, user_id=str(user.google_id))
-=======
                 if await _already_sent_in_window(db, str(user.google_id), hours=10):
                     logger.warning(f"  [skip] {user.email} already sent today")
                     continue
@@ -198,7 +175,6 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                 db.add(batch)
                 await db.commit()
                 await db.refresh(batch)
->>>>>>> Stashed changes
 
                 # 2. 오늘의 pending 로그 ID 수집
                 today_start = datetime.now(timezone.utc).replace(
@@ -235,12 +211,7 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                     )
                     await db.commit()
 
-<<<<<<< Updated upstream
-                triggered_topics = merged_topics
-
-=======
                 # 5. 파이프라인 실행
->>>>>>> Stashed changes
                 subscribed_channel_ids = await _get_subscribed_channel_ids(str(user.google_id))
                 newsletter = await run_pipeline(
                     user_id=str(user.google_id),

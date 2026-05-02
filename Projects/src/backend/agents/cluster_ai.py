@@ -137,28 +137,6 @@ def _enrich_clusters(
             "event_count": len(related_logs),
         })
 
-<<<<<<< Updated upstream
-    try:
-        text = call_gemini(prompt, temperature=0.2)
-        clusters = _parse_clusters(text)
-    except Exception as e:
-        print(f"[cluster_ai] Gemini 오류 — 폴백 실행: {e}")
-        clusters = _fallback_cluster(unique_keywords)
-
-    # 상한선 적용 (가장 관심도 높은 순 — Gemini가 이미 정렬해준다고 가정)
-    clusters = clusters[:max_topics]
-
-    print(f"[cluster_ai] 완료 — {len(clusters)}개 클러스터 생성")
-    return clusters
-
-
-def _parse_clusters(text: str) -> List[Dict[str, Any]]:
-    """Gemini 응답에서 JSON 파싱"""
-    # JSON 배열 추출
-    match = re.search(r"\[.*\]", text, re.DOTALL)
-    if not match:
-        raise ValueError("JSON 배열을 찾을 수 없음")
-=======
     return enriched
 
 
@@ -173,7 +151,6 @@ def _parse_clusters(text: str) -> List[Dict[str, Any]]:
     match = re.search(r"\[.*\]", cleaned, re.DOTALL)
     if not match:
         raise ValueError(f"JSON 배열을 찾을 수 없음. 원본: {text[:200]!r}")
->>>>>>> Stashed changes
 
     clusters = json.loads(match.group())
     result = []

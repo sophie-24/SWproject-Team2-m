@@ -1,9 +1,5 @@
-<<<<<<< Updated upstream
-import concurrent.futures
-=======
 # Pipeline B 총괄 오케스트레이터 — intent→cluster→select→analyze→newsletter 순차 실행
 import asyncio
->>>>>>> Stashed changes
 from typing import List, Dict, Any, Optional
 
 from agents.intent_ai import classify_intent
@@ -97,23 +93,6 @@ async def run_pipeline(
         except ImportError:
             pipeline_a_cache = {}
 
-<<<<<<< Updated upstream
-    # ── Step 0: 의도 분류 + 포맷 결정 (병렬) ──────────────────────────────────
-    print(f"[orchestrator] Step 0 — 의도 분류 + 포맷 결정 (병렬)")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        future_intent = executor.submit(
-            classify_intent,
-            raw_keywords,
-            clicked_video_titles,
-        )
-        # intent 결과를 기다렸다가 format 결정 (format은 intent 타입이 필요)
-        # → intent가 매우 빠르므로 순차 처리와 차이 없음. 안전하게 순차로.
-        intent_result = future_intent.result()
-
-    intent_type = intent_result.get("intent_type") or initial_intent or "지식형"
-    format_style = decide_format(intent_type)
-    print(f"[orchestrator] 의도={intent_type} / 길이={format_style['length']}")
-=======
     # ── Step 0: 의도 분류 (format_style 포함) ─────────────────────────────────
     logger.info("[orchestrator] Step 0 — 의도 분류")
     intent_result = await classify_intent(raw_keywords, clicked_video_titles)
@@ -121,7 +100,6 @@ async def run_pipeline(
     intent_type = intent_result.get("intent_type") or initial_intent or "지식형"
     format_style = intent_result["format_style"]
     logger.info(f"[orchestrator] 의도={intent_type} / 길이={format_style['length']}")
->>>>>>> Stashed changes
 
     # ── Step 1: 주제 클러스터링 ────────────────────────────────────────────────
     logger.info(f"[orchestrator] Step 1 — 주제 클러스터링 ({len(raw_keywords)}개 키워드)")

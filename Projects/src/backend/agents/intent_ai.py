@@ -1,8 +1,3 @@
-<<<<<<< Updated upstream
-from typing import List, Dict
-
-from agents.gemini_client import call_gemini
-=======
 # 검색 의도 분류 에이전트 — 유희형/지식형/구매형 판별 + 포맷 스타일(길이·톤·구조) 결정
 from typing import List, Dict, Any
 
@@ -52,7 +47,6 @@ DEFAULT_FORMAT = FORMAT_MAP["지식형"]
 from logger import get_logger
 logger = get_logger(__name__)
 
->>>>>>> Stashed changes
 
 # 분류 불가 시 기본값
 _DEFAULT_INTENT = "지식형"
@@ -111,13 +105,6 @@ async def classify_intent(
     try:
         result = (await call_gemini_async(prompt, temperature=0.1)).strip()
         intent = _parse_intent(result)
-<<<<<<< Updated upstream
-        print(f"[intent_ai] 의도 분류 완료: {intent}")
-        return {"intent_type": intent}
-    except Exception as e:
-        print(f"[intent_ai] 분류 오류 — 기본값 사용: {e}")
-        return {"intent_type": _DEFAULT_INTENT}
-=======
         logger.info(f"[intent_ai] 의도 분류 완료: {intent}")
         return _build_result(intent)
     except Exception as e:
@@ -129,7 +116,6 @@ def _build_result(intent_type: str) -> Dict[str, Any]:
     """intent_type으로 format_style을 조회해 통합 결과 딕셔너리를 반환."""
     fmt = dict(FORMAT_MAP.get(intent_type, DEFAULT_FORMAT))
     return {"intent_type": intent_type, "format_style": fmt}
->>>>>>> Stashed changes
 
 
 def _parse_intent(text: str) -> str:

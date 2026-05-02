@@ -1,7 +1,7 @@
 import os
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, BackgroundTasks
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
@@ -15,14 +15,14 @@ from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from agents.cluster_ai import cluster_topics
 from auth import create_auth_url, exchange_code_for_tokens, create_jwt, verify_jwt
-from youtube_search import search_videos
+from youtube_search import search_videos, get_subscriptions
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
 from shared_cache import search_analysis_cache as _search_analysis_cache_shared
-from database import init_db, get_db, Newsletter, UserInterest
-from collector.behavior_store import save_behavior, get_today_logs
-from collector.trigger import get_triggered_topics
-from agents.orchestrator import run_pipeline
+from database import init_db, get_db, Newsletter, UserInterest, UserSubscription
+from behavior_store import save_behavior, get_today_logs
+from trigger import get_triggered_topics
+from agents.pipeB_orchestrator import run_pipeline
 from scheduler import start_scheduler, stop_scheduler
 
 load_dotenv()
@@ -63,14 +63,10 @@ _oauth_sessions: dict[str, str] = {}  # {state: code_verifier}
 _oauth_credentials: dict[str, dict] = {}  # {state: credentials}
 
 _transcript_cache: dict = {}
-<<<<<<< Updated upstream
-_search_analysis_cache: dict = {}  # {keyword: analysis_result} — 동일 키워드 Gemini 재호출 방지
-=======
 # Pipeline A 분석 캐시 — shared_cache 모듈과 동일 객체 참조
 # Pipeline B(scheduler)도 이 캐시를 읽어 Gemini 중복 호출 방지
 _search_analysis_cache = _search_analysis_cache_shared
 _search_analysis_lock = asyncio.Lock()   # 동일 키워드 동시 요청 시 중복 Gemini 호출 방지
->>>>>>> Stashed changes
 
 
 # ── JWT 인증 의존성 ────────────────────────────────────────────────────────────
@@ -282,9 +278,6 @@ async def my_logs(
         "merged_topics":      merged_topics,
     }
 
-
-<<<<<<< Updated upstream
-=======
 # ── 발송 시간 유효성 검사 유틸 ────────────────────────────────────────────────
 
 _DEFAULT_SEND_TIME = "21:00"
@@ -308,8 +301,6 @@ def _validate_send_time(send_time: str) -> str:
         )
     return send_time
 
-
->>>>>>> Stashed changes
 # ── 구독 설정 ─────────────────────────────────────────────────────────────────
 
 class SubscribeData(BaseModel):
@@ -357,13 +348,8 @@ async def subscribe(
         db_user.send_time = data.send_time
 
     await db.commit()
-<<<<<<< Updated upstream
     print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
     return {"success": True}
-=======
-    logger.info(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
-    return {"success": True, "send_time": db_user.send_time}
-
 
 # ── 마이페이지: 발송 시간 변경 ────────────────────────────────────────────────
 
@@ -621,7 +607,6 @@ async def resubscribe(
 
     logger.info(f"[resubscribe] {user['user_id']} 수신 재신청 완료")
     return {"success": True, "message": "수신 신청이 완료되었습니다."}
->>>>>>> Stashed changes
 
 
 # ── YouTube ───────────────────────────────────────────────────────────────────
@@ -727,24 +712,26 @@ async def analyze_search(
 ):
     """
     검색어 기반 즉석 분석 — popup/search_dashboard에서 호출.
-    selector_ai + analyzer_ai만 실행 (cluster/newsletter 생략).
+    pipeA_orchestrator: selector_ai + intent_ai + analyzer_ai 병렬 실행.
     keyword 기준 인메모리 캐시로 Gemini 중복 호출 방지.
     """
-    import asyncio
-    from agents.selector_ai import select_top_videos
-    from agents.analyzer_ai import analyze_videos
+    from pipeA_orchestrator import run_pipeline_a
 
     if keyword in _search_analysis_cache:
         return JSONResponse(_search_analysis_cache[keyword])
 
-    def _run():
-        videos = select_top_videos(topic=keyword, subscribed_channel_ids=[])
-        if not videos:
-            return {"keyword": keyword, "videos": [], "common_facts": [], "controversies": []}
-        return analyze_videos(keyword=keyword, videos=videos)
+    async with _search_analysis_lock:
+        # double-check: 락 대기 중 다른 코루틴이 채웠을 수 있음
+        if keyword in _search_analysis_cache:
+            return JSONResponse(_search_analysis_cache[keyword])
 
-    result = await asyncio.to_thread(_run)
-    _search_analysis_cache[keyword] = result
+        try:
+            result = await run_pipeline_a(keyword=keyword)
+        except ValueError:
+            result = {"keyword": keyword, "videos": [], "common_facts": [], "controversies": []}
+
+        _search_analysis_cache[keyword] = result
+
     return JSONResponse(result)
 
 
@@ -924,21 +911,11 @@ async def admin_run_pipeline(
     if not triggered:
         raise HTTPException(status_code=404, detail="트리거된 주제 없음")
 
-<<<<<<< Updated upstream
-    # sync 함수 → 이벤트 루프 블로킹 방지
-    newsletter = await asyncio.to_thread(
-        run_pipeline,
-=======
     newsletter = await run_pipeline(
->>>>>>> Stashed changes
         user_id=user_id,
         raw_keywords=triggered,
     )
 
-<<<<<<< Updated upstream
-    # DB 저장
-=======
->>>>>>> Stashed changes
     record = Newsletter(
         user_id=user_id,
         subject=newsletter.get("subject", ""),
@@ -949,75 +926,3 @@ async def admin_run_pipeline(
     await db.commit()
 
     return JSONResponse(newsletter)
-<<<<<<< Updated upstream
-
-
-# ── 프로필 초기화 (PHASE 1) ───────────────────────────────────────────────────
-
-class ProfileInitData(BaseModel):
-    initial_intent: str                    # '유희형' | '지식형' | '구매형'
-    interest_categories: list[str] = []   # 관심사 카테고리 목록
-
-
-class HistoryAnalysisRequest(BaseModel):
-    keywords: list[str]
-
-
-@app.post("/profile/init")
-async def profile_init(
-    data: ProfileInitData,
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    온보딩 완료 시 초기 관심사 프로필 저장.
-    initial_intent와 interest_categories를 users 테이블에 저장한다.
-    """
-    import json as _json
-    from database import User
-
-    result = await db.execute(
-        select(User).where(User.google_id == user["user_id"])
-    )
-    db_user = result.scalar_one_or_none()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
-
-    if data.initial_intent not in ("유희형", "지식형", "구매형"):
-        raise HTTPException(status_code=400, detail="initial_intent는 유희형|지식형|구매형 중 하나여야 합니다")
-
-    db_user.initial_intent      = data.initial_intent
-    db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
-    await db.commit()
-
-    print(f"[profile/init] {user['user_id']} → 의도={data.initial_intent}, 카테고리={data.interest_categories}")
-    return {"success": True}
-
-
-@app.post("/profile/analyze-history")
-async def analyze_history(
-    data: HistoryAnalysisRequest,
-    user=Depends(get_current_user),
-):
-    """
-    익스텐션이 chrome.history API로 수집한 유튜브 검색어를 받아
-    cluster_ai + intent_ai로 초기 관심사 프로필을 추론한다.
-
-    INPUT:  {"keywords": ["파이썬 강의", "아이폰 16 리뷰", ...]}
-    OUTPUT: {"intent_type": "지식형", "categories": ["파이썬", "스마트폰"]}
-    """
-    from agents.cluster_ai import cluster_topics
-    from agents.intent_ai import classify_intent
-
-    keywords = [k.strip() for k in data.keywords if k.strip()]
-    if not keywords:
-        raise HTTPException(status_code=400, detail="keywords가 비어 있습니다")
-
-    clusters      = await asyncio.to_thread(cluster_topics, keywords, 5)
-    categories    = [c["topic"] for c in clusters]
-    intent_result = await asyncio.to_thread(classify_intent, keywords, [])
-    intent_type   = intent_result.get("intent_type", "지식형")
-
-    return {"intent_type": intent_type, "categories": categories}
-=======
->>>>>>> Stashed changes

@@ -4,11 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
-<<<<<<< Updated upstream
-from sqlalchemy import Column, String, DateTime, Text
-=======
 from sqlalchemy import Column, String, DateTime, Text, Boolean, Integer, UniqueConstraint, Index
->>>>>>> Stashed changes
 from sqlalchemy.dialects.postgresql import UUID
 from dotenv import load_dotenv
 
@@ -41,17 +37,12 @@ class User(Base):
     # 온보딩 프로파일링
     initial_intent       = Column(String(20), nullable=True)   # '유희형'|'지식형'|'구매형'
     interest_categories  = Column(Text, nullable=True)         # JSON 문자열 — 관심사 카테고리 목록
-<<<<<<< Updated upstream
-    # PHASE 4: 사용자 설정 발송 시간
-    send_time            = Column(String(5), nullable=True, default="21:00")  # "HH:MM" KST
-=======
     # 사용자 설정 발송 시간
     morning_send_time    = Column(String(5), nullable=False, default="08:00", server_default="08:00")  # "HH:MM" KST 오전 발송
     send_time            = Column(String(5), nullable=False, default="21:00", server_default="21:00")  # "HH:MM" KST 오후 발송
     # 수신 동의 여부 — False이면 배치에서 완전히 제외
     is_subscribed        = Column(Boolean, nullable=False, default=True)
     unsubscribed_at      = Column(DateTime, nullable=True)
->>>>>>> Stashed changes
     created_at           = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
