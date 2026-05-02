@@ -1,3 +1,4 @@
+# Resend API를 통한 HTML 뉴스레터 이메일 발송 — 의도별 카드 레이아웃(썸네일·쟁점배지·채널명)
 import os
 from typing import Dict, Any, List
 from dotenv import load_dotenv

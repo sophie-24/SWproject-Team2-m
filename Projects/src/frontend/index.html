@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TechVisibility</title>
+  <title>Tubify</title>
   <style>
     * {
       box-sizing: border-box;
@@ -247,7 +247,7 @@
 
 <body>
   <div id="login-screen">
-    <h1>SWProjectTeam2</h1>
+    <h1>Tubify</h1>
     <p>유튜브 트렌드를 한눈에</p>
     <button class="google-btn" onclick="login()">
       <img src="https://www.google.com/favicon.ico" alt="" />
@@ -257,7 +257,7 @@
 
   <div id="main-screen">
     <header>
-      <h1>SWProjectTeam2</h1>
+      <h1>Tubify</h1>
       <button class="logout-btn" onclick="logout()">로그아웃</button>
     </header>
 
@@ -271,9 +271,33 @@
 
   <script>
     const API = "";
+    const EXTENSION_ID = "__EXTENSION_ID__";
 
     window.onload = () => {
       const params = new URLSearchParams(location.search);
+      const token = params.get("token");
+
+      if (token) {
+        // JWT 저장
+        localStorage.setItem("access_token", token);
+        sessionStorage.setItem("loggedIn", "1");
+        // 익스텐션에 토큰 전달 (설치된 경우에만)
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          chrome.runtime.sendMessage(
+            EXTENSION_ID,
+            { type: "SET_TOKEN", token: token },
+            () => { if (chrome.runtime.lastError) {} }
+          );
+        }
+        history.replaceState({}, "", location.pathname);
+        // 익스텐션 팝업이 window.open()으로 이 페이지를 열었다면 → 창 자동 닫기
+        // 사용자가 직접 웹사이트를 방문한 경우엔 window.opener === null 이므로 닫히지 않음
+        if (window.opener !== null) {
+          setTimeout(() => window.close(), 400);
+          return;
+        }
+      }
+
       if (params.get("loggedIn") === "1") {
         sessionStorage.setItem("loggedIn", "1");
         history.replaceState({}, "", location.pathname);
@@ -423,7 +447,10 @@
       try {
         // 2. 검색창의 키워드를 쿼리로 함께 보냅니다.
         const query = document.getElementById("search-input").value;
-        const res = await fetch(`${API}/ai_analyze/${videoId}?query=${encodeURIComponent(query)}`);
+        const jwt = localStorage.getItem("access_token") || "";
+        const res = await fetch(`${API}/ai_analyze/${videoId}?query=${encodeURIComponent(query)}`, {
+          headers: { "Authorization": `Bearer ${jwt}` }
+        });
 
         if (!res.ok) throw new Error();
 
@@ -432,25 +459,19 @@
       <div style="background:#2a2a2a; padding:15px; border-radius:8px; border-left:4px solid #007bff; margin-bottom:10px;">
           <h4 style="color:#007bff; margin-bottom:10px;">🤖 AI 분석 리포트</h4>
           <p style="font-size:0.85rem; color:#aaa;">⚠️ 광고 의심 점수: <span style="color:#ff6666;">${data.ad_score}점</span></p>
-          <hr style="border:0.5px solid #444; margin:10px 0;">
-          <div class="txt" style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6;">${data.final_analysis}</div>
-      </div>
-    `;
-      } catch (error) {
-        area.innerHTML = '<div class="empty">분석 중 오류가 발생했습니다. 백엔드 서버를 확인하세요.</div>';
+          <hr style="border-color:#444; margin:10px 0;">
+          <p style="font-size:0.85rem; color:#ccc; white-space:pre-wrap;">${data.summary || "요약 없음"}</p>
+      </div>`;
+      } catch {
+        area.innerHTML = '<div class="empty">AI 분석 실패. 다시 시도해주세요.</div>';
       }
     }
 
     function formatTime(sec) {
-      const m = Math.floor(sec / 60)
-        .toString()
-        .padStart(2, "0");
-      const s = Math.floor(sec % 60)
-        .toString()
-        .padStart(2, "0");
-      return `${m}:${s}`;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
     }
   </script>
 </body>
-
 </html>

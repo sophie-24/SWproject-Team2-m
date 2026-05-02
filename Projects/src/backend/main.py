@@ -2,7 +2,7 @@ import os
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Depends
-from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.staticfiles import StaticFiles
@@ -11,24 +11,28 @@ from typing import Optional
 from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from agents.cluster_ai import cluster_topics
 from auth import create_auth_url, exchange_code_for_tokens, create_jwt, verify_jwt
-from youtube_service import get_subscriptions
 from youtube_search import search_videos
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
-from database import init_db, get_db, Newsletter
+from shared_cache import search_analysis_cache as _search_analysis_cache_shared
+from database import init_db, get_db, Newsletter, UserInterest
 from collector.behavior_store import save_behavior, get_today_logs
 from collector.trigger import get_triggered_topics
 from agents.orchestrator import run_pipeline
 from scheduler import start_scheduler, stop_scheduler
 
 load_dotenv()
+from logger import get_logger
+logger = get_logger(__name__)
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "../frontend")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8000")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "admin1234")
+EXTENSION_ID = os.getenv("EXTENSION_ID", "")
 
 
 @asynccontextmanager
@@ -40,7 +44,7 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title="TechVisibility Backend", lifespan=lifespan)
+app = FastAPI(title="Tubify Backend", lifespan=lifespan)
 security = HTTPBearer()
 
 app.add_middleware(
@@ -59,7 +63,14 @@ _oauth_sessions: dict[str, str] = {}  # {state: code_verifier}
 _oauth_credentials: dict[str, dict] = {}  # {state: credentials}
 
 _transcript_cache: dict = {}
+<<<<<<< Updated upstream
 _search_analysis_cache: dict = {}  # {keyword: analysis_result} — 동일 키워드 Gemini 재호출 방지
+=======
+# Pipeline A 분석 캐시 — shared_cache 모듈과 동일 객체 참조
+# Pipeline B(scheduler)도 이 캐시를 읽어 Gemini 중복 호출 방지
+_search_analysis_cache = _search_analysis_cache_shared
+_search_analysis_lock = asyncio.Lock()   # 동일 키워드 동시 요청 시 중복 Gemini 호출 방지
+>>>>>>> Stashed changes
 
 
 # ── JWT 인증 의존성 ────────────────────────────────────────────────────────────
@@ -79,7 +90,10 @@ def root():
 
 @app.get("/onboarding.html")
 def onboarding():
-    return FileResponse(os.path.join(FRONTEND_DIR, "onboarding.html"))
+    with open(os.path.join(FRONTEND_DIR, "onboarding.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("__EXTENSION_ID__", EXTENSION_ID)
+    return HTMLResponse(content=html)
 
 @app.get("/dashboard.html")
 def dashboard():
@@ -103,7 +117,7 @@ def health():
 def login():
     auth_url, state, code_verifier = create_auth_url()
     _oauth_sessions[state] = code_verifier  # state별로 분리 저장
-    print(f"[login] state 저장: {state}")
+    logger.debug(f"[login] state 저장: {state}")
     return RedirectResponse(auth_url)
 
 
@@ -113,7 +127,7 @@ async def callback(
     state: str,
     db : AsyncSession = Depends(get_db)
 ):
-    print(f"[callback] state 수신: {state}")
+    logger.debug(f"[callback] state 수신: {state}")
 
     code_verifier = _oauth_sessions.pop(state, None)  # 사용 후 즉시 제거
     if not code_verifier:
@@ -137,17 +151,22 @@ async def callback(
         db.add(user)
         await db.commit()
         await db.refresh(user)
-        print(f"[callback] 신규 유저 생성: {user_info['email']}")
+        logger.info(f"[callback] 신규 유저 생성: {user_info['email']}")
     else:
-        print(f"[callback] 기존 유저 로그인: {user_info['email']}")
+        logger.info(f"[callback] 기존 유저 로그인: {user_info['email']}")
 
     jwt_token = create_jwt(
         user_id=user_info["google_id"],
         email=user_info["email"],
     )
-    return RedirectResponse(
-        url=f"{FRONTEND_URL}/onboarding.html?token={jwt_token}"
-    )
+
+    # 신규 유저 → 온보딩, 기존 유저 → 메인 페이지
+    if not user.initial_intent:
+        redirect_url = f"{FRONTEND_URL}/onboarding.html?token={jwt_token}"
+    else:
+        redirect_url = f"{FRONTEND_URL}/?token={jwt_token}"
+
+    return RedirectResponse(url=redirect_url)
 
 
 @app.get("/auth/me")
@@ -264,6 +283,33 @@ async def my_logs(
     }
 
 
+<<<<<<< Updated upstream
+=======
+# ── 발송 시간 유효성 검사 유틸 ────────────────────────────────────────────────
+
+_DEFAULT_SEND_TIME = "21:00"
+
+
+def _validate_send_time(send_time: str) -> str:
+    """
+    발송 시간 유효성 검사 후 정규화된 값 반환.
+
+    - 형식: HH:MM (00:00 ~ 23:59)
+    - 임의 시간 허용 — scheduler가 매분 체크해 일치하는 유저만 배치 처리
+
+    Raises:
+        HTTPException 400: 형식 오류
+    """
+    import re as _re
+    if not _re.match(r"^([01]\d|2[0-3]):[0-5]\d$", send_time):
+        raise HTTPException(
+            status_code=400,
+            detail="send_time은 HH:MM 형식이어야 합니다 (예: '07:30', '21:00')",
+        )
+    return send_time
+
+
+>>>>>>> Stashed changes
 # ── 구독 설정 ─────────────────────────────────────────────────────────────────
 
 class SubscribeData(BaseModel):
@@ -290,6 +336,18 @@ async def subscribe(
 
     db_user.delivery_type = "email"
     if data.email:
+        # 이메일 중복 체크 — 다른 유저가 이미 사용 중인 이메일인지 확인
+        dup = await db.execute(
+            select(User).where(
+                User.email == data.email,
+                User.google_id != user["user_id"],
+            )
+        )
+        if dup.scalar_one_or_none():
+            raise HTTPException(
+                status_code=409,
+                detail="이미 다른 계정에서 사용 중인 이메일입니다.",
+            )
         db_user.email = data.email
     if data.send_time:
         # HH:MM 형식 검증
@@ -299,8 +357,271 @@ async def subscribe(
         db_user.send_time = data.send_time
 
     await db.commit()
+<<<<<<< Updated upstream
     print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
     return {"success": True}
+=======
+    logger.info(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
+    return {"success": True, "send_time": db_user.send_time}
+
+
+# ── 마이페이지: 발송 시간 변경 ────────────────────────────────────────────────
+
+class SendTimeData(BaseModel):
+    send_time: str   # "08:00" | "21:00"
+
+
+@app.patch("/settings/send_time")
+@app.patch("/my/send-time")
+async def update_send_time(
+    data: SendTimeData,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    마이페이지에서 뉴스레터 발송 시간 변경.
+
+    INPUT:  { "send_time": "08:00" }  또는  { "send_time": "21:00" }
+    OUTPUT: { "success": true, "send_time": "08:00" }
+
+    허용값: "08:00" (아침 8시 KST) | "21:00" (저녁 9시 KST, 기본값)
+    변경 즉시 다음 배치부터 반영됩니다.
+    """
+    from database import User
+
+    validated_time = _validate_send_time(data.send_time)
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    prev_time = db_user.send_time
+    db_user.send_time = validated_time
+    await db.commit()
+
+    logger.info(f"[send-time] {user['user_id']} {prev_time} → {validated_time}")
+    return {"success": True, "send_time": validated_time}
+
+
+@app.get("/my/settings")
+async def get_my_settings(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    마이페이지 설정 조회.
+    발송 시간, 수신 동의 여부, 배송 방법 반환.
+    """
+    from database import User
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    return {
+        "send_time":      db_user.send_time or _DEFAULT_SEND_TIME,
+        "is_subscribed":  db_user.is_subscribed,
+        "delivery_type":  db_user.delivery_type,
+        "email":          db_user.email,
+    }
+
+
+# ── 프로필 조회 / 수정 / 통계 ─────────────────────────────────────────────────
+
+@app.get("/my/profile")
+async def my_profile(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """프로필 전체 조회 — 이메일, 발송 시간, 의도 유형, 관심사 카테고리"""
+    import json as _json
+    from database import User
+
+    result = await db.execute(select(User).where(User.google_id == user["user_id"]))
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="유저 없음")
+
+    categories = []
+    if db_user.interest_categories:
+        try:
+            categories = _json.loads(db_user.interest_categories)
+        except Exception:
+            pass
+
+    return {
+        "email":               db_user.email,
+        "send_time":           db_user.send_time,
+        "morning_send_time":   db_user.morning_send_time,
+        "initial_intent":      db_user.initial_intent,
+        "interest_categories": categories,
+        "is_subscribed":       db_user.is_subscribed,
+        "created_at":          db_user.created_at.isoformat() if db_user.created_at else None,
+    }
+
+
+class ProfileUpdateData(BaseModel):
+    send_time:           Optional[str]       = None  # "HH:MM" 저녁 발송 시간
+    morning_send_time:   Optional[str]       = None  # "HH:MM" 아침 발송 시간
+    interest_categories: Optional[list[str]] = None  # 관심사 카테고리 목록
+
+
+@app.put("/my/profile")
+async def update_my_profile(
+    data: ProfileUpdateData,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """발송 시간 / 관심사 수정.
+    관심사 변경 시 user_interests에 신규 카테고리만 추가 (기존 weight 유지).
+    """
+    import re, json as _json
+    from database import User
+    from datetime import datetime, timezone
+
+    result = await db.execute(select(User).where(User.google_id == user["user_id"]))
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="유저 없음")
+
+    time_re = re.compile(r'^\d{2}:\d{2}$')
+
+    if data.send_time is not None:
+        if not time_re.match(data.send_time):
+            raise HTTPException(status_code=400, detail="send_time 형식은 HH:MM이어야 합니다.")
+        db_user.send_time = data.send_time
+
+    if data.morning_send_time is not None:
+        if not time_re.match(data.morning_send_time):
+            raise HTTPException(status_code=400, detail="morning_send_time 형식은 HH:MM이어야 합니다.")
+        db_user.morning_send_time = data.morning_send_time
+
+    if data.interest_categories is not None:
+        db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
+        for category in data.interest_categories:
+            stmt = (
+                pg_insert(UserInterest)
+                .values(
+                    user_id=user["user_id"],
+                    category=category,
+                    weight=1,
+                    updated_at=datetime.now(timezone.utc),
+                )
+                .on_conflict_do_nothing(constraint="uq_user_interest_category")
+            )
+            await db.execute(stmt)
+
+    await db.commit()
+    logger.info(f"[profile/update] {user['user_id']} 프로필 수정 완료")
+    return {"ok": True}
+
+
+@app.get("/my/stats")
+async def my_stats(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """오늘 활동 통계 — 로그 수, 트리거된 토픽, 총 뉴스레터 수, 마지막 발송 시각"""
+    from database import BehaviorLog, Newsletter
+    from datetime import datetime, timezone
+
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    log_count_r = await db.execute(
+        select(func.count()).select_from(BehaviorLog).where(
+            BehaviorLog.user_id == user["user_id"],
+            BehaviorLog.logged_at >= today_start,
+        )
+    )
+    today_log_count = log_count_r.scalar()
+
+    today_logs     = await get_today_logs(db, user_id=user["user_id"])
+    triggered_topics = get_triggered_topics(today_logs)
+
+    total_r = await db.execute(
+        select(func.count()).select_from(Newsletter).where(
+            Newsletter.user_id == user["user_id"]
+        )
+    )
+    total_newsletters = total_r.scalar()
+
+    last_r = await db.execute(
+        select(Newsletter.delivered_at)
+        .where(Newsletter.user_id == user["user_id"])
+        .order_by(Newsletter.delivered_at.desc())
+        .limit(1)
+    )
+    last_sent = last_r.scalar_one_or_none()
+
+    return {
+        "today_log_count":   today_log_count,
+        "triggered_topics":  triggered_topics,
+        "total_newsletters": total_newsletters,
+        "last_sent_at":      last_sent.isoformat() if last_sent else None,
+    }
+
+
+@app.delete("/my/subscription")
+async def unsubscribe(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    뉴스레터 수신 해지.
+    users.is_subscribed = False + unsubscribed_at 기록.
+    이후 배치에서 완전히 제외됨.
+    """
+    from database import User
+    from datetime import datetime, timezone
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    db_user.is_subscribed   = False
+    db_user.unsubscribed_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    logger.info(f"[unsubscribe] {user['user_id']} 수신 해지 완료")
+    return {"success": True, "message": "수신이 해지되었습니다. 언제든 다시 구독할 수 있습니다."}
+
+
+@app.post("/my/subscription")
+async def resubscribe(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    뉴스레터 수신 재신청 (해지 후 복구).
+    users.is_subscribed = True + unsubscribed_at 초기화.
+    """
+    from database import User
+
+    result = await db.execute(
+        select(User).where(User.google_id == user["user_id"])
+    )
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    db_user.is_subscribed   = True
+    db_user.unsubscribed_at = None
+    await db.commit()
+
+    logger.info(f"[resubscribe] {user['user_id']} 수신 재신청 완료")
+    return {"success": True, "message": "수신 신청이 완료되었습니다."}
+>>>>>>> Stashed changes
 
 
 # ── YouTube ───────────────────────────────────────────────────────────────────
@@ -379,9 +700,7 @@ async def send_now(
     if not triggered:
         raise HTTPException(status_code=404, detail="트리거된 주제 없음 — 유튜브에서 검색해보세요")
 
-    # sync 함수 → 이벤트 루프 블로킹 방지
-    newsletter = await asyncio.to_thread(
-        run_pipeline,
+    newsletter = await run_pipeline(
         user_id=user["user_id"],
         raw_keywords=triggered,
     )
@@ -427,6 +746,46 @@ async def analyze_search(
     result = await asyncio.to_thread(_run)
     _search_analysis_cache[keyword] = result
     return JSONResponse(result)
+
+
+# ── 단일 영상 AI 분석 ─────────────────────────────────────────────────────────
+
+@app.get("/ai_analyze/{video_id}")
+async def ai_analyze_video(
+    video_id: str,
+    query: str = Query("", description="검색 키워드 (컨텍스트용)"),
+    user=Depends(get_current_user),
+):
+    """
+    단일 영상 AI 분석 — index.html의 'AI 쟁점 분석' 버튼에서 호출.
+    analyzer_ai의 배치 분석을 단일 영상으로 호출.
+    """
+    from agents.analyzer_ai import analyze_videos
+
+    cache_key = f"ai_analyze:{video_id}"
+    if cache_key in _search_analysis_cache:
+        return JSONResponse(_search_analysis_cache[cache_key])
+
+    try:
+        keyword = query or video_id
+        video_info = {"video_id": video_id, "title": keyword, "channel_title": "", "duration": 0}
+        result = await analyze_videos(keyword=keyword, videos=[video_info])
+
+        # index.html에서 쓰는 필드만 추출해서 반환
+        video_results = result.get("videos", [])
+        first = video_results[0] if video_results else {}
+        response = {
+            "video_id": video_id,
+            "ad_score": first.get("ad_score", 0),
+            "summary": first.get("summary", ""),
+            "key_claims": first.get("key_claims", []),
+            "credibility_score": first.get("credibility_score", 0.5),
+            "ad_detected": first.get("ad_detected", False),
+        }
+        _search_analysis_cache[cache_key] = response
+        return JSONResponse(response)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"분석 실패: {str(e)}")
 
 
 # ── 자막 ──────────────────────────────────────────────────────────────────────
@@ -565,14 +924,21 @@ async def admin_run_pipeline(
     if not triggered:
         raise HTTPException(status_code=404, detail="트리거된 주제 없음")
 
+<<<<<<< Updated upstream
     # sync 함수 → 이벤트 루프 블로킹 방지
     newsletter = await asyncio.to_thread(
         run_pipeline,
+=======
+    newsletter = await run_pipeline(
+>>>>>>> Stashed changes
         user_id=user_id,
         raw_keywords=triggered,
     )
 
+<<<<<<< Updated upstream
     # DB 저장
+=======
+>>>>>>> Stashed changes
     record = Newsletter(
         user_id=user_id,
         subject=newsletter.get("subject", ""),
@@ -583,6 +949,7 @@ async def admin_run_pipeline(
     await db.commit()
 
     return JSONResponse(newsletter)
+<<<<<<< Updated upstream
 
 
 # ── 프로필 초기화 (PHASE 1) ───────────────────────────────────────────────────
@@ -652,3 +1019,5 @@ async def analyze_history(
     intent_type   = intent_result.get("intent_type", "지식형")
 
     return {"intent_type": intent_type, "categories": categories}
+=======
+>>>>>>> Stashed changes

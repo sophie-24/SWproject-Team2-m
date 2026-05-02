@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TechVisibility — 검색 분석</title>
+  <title>Tubify — 검색 분석</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -218,7 +218,7 @@
 
   <!-- 헤더 -->
   <div class="header">
-    <a class="logo" href="/">✦ TechVisibility</a>
+    <a class="logo" href="/">✦ Tubify</a>
     <span class="divider">/</span>
     <span class="keyword-title" id="keyword-display">검색어 로딩 중...</span>
   </div>
@@ -280,7 +280,7 @@
     showError('로그인이 필요합니다. <a href="/auth/login">Google 로그인</a>');
   } else {
     document.getElementById("keyword-display").textContent = `"${keyword}"`;
-    document.title = `${keyword} — TechVisibility`;
+    document.title = `${keyword} — Tubify`;
     runAnalysis();
   }
 
@@ -321,7 +321,7 @@
       renderResult(data);
     } catch (e) {
       clearInterval(stepTimer);
-      showError(`서버 연결 실패 — 백엔드(localhost:8000)를 확인해주세요.`);
+      showError(`서버 연결 실패 — 백엔드 서버를 확인해주세요.`);
     }
   }
 

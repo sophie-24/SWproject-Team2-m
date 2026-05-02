@@ -132,5 +132,10 @@ iOSInjectionProject/
 .build/*
 CLAUDE.md
 sophie.md
+architecture_review.md
+async_refactoring.md
+token_optimization.md
+todo.md
+.claude/*
 
 # End of https://www.toptal.com/developers/gitignore/api/xcode,macos,swift,swiftpackagemanager,cocoapods

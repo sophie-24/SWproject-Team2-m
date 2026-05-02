@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TechVisibility — 대시보드</title>
+  <title>Tubify — 대시보드</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -12,268 +12,606 @@
       background: #0f0f0f;
       color: #f1f1f1;
       min-height: 100vh;
-      padding: 24px;
+      padding: 24px 24px 48px;
     }
 
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      max-width: 720px;
+      max-width: 760px;
       margin: 0 auto 32px;
     }
+    .logo { font-size: 1.2rem; font-weight: 800; color: #ff4444; }
+    .header-right { display: flex; gap: 10px; align-items: center; }
 
-    .logo {
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: #ff4444;
-    }
-
-    .btn-logout {
+    .btn {
       padding: 8px 16px;
-      background: transparent;
-      border: 1px solid #333;
       border-radius: 8px;
-      color: #888;
       font-size: 0.82rem;
       cursor: pointer;
+      border: 1px solid #333;
+      background: transparent;
+      color: #888;
+      transition: all 0.15s;
     }
-    .btn-logout:hover { border-color: #666; color: #f1f1f1; }
+    .btn:hover { border-color: #666; color: #f1f1f1; }
+    .btn-primary { background: #ff4444; border-color: #ff4444; color: #fff; }
+    .btn-primary:hover { background: #cc3333; border-color: #cc3333; color: #fff; }
+    .btn-sm { padding: 5px 12px; font-size: 0.78rem; }
 
-    .container {
-      max-width: 720px;
-      margin: 0 auto;
-    }
+    .container { max-width: 760px; margin: 0 auto; }
 
+    /* 섹션 */
+    .section { margin-bottom: 32px; }
     .section-title {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 700;
-      color: #666;
+      color: #555;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 16px;
+      letter-spacing: 0.1em;
+      margin-bottom: 14px;
     }
 
-    /* 뉴스레터 카드 */
-    .newsletter-card {
+    /* 프로필 카드 */
+    .profile-card {
       background: #1a1a1a;
       border: 1px solid #2a2a2a;
       border-radius: 16px;
       padding: 24px;
-      margin-bottom: 16px;
     }
-
-    .newsletter-date {
-      font-size: 0.78rem;
-      color: #666;
-      margin-bottom: 12px;
-    }
-
-    .newsletter-subject {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 16px;
-      color: #f1f1f1;
-    }
-
-    .topic-item {
-      border-top: 1px solid #2a2a2a;
-      padding: 16px 0;
-    }
-
-    .topic-name {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #ff4444;
-      margin-bottom: 8px;
-    }
-
-    .topic-summary {
-      font-size: 0.85rem;
-      color: #ccc;
-      line-height: 1.7;
-      margin-bottom: 10px;
-    }
-
-    .pros-cons {
+    .profile-row {
       display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
       gap: 16px;
-      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .profile-info { flex: 1; min-width: 220px; }
+    .profile-email { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .profile-meta { font-size: 0.82rem; color: #888; line-height: 1.8; }
+    .profile-meta span { color: #ccc; }
+
+    .cat-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .cat-tag {
+      font-size: 0.78rem;
+      background: #222;
+      border: 1px solid #333;
+      border-radius: 20px;
+      padding: 3px 10px;
+      color: #aaa;
     }
 
-    .pros, .cons {
-      flex: 1;
-      font-size: 0.8rem;
-      line-height: 1.6;
+    /* 구독 상태 배지 */
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 20px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .badge-on  { background: #1a3a1a; color: #66cc66; border: 1px solid #2a5a2a; }
+    .badge-off { background: #3a1a1a; color: #cc6666; border: 1px solid #5a2a2a; }
+
+    /* 통계 그리드 */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .stat-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+    .stat-value { font-size: 1.8rem; font-weight: 800; color: #ff4444; margin-bottom: 4px; }
+    .stat-label { font-size: 0.78rem; color: #666; }
+
+    /* 토픽 태그 */
+    .topic-tag {
+      display: inline-block;
+      font-size: 0.78rem;
+      background: #1a2a3a;
+      border: 1px solid #2a3a5a;
+      border-radius: 20px;
+      padding: 3px 10px;
+      color: #88aadd;
+      margin: 3px 2px;
     }
 
+    /* 편집 패널 */
+    .edit-panel {
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-top: 14px;
+      display: none;
+    }
+    .edit-panel.open { display: block; }
+    .edit-row { margin-bottom: 16px; }
+    .edit-label { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+    .edit-input {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #f1f1f1;
+      padding: 8px 12px;
+      font-size: 0.88rem;
+      width: 160px;
+    }
+    .edit-input:focus { outline: none; border-color: #ff4444; }
+    .save-row { display: flex; gap: 8px; margin-top: 4px; }
+
+    .sub-toggle { margin-top: 10px; }
+
+    /* 관심사 차트 */
+    .interest-bar-list { display: flex; flex-direction: column; gap: 10px; }
+    .interest-bar-row {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .interest-bar-label {
+      width: 110px; flex-shrink: 0;
+      font-size: 0.82rem; color: #ccc;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .interest-bar-track {
+      flex: 1; height: 10px; background: #222; border-radius: 6px; overflow: hidden;
+    }
+    .interest-bar-fill {
+      height: 100%; border-radius: 6px;
+      background: linear-gradient(90deg, #ff4444, #ff8844);
+      transition: width 0.5s ease;
+    }
+    .interest-bar-weight {
+      width: 28px; text-align: right;
+      font-size: 0.78rem; color: #666;
+    }
+
+    /* 뉴스레터 히스토리 */
+    .newsletter-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 22px 24px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .newsletter-card:hover { border-color: #444; }
+    .nl-header { display: flex; align-items: center; justify-content: space-between; }
+    .nl-subject { font-size: 0.95rem; font-weight: 700; color: #f1f1f1; }
+    .nl-date { font-size: 0.78rem; color: #555; white-space: nowrap; }
+    .nl-status {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-left: 8px;
+    }
+    .nl-status-sent  { background: #1a3a1a; color: #66cc66; }
+    .nl-status-failed { background: #3a1a1a; color: #cc6666; }
+
+    /* 모달 */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      overflow-y: auto;
+      padding: 32px 16px;
+    }
+    .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+    .modal {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 640px;
+      width: 100%;
+      position: relative;
+    }
+    .modal-close {
+      position: absolute; top: 16px; right: 16px;
+      background: transparent; border: none;
+      color: #666; font-size: 1.2rem; cursor: pointer;
+    }
+    .modal-close:hover { color: #f1f1f1; }
+    .modal-subject { font-size: 1.1rem; font-weight: 800; margin-bottom: 8px; }
+    .modal-date { font-size: 0.8rem; color: #666; margin-bottom: 20px; }
+
+    .topic-block { border-top: 1px solid #2a2a2a; padding: 18px 0; }
+    .topic-name { font-size: 0.95rem; font-weight: 700; color: #ff4444; margin-bottom: 8px; }
+    .topic-summary { font-size: 0.85rem; color: #ccc; line-height: 1.75; margin-bottom: 10px; }
+    .pros-cons { display: flex; gap: 16px; margin-bottom: 10px; }
+    .pros, .cons { flex: 1; font-size: 0.8rem; line-height: 1.65; }
     .pros-title { color: #44cc44; font-weight: 700; margin-bottom: 4px; }
     .cons-title { color: #ff6644; font-weight: 700; margin-bottom: 4px; }
     .pros li, .cons li { color: #aaa; margin-left: 14px; }
-
-    .sources {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
-    }
-
+    .sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .source-link {
-      font-size: 0.78rem;
-      color: #6699ff;
+      font-size: 0.78rem; color: #6699ff;
       text-decoration: none;
-      background: #1e2a3a;
-      border: 1px solid #2a3a5a;
-      border-radius: 6px;
-      padding: 3px 8px;
+      background: #1e2a3a; border: 1px solid #2a3a5a;
+      border-radius: 6px; padding: 3px 8px;
     }
     .source-link:hover { color: #99bbff; }
 
-    /* 빈 상태 */
-    .empty-state {
-      text-align: center;
-      padding: 64px 24px;
-      color: #555;
-    }
-    .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
-    .empty-state p { font-size: 0.9rem; line-height: 1.7; }
+    /* 빈 상태 / 로딩 */
+    .empty-state { text-align: center; padding: 48px 24px; color: #555; }
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.88rem; line-height: 1.7; }
+    .loading { text-align: center; padding: 36px; color: #555; font-size: 0.88rem; }
 
-    .loading {
-      text-align: center;
-      padding: 48px;
-      color: #666;
-      font-size: 0.9rem;
-    }
+    .divider { border: none; border-top: 1px solid #222; margin: 28px 0; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <span class="logo">✦ TechVisibility</span>
-    <button class="btn-logout" onclick="logout()">로그아웃</button>
-  </div>
 
-  <div class="container">
-    <div class="section-title">내 뉴스레터 히스토리</div>
-    <div id="newsletter-list">
-      <div class="loading">불러오는 중...</div>
+<div class="header">
+  <span class="logo">✦ Tubify</span>
+  <div class="header-right">
+    <button class="btn btn-sm" onclick="toggleEdit()">⚙ 설정</button>
+    <button class="btn btn-sm" onclick="logout()">로그아웃</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- 프로필 섹션 -->
+  <div class="section">
+    <div class="section-title">내 프로필</div>
+    <div class="profile-card">
+      <div class="profile-row">
+        <div class="profile-info">
+          <div class="profile-email" id="profile-email">불러오는 중...</div>
+          <div class="profile-meta">
+            의도 유형: <span id="profile-intent">—</span><br>
+            저녁 발송: <span id="profile-send-time">—</span> &nbsp;|&nbsp;
+            아침 발송: <span id="profile-morning-time">—</span><br>
+            구독 상태: <span id="profile-sub-badge">—</span>
+          </div>
+          <div class="cat-list" id="profile-cats"></div>
+        </div>
+      </div>
+
+      <!-- 편집 패널 -->
+      <div class="edit-panel" id="edit-panel">
+        <hr style="border-color:#2a2a2a; margin-bottom:18px;">
+        <div class="edit-row">
+          <div class="edit-label">저녁 발송 시간 (HH:MM)</div>
+          <input class="edit-input" id="edit-send-time" type="text" placeholder="21:00" maxlength="5">
+        </div>
+        <div class="edit-row">
+          <div class="edit-label">아침 발송 시간 (HH:MM)</div>
+          <input class="edit-input" id="edit-morning-time" type="text" placeholder="08:00" maxlength="5">
+        </div>
+        <div class="save-row">
+          <button class="btn btn-primary btn-sm" onclick="saveProfile()">저장</button>
+          <button class="btn btn-sm" onclick="toggleEdit()">취소</button>
+        </div>
+        <div class="sub-toggle">
+          <button class="btn btn-sm" id="sub-toggle-btn" onclick="toggleSubscription()">—</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <script>
-    const API = "http://127.0.0.1:8000";
+  <!-- 오늘 활동 통계 -->
+  <div class="section">
+    <div class="section-title">오늘 활동</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-logs">—</div>
+        <div class="stat-label">오늘 수집된 로그</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-label">총 수신 뉴스레터</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-last">—</div>
+        <div class="stat-label">마지막 발송</div>
+      </div>
+    </div>
+    <div id="triggered-topics" style="margin-top:12px;"></div>
+  </div>
 
-    // 로그인 확인
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      window.location.href = "/";
-    }
+  <hr class="divider">
 
-    // ── 뉴스레터 히스토리 로드 ────────────────────────
-    async function loadHistory() {
-      const listEl = document.getElementById("newsletter-list");
+  <!-- 관심사 추이 -->
+  <div class="section">
+    <div class="section-title">관심사 추이</div>
+    <div id="interests-chart"><div class="loading">불러오는 중...</div></div>
+  </div>
 
-      try {
-        const res = await fetch(`${API}/newsletter/history`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+  <!-- 뉴스레터 히스토리 -->
+  <div class="section">
+    <div class="section-title">뉴스레터 히스토리</div>
+    <div id="newsletter-list"><div class="loading">불러오는 중...</div></div>
+  </div>
+</div>
 
-        if (res.status === 401) {
-          localStorage.removeItem("access_token");
-          window.location.href = "/";
-          return;
-        }
+<!-- 뉴스레터 상세 모달 -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal-body">
+    <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
 
-        const data = await res.json();
-        const newsletters = data.newsletters || [];
+<script>
+  var API = "";  // 같은 서버에서 서빙 — 상대 경로 사용
+  var token = localStorage.getItem("access_token");
+  var profileData = null;
+  var editOpen = false;
 
-        if (!newsletters.length) {
-          listEl.innerHTML = `
-            <div class="empty-state">
-              <div class="icon">📭</div>
-              <p>
-                아직 발송된 뉴스레터가 없습니다.<br>
-                유튜브에서 관심 있는 주제를 검색해보세요.<br>
-                <br>
-                같은 주제를 2번 이상 검색하면<br>
-                저녁 9시에 뉴스레터로 발송됩니다.
-              </p>
-            </div>
-          `;
-          return;
-        }
+  if (!token) { window.location.href = "/"; }
 
-        listEl.innerHTML = newsletters.map(renderCard).join("");
+  // ── 초기화 ──────────────────────────────────────────────────────
+  async function init() {
+    await Promise.all([loadProfile(), loadStats(), loadInterests(), loadHistory()]);
+  }
 
-      } catch (err) {
-        listEl.innerHTML = `
-          <div class="empty-state">
-            <div class="icon">⚠️</div>
-            <p>불러오기 실패 — 백엔드 서버를 확인해주세요.</p>
-          </div>
-        `;
-      }
-    }
-
-    // ── 카드 렌더 ─────────────────────────────────────
-    function renderCard(newsletter) {
-      const date = new Date(newsletter.delivered_at).toLocaleDateString("ko-KR", {
-        year: "numeric", month: "long", day: "numeric",
-        hour: "2-digit", minute: "2-digit"
+  // ── 프로필 ──────────────────────────────────────────────────────
+  async function loadProfile() {
+    try {
+      var res = await fetch(API + "/my/profile", {
+        headers: { "Authorization": "Bearer " + token }
       });
+      if (res.status === 401) { doLogout(); return; }
+      profileData = await res.json();
+      renderProfile(profileData);
+    } catch(e) {
+      document.getElementById("profile-email").textContent = "프로필 로드 실패";
+    }
+  }
 
-      const content = typeof newsletter.content_json === "string"
-        ? JSON.parse(newsletter.content_json)
-        : newsletter.content_json;
+  function renderProfile(p) {
+    document.getElementById("profile-email").textContent = p.email || "—";
+    document.getElementById("profile-intent").textContent = p.initial_intent || "미설정";
+    document.getElementById("profile-send-time").textContent = p.send_time || "21:00";
+    document.getElementById("profile-morning-time").textContent = p.morning_send_time || "08:00";
 
-      const topicsHtml = (content.topics || []).map(topic => `
-        <div class="topic-item">
-          <div class="topic-name">📌 ${escapeHtml(topic.topic)}</div>
-          <div class="topic-summary">
-            ${(topic.summary || []).filter(Boolean).map(s => `• ${escapeHtml(s)}`).join("<br>")}
-          </div>
-          <div class="pros-cons">
-            <div class="pros">
-              <div class="pros-title">✅ 장점</div>
-              <ul>${(topic.pros || []).map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
-            </div>
-            <div class="cons">
-              <div class="cons-title">⚠️ 단점</div>
-              <ul>${(topic.cons || []).map(c => `<li>${escapeHtml(c)}</li>`).join("")}</ul>
-            </div>
-          </div>
-          <div class="sources">
-            ${(topic.sources || []).map(s =>
-              `<a href="${escapeHtml(s.url)}" target="_blank" class="source-link">
-                🔗 ${escapeHtml(s.title)}
-              </a>`
-            ).join("")}
-          </div>
-        </div>
-      `).join("");
-
-      return `
-        <div class="newsletter-card">
-          <div class="newsletter-date">${date}</div>
-          <div class="newsletter-subject">${escapeHtml(content.subject || "")}</div>
-          ${topicsHtml}
-        </div>
-      `;
+    var subBadge = document.getElementById("profile-sub-badge");
+    if (p.is_subscribed) {
+      subBadge.innerHTML = '<span class="badge badge-on">구독 중</span>';
+    } else {
+      subBadge.innerHTML = '<span class="badge badge-off">해지됨</span>';
     }
 
-    function escapeHtml(str) {
-      return String(str ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+    var catsEl = document.getElementById("profile-cats");
+    var cats = p.interest_categories || [];
+    if (cats.length) {
+      catsEl.innerHTML = cats.map(function(c) {
+        return '<span class="cat-tag">' + escHtml(c) + '</span>';
+      }).join("");
     }
 
-    function logout() {
-      localStorage.removeItem("access_token");
-      window.location.href = "/";
+    document.getElementById("edit-send-time").value = p.send_time || "21:00";
+    document.getElementById("edit-morning-time").value = p.morning_send_time || "08:00";
+    var subBtn = document.getElementById("sub-toggle-btn");
+    if (p.is_subscribed) {
+      subBtn.textContent = "구독 해지";
+      subBtn.style.color = "#cc6666";
+    } else {
+      subBtn.textContent = "구독 재신청";
+      subBtn.style.color = "#66cc66";
     }
+  }
 
-    // 초기화
-    loadHistory();
-  </script>
+  function toggleEdit() {
+    editOpen = !editOpen;
+    document.getElementById("edit-panel").className = editOpen ? "edit-panel open" : "edit-panel";
+  }
+
+  async function saveProfile() {
+    var sendTime = document.getElementById("edit-send-time").value.trim();
+    var morningTime = document.getElementById("edit-morning-time").value.trim();
+    var timeRe = /^\d{2}:\d{2}$/;
+    if (!timeRe.test(sendTime) || !timeRe.test(morningTime)) {
+      alert("시간 형식은 HH:MM 이어야 합니다. (예: 21:00)");
+      return;
+    }
+    try {
+      var res = await fetch(API + "/my/profile", {
+        method: "PUT",
+        headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ send_time: sendTime, morning_send_time: morningTime })
+      });
+      if (res.ok) {
+        await loadProfile();
+        toggleEdit();
+      } else {
+        alert("저장 실패 — 다시 시도해주세요.");
+      }
+    } catch(e) { alert("서버 연결 실패"); }
+  }
+
+  async function toggleSubscription() {
+    if (!profileData) return;
+    var url, label;
+    if (profileData.is_subscribed) {
+      url = API + "/my/subscription";
+      if (!confirm("수신을 해지하면 더 이상 뉴스레터를 받지 못합니다.\n계속하시겠습니까?")) return;
+      var res = await fetch(url, { method: "DELETE", headers: { "Authorization": "Bearer " + token } });
+    } else {
+      url = API + "/my/subscription";
+      var res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + token } });
+    }
+    await loadProfile();
+  }
+
+  // ── 통계 ──────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      var res = await fetch(API + "/my/stats", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      if (!res.ok) return;
+      var data = await res.json();
+
+      document.getElementById("stat-logs").textContent = data.today_log_count !== undefined ? data.today_log_count : "—";
+      document.getElementById("stat-total").textContent = data.total_newsletters !== undefined ? data.total_newsletters : "—";
+
+      if (data.last_sent_at) {
+        var d = new Date(data.last_sent_at);
+        document.getElementById("stat-last").textContent = (d.getMonth()+1) + "/" + d.getDate();
+      } else {
+        document.getElementById("stat-last").textContent = "없음";
+      }
+
+      var topicsEl = document.getElementById("triggered-topics");
+      var topics = data.triggered_topics || [];
+      if (topics.length) {
+        topicsEl.innerHTML = "<div style='font-size:0.75rem;color:#555;margin-bottom:6px;'>오늘 트리거된 토픽</div>" +
+          topics.map(function(t) { return '<span class="topic-tag">' + escHtml(t) + '</span>'; }).join("");
+      }
+    } catch(e) {}
+  }
+
+  // ── 관심사 차트 ──────────────────────────────────────────────────
+  async function loadInterests() {
+    var el = document.getElementById("interests-chart");
+    try {
+      var res = await fetch(API + "/my/interests", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      if (!res.ok) { el.innerHTML = ""; return; }
+      var data = await res.json();
+      var interests = data.interests || [];
+
+      if (!interests.length) {
+        el.innerHTML = '<div class="empty-state"><div class="icon">📊</div>' +
+          '<p>아직 누적된 관심사 데이터가 없습니다.<br>뉴스레터를 받을수록 관심사가 쌓입니다.</p></div>';
+        return;
+      }
+
+      var maxWeight = interests[0].weight || 1;
+      var rows = interests.slice(0, 10).map(function(item) {
+        var pct = Math.round((item.weight / maxWeight) * 100);
+        return '<div class="interest-bar-row">' +
+          '<div class="interest-bar-label" title="' + escHtml(item.category) + '">' + escHtml(item.category) + '</div>' +
+          '<div class="interest-bar-track">' +
+            '<div class="interest-bar-fill" style="width:' + pct + '%"></div>' +
+          '</div>' +
+          '<div class="interest-bar-weight">' + item.weight + '</div>' +
+        '</div>';
+      }).join("");
+
+      el.innerHTML = '<div class="interest-bar-list">' + rows + '</div>';
+    } catch(e) { el.innerHTML = ""; }
+  }
+
+  // ── 히스토리 ──────────────────────────────────────────────────────
+  async function loadHistory() {
+    var listEl = document.getElementById("newsletter-list");
+    try {
+      var res = await fetch(API + "/newsletter/history", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      if (res.status === 401) { doLogout(); return; }
+      var data = await res.json();
+      var newsletters = data.newsletters || [];
+
+      if (!newsletters.length) {
+        listEl.innerHTML = '<div class="empty-state"><div class="icon">📭</div>' +
+          '<p>아직 발송된 뉴스레터가 없습니다.<br>유튜브에서 관심 주제를 2번 이상 검색하면<br>저녁에 뉴스레터로 발송됩니다.</p></div>';
+        return;
+      }
+      listEl.innerHTML = newsletters.map(function(nl) { return renderCard(nl); }).join("");
+    } catch(e) {
+      listEl.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>불러오기 실패 — 백엔드를 확인해주세요.</p></div>';
+    }
+  }
+
+  function renderCard(nl) {
+    var content = nl.content_json;
+    if (typeof content === "string") { try { content = JSON.parse(content); } catch(e) {} }
+    var date = new Date(nl.delivered_at).toLocaleDateString("ko-KR", {
+      year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit"
+    });
+    var statusHtml = "";
+    if (nl.delivery_status === "failed") {
+      statusHtml = '<span class="nl-status nl-status-failed">발송 실패</span>';
+    }
+    var topicNames = (content && content.topics ? content.topics : [])
+      .map(function(t) { return '<span class="topic-tag">' + escHtml(t.topic || "") + '</span>'; }).join("");
+    var safeNl = JSON.stringify(nl).replace(/'/g, "\\'");
+    return '<div class="newsletter-card" onclick="openModal(' + escHtml(JSON.stringify(nl)) + ')">' +
+      '<div class="nl-header">' +
+      '<div class="nl-subject">' + escHtml((content && content.subject) || "(제목 없음)") + statusHtml + '</div>' +
+      '<div class="nl-date">' + date + '</div>' +
+      '</div>' +
+      (topicNames ? '<div style="margin-top:10px">' + topicNames + '</div>' : '') +
+      '</div>';
+  }
+
+  // ── 모달 ──────────────────────────────────────────────────────
+  function openModal(nlJson) {
+    var nl = typeof nlJson === "string" ? JSON.parse(nlJson) : nlJson;
+    var content = nl.content_json;
+    if (typeof content === "string") { try { content = JSON.parse(content); } catch(e) {} }
+
+    var date = new Date(nl.delivered_at).toLocaleDateString("ko-KR", {
+      year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit"
+    });
+
+    var topicsHtml = (content && content.topics ? content.topics : []).map(function(topic) {
+      var summaryHtml = (topic.summary || []).map(function(s) {
+        return "• " + escHtml(s);
+      }).join("<br>");
+      var prosHtml = (topic.pros || []).map(function(p) { return "<li>" + escHtml(p) + "</li>"; }).join("");
+      var consHtml = (topic.cons || []).map(function(c) { return "<li>" + escHtml(c) + "</li>"; }).join("");
+      var sourcesHtml = (topic.sources || []).map(function(s) {
+        return '<a href="' + escHtml(s.url || "#") + '" target="_blank" class="source-link">🔗 ' + escHtml(s.title || s.url || "") + '</a>';
+      }).join("");
+      return '<div class="topic-block">' +
+        '<div class="topic-name">📌 ' + escHtml(topic.topic || "") + '</div>' +
+        '<div class="topic-summary">' + summaryHtml + '</div>' +
+        '<div class="pros-cons">' +
+        '<div class="pros"><div class="pros-title">✅ 장점</div><ul>' + prosHtml + '</ul></div>' +
+        '<div class="cons"><div class="cons-title">⚠️ 단점</div><ul>' + consHtml + '</ul></div>' +
+        '</div>' +
+        (sourcesHtml ? '<div class="sources">' + sourcesHtml + '</div>' : '') +
+        '</div>';
+    }).join("");
+
+    document.getElementById("modal-content").innerHTML =
+      '<div class="modal-subject">' + escHtml((content && content.subject) || "(제목 없음)") + '</div>' +
+      '<div class="modal-date">' + date + '</div>' +
+      topicsHtml;
+
+    document.getElementById("modal-overlay").className = "modal-overlay open";
+  }
+
+  function closeModal(e) {
+    if (e.target === document.getElementById("modal-overlay")) closeModalDirect();
+  }
+  function closeModalDirect() {
+    document.getElementById("modal-overlay").className = "modal-overlay";
+  }
+
+  // ── 유틸 ──────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str == null ? "" : str)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function logout() {
+    localStorage.removeItem("access_token");
+    window.location.href = "/";
+  }
+
+  function doLogout() {
+    localStorage.removeItem("access_token");
+    window.location.href = "/";
+  }
+
+  init();
+</script>
 </body>
 </html>
