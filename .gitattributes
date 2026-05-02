@@ -1,1 +1,4 @@
 *.pbxproj binary merge=union
+* text=auto eol=lf
+*.py text eol=lf
+*.md text eol=lf
