@@ -194,7 +194,9 @@ def _parse_batch_response(
             "title": v.get("title", ""),
             "channel_id": v.get("channel_id", ""),
             "channel_title": v.get("channel_title", ""),
+            "subscriber_count": v.get("subscriber_count", 0),
             "transcript_available": transcript is not None,
+            "transcript_len": len(transcript) if transcript else 0,
             "ad_score": ad_score,
             "ad_detected": ad_score >= 60,
             "ad_signals": [
@@ -218,19 +220,57 @@ def _parse_ad_score(text: str) -> int:
     return max(0, min(100, int(match.group()))) if match else 0
 
 
-# ── Strategy C: 교차분석 + 뉴스레터 통합 (2회 → 1회) ────────────────────────
+# ── 의도별 교차분석 프롬프트 전략 ───────────────────────────────────────────────
+
+# intent_type → 포함할 섹션 목록
+_INTENT_SECTIONS: Dict[str, List[str]] = {
+    "유희형":  ["쟁점", "요약"],                              # 흥미·화제성 위주
+    "지식형":  ["공통사실", "쟁점", "요약", "장점", "단점"],  # 모든 섹션 포함
+    "구매형":  ["공통사실", "요약", "장점", "단점"],          # 실용 비교 위주
+}
+
+_SECTION_GUIDE: Dict[str, str] = {
+    "공통사실": (
+        "3개 이상 영상에서 공통으로 언급된 사실·정보를 최대 5개.\n"
+        "각 항목은 \"- \"으로 시작. 없으면 \"- 없음\"."
+    ),
+    "쟁점": (
+        "영상마다 서로 다른 주장이나 의견 차이를 최대 5개.\n"
+        "각 항목은 \"- \"으로 시작. 없으면 \"- 없음\"."
+    ),
+    "요약": "이 주제의 핵심을 정확히 3줄로 요약. 각 줄은 \"- \"으로 시작.",
+    "장점": "긍정적인 점을 최대 3개. 각 항목은 \"- \"으로 시작.",
+    "단점": "부정적이거나 주의할 점을 최대 3개. 각 항목은 \"- \"으로 시작.",
+}
+
+_INTENT_TONE: Dict[str, str] = {
+    "유희형": "친근하고 가벼운 말투. 이모지 1~2개 포함. 흥미를 유발하는 표현 사용.",
+    "지식형": "정확하고 신뢰감 있는 문체. 전문 용어는 간단히 풀어 설명. 근거 중심.",
+    "구매형": "실용적·객관적 말투. 수치와 비교 표현 활용. 결론을 앞에 배치.",
+}
+
+_INTENT_FOCUS: Dict[str, str] = {
+    "유희형": "화제성·논란·재미 포인트에 집중. 장단점 대신 '주목할 관점'을 작성.",
+    "지식형": "사실 정확성과 출처 신뢰도 우선. 배경→핵심→시사점 순으로 요약.",
+    "구매형": "구매 결정에 도움이 되는 장단점을 명확히 대비. 가격·스펙·사용성 위주 서술.",
+}
+
+
+# ── Strategy C: 교차분석 + 콘텐츠 통합 (1회 호출) ────────────────────────────
 
 async def _cross_and_generate(
     keyword: str,
     video_results: List[Dict[str, Any]],
     format_style: Optional[Dict[str, str]] = None,
+    intent_type: str = "지식형",
 ) -> Dict[str, Any]:
     """
-    교차분석(공통사실/쟁점)과 뉴스레터 콘텐츠(요약/장점/단점)를
-    하나의 Gemini 호출로 통합 생성.
+    교차분석(공통사실/쟁점)과 콘텐츠(요약/장점/단점)를 1회 Gemini 호출로 통합 생성.
 
-    이전: _cross_analyze() 1회 + _generate_topic_content() 1회 = 2회
-    이후: 1회
+    intent_type에 따라 포함 섹션과 작성 톤이 달라진다:
+      유희형 - 쟁점·요약만, 친근·가벼운 말투
+      지식형 - 모든 섹션, 신뢰감 있는 문체
+      구매형 - 공통사실·요약·장단점, 실용적 비교 언어
     """
     valid = [v for v in video_results if v["transcript_available"] and v["key_claims"]]
     if not valid:
@@ -254,15 +294,20 @@ async def _cross_and_generate(
             claims_lines.append(f"  - {c}")
     claims_block = "\n".join(claims_lines)
 
-    length_guide = (
-        "각 항목은 1줄로 간결하게"
-        if format_style and format_style.get("length") == "short"
-        else "각 항목은 2줄 이내로"
+    # 의도별 설정
+    sections     = _INTENT_SECTIONS.get(intent_type, _INTENT_SECTIONS["지식형"])
+    tone         = _INTENT_TONE.get(intent_type, _INTENT_TONE["지식형"])
+    focus        = _INTENT_FOCUS.get(intent_type, _INTENT_FOCUS["지식형"])
+    length       = (format_style or {}).get("length", "medium")
+    length_guide = "각 항목은 1줄로 간결하게" if length == "short" else "각 항목은 2줄 이내로"
+
+    section_prompts = "\n\n".join(
+        f"[{sec}]\n{_SECTION_GUIDE[sec]}" for sec in sections
     )
-    tone_note = f"작성 스타일: {format_style['tone']}\n" if format_style and format_style.get("tone") else ""
 
     prompt = (
         f"검색 주제: {keyword}\n"
+        f"사용자 검색 의도: {intent_type}\n"
         f"\n"
         f"아래는 {len(valid)}개 유튜브 영상에서 추출한 핵심 주장입니다.\n"
         f"[광고포함] 영상의 주장은 신뢰도가 낮으므로 보조 정보로만 활용하세요.\n"
@@ -270,25 +315,11 @@ async def _cross_and_generate(
         f"{claims_block}\n"
         f"\n"
         f"위 영상 분석을 바탕으로 아래 항목들을 한국어로 작성하세요.\n"
-        f"{tone_note}"
+        f"작성 스타일: {tone}\n"
+        f"분석 방향: {focus}\n"
         f"{length_guide} 작성하세요.\n"
         f"\n"
-        f"[공통사실]\n"
-        f"3개 이상 영상에서 공통으로 언급된 사실/정보를 최대 5개.\n"
-        f"각 항목은 \"- \"으로 시작. 없으면 \"- 없음\".\n"
-        f"\n"
-        f"[쟁점]\n"
-        f"영상마다 서로 다른 주장이나 의견이 갈리는 내용을 최대 5개.\n"
-        f"각 항목은 \"- \"으로 시작. 없으면 \"- 없음\".\n"
-        f"\n"
-        f"[요약]\n"
-        f"이 주제의 핵심을 정확히 3줄로 요약. 각 줄은 \"- \"으로 시작.\n"
-        f"\n"
-        f"[장점]\n"
-        f"긍정적인 점을 최대 3개. 각 항목은 \"- \"으로 시작.\n"
-        f"\n"
-        f"[단점]\n"
-        f"부정적이거나 주의할 점을 최대 3개. 각 항목은 \"- \"으로 시작.\n"
+        f"{section_prompts}\n"
     )
 
     try:
@@ -303,11 +334,18 @@ async def _cross_and_generate(
             "cons": [],
         }
 
-    common_facts  = [f for f in parse_bullet_list(text, "공통사실") if f != "없음"]
-    controversies = [c for c in parse_bullet_list(text, "쟁점")    if c != "없음"]
-    summary       = parse_bullet_list(text, "요약")
-    pros          = parse_bullet_list(text, "장점")
-    cons          = parse_bullet_list(text, "단점")
+    # 요청한 섹션만 파싱 (요청 안 한 섹션은 빈 리스트)
+    common_facts  = (
+        [f for f in parse_bullet_list(text, "공통사실") if f != "없음"]
+        if "공통사실" in sections else []
+    )
+    controversies = (
+        [c for c in parse_bullet_list(text, "쟁점") if c != "없음"]
+        if "쟁점" in sections else []
+    )
+    summary = parse_bullet_list(text, "요약") if "요약" in sections else []
+    pros    = parse_bullet_list(text, "장점") if "장점" in sections else []
+    cons    = parse_bullet_list(text, "단점") if "단점" in sections else []
 
     while len(summary) < 3:
         summary.append("")
@@ -323,19 +361,78 @@ async def _cross_and_generate(
 
 
 # ── 신뢰도 보정 ───────────────────────────────────────────────────────────────
+#
+# PPT 공식: 신뢰도 = ω₁·자막품질 + ω₂·(1-광고확률) + ω₃·채널신뢰도 + ω₄·정보일관성
+#   ω₁=0.20, ω₂=0.35, ω₃=0.25, ω₄=0.20
+
+W_TRANSCRIPT  = 0.20  # ω₁ 자막품질
+W_AD_FREE     = 0.35  # ω₂ (1 - 광고확률)
+W_CHANNEL     = 0.25  # ω₃ 채널신뢰도 (구독자 수 기반)
+W_CONSISTENCY = 0.20  # ω₄ 정보일관성 (공통사실 매칭률)
+
+
+def _transcript_quality_score(transcript_len: int, transcript_available: bool) -> float:
+    """
+    자막품질 점수 (0.0 ~ 1.0).
+    자막 없으면 0.0, 있으면 길이 기준 선형 증가 (5000자 이상 = 1.0).
+    """
+    if not transcript_available or transcript_len == 0:
+        return 0.0
+    return min(1.0, transcript_len / 5000)
+
+
+def _channel_credibility_score(subscriber_count: int) -> float:
+    """
+    채널신뢰도 점수 (0.0 ~ 1.0) — 구독자 수 기반 로그 스케일.
+    - 100만+ : 1.0
+    - 10만  : 0.8
+    - 1만   : 0.6
+    - 1000  : 0.4
+    - 100   : 0.2
+    - 0     : 0.0
+    """
+    if subscriber_count <= 0:
+        return 0.0
+    import math
+    # log10(1_000_000) = 6  → 1.0
+    # log10(100)       = 2  → 0.2
+    score = math.log10(subscriber_count) / 6.0
+    return round(min(1.0, max(0.0, score)), 4)
+
 
 def _calc_credibility(video: Dict[str, Any], common_facts: List[str]) -> float:
-    score = 0.5
-    if video["ad_detected"]:
-        score -= 0.2
-    if common_facts and video["key_claims"]:
+    """
+    신뢰도 = ω₁·자막품질 + ω₂·(1-광고확률) + ω₃·채널신뢰도 + ω₄·정보일관성
+    """
+    # ω₁ 자막품질
+    transcript_q = _transcript_quality_score(
+        video.get("transcript_len", 0),
+        video.get("transcript_available", False),
+    )
+
+    # ω₂ (1 - 광고확률) — ad_score 는 0~100
+    ad_free = 1.0 - (video.get("ad_score", 0) / 100.0)
+
+    # ω₃ 채널신뢰도
+    channel_cred = _channel_credibility_score(video.get("subscriber_count", 0))
+
+    # ω₄ 정보일관성 — key_claims 와 공통사실 토큰 겹침 비율
+    consistency = 0.0
+    if common_facts and video.get("key_claims"):
         claim_text = " ".join(video["key_claims"]).lower()
         matched = sum(
             1 for fact in common_facts
             if any(word in claim_text for word in fact.lower().split() if len(word) > 2)
         )
-        score += 0.3 * (matched / max(len(common_facts), 1))
-    return round(max(0.0, min(1.0, score)), 3)
+        consistency = matched / max(len(common_facts), 1)
+
+    score = (
+        W_TRANSCRIPT  * transcript_q
+        + W_AD_FREE     * ad_free
+        + W_CHANNEL     * channel_cred
+        + W_CONSISTENCY * consistency
+    )
+    return round(max(0.0, min(1.0, score)), 4)
 
 
 # ── 메인 진입점 ───────────────────────────────────────────────────────────────
@@ -344,26 +441,28 @@ async def analyze_videos(
     keyword: str,
     videos: List[Dict[str, Any]],
     format_style: Optional[Dict[str, str]] = None,
+    intent_type: str = "지식형",
 ) -> Dict[str, Any]:
     """
-    영상 배치 분석 + 교차분석 + 뉴스레터 콘텐츠를 2회 Gemini 호출로 완성.
+    영상 배치 분석 + 교차분석 + 콘텐츠 생성을 2회 Gemini 호출로 완성.
 
     Gemini 호출 횟수 변화 (영상 5개 기준):
       이전: 5 (개별분석) + 1 (교차분석) + 1 (뉴스레터) = 7회
-      이후: 1 (배치분석) + 1 (교차+뉴스레터 통합) = 2회
+      이후: 1 (배치분석) + 1 (교차+콘텐츠 통합) = 2회
 
     Args:
         keyword:      검색 키워드
         videos:       selector_ai 반환 영상 목록 (최대 5개)
-        format_style: intent_ai가 반환한 format_style (뉴스레터 스타일 제어)
+        format_style: intent_ai가 반환한 format_style (길이·톤 제어)
+        intent_type:  사용자 검색 의도 (유희형/지식형/구매형) — 교차분석 프롬프트 분기
     """
-    logger.info(f"[analyzer] '{keyword}' 영상 {len(videos)}개 — 배치 분석 시작")
+    logger.info(f"[analyzer] '{keyword}' 영상 {len(videos)}개 — 의도={intent_type}, 배치 분석 시작")
 
     # Step 1: 배치 분석 [1회 호출]
     video_results = await _analyze_videos_batch(keyword, videos)
 
-    # Step 2: 교차분석 + 뉴스레터 통합 [1회 호출]
-    content = await _cross_and_generate(keyword, video_results, format_style)
+    # Step 2: 의도 반영 교차분석 + 콘텐츠 통합 [1회 호출]
+    content = await _cross_and_generate(keyword, video_results, format_style, intent_type)
 
     # Step 3: 최종 신뢰도 보정 (공통사실 기반, 호출 없음)
     common_facts = content["common_facts"]
@@ -392,7 +491,8 @@ async def analyze_videos(
             for v in video_results
         ]
 
-    logger.info(f"[analyzer] 완료 — 공통사실 {len(common_facts)}개 / "
+    logger.info(
+        f"[analyzer] 완료 — 공통사실 {len(common_facts)}개 / "
         f"쟁점 {len(content['controversies'])}개"
     )
 
