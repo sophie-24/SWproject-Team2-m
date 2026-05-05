@@ -127,9 +127,17 @@ async def callback(
 
     code_verifier = _oauth_sessions.pop(state, None)  # 사용 후 즉시 제거
     if not code_verifier:
-        raise HTTPException(status_code=400, detail="Invalid state parameter")
+        logger.error(f"[callback] state 없음 (서버 재시작됐거나 중복 요청): {state}")
+        raise HTTPException(status_code=400, detail="로그인 세션이 만료됐습니다. 다시 로그인해주세요.")
 
-    user_info = exchange_code_for_tokens(code, code_verifier)
+    # 동기 블로킹 함수(requests.post + id_token 검증)를 스레드풀에서 실행
+    # 이벤트 루프 블락 방지
+    try:
+        user_info = await asyncio.to_thread(exchange_code_for_tokens, code, code_verifier)
+    except Exception as e:
+        logger.error(f"[callback] 토큰 교환 실패: {e}")
+        raise HTTPException(status_code=502, detail=f"Google 인증 실패: {e}")
+
     _oauth_credentials[state] = user_info.get("credentials")
     from database import User
     from sqlalchemy import select
@@ -555,6 +563,69 @@ async def my_stats(
     }
 
 
+@app.get("/my/interests")
+async def my_interests(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """유저 관심사 목록 — weight 내림차순 상위 20개 반환 (dashboard 차트용)"""
+    rows = await db.execute(
+        select(UserInterest)
+        .where(UserInterest.user_id == user["user_id"])
+        .order_by(UserInterest.weight.desc())
+        .limit(20)
+    )
+    interests = rows.scalars().all()
+    return {
+        "interests": [
+            {
+                "category":   i.category,
+                "weight":     i.weight,
+                "updated_at": i.updated_at.isoformat() if i.updated_at else None,
+            }
+            for i in interests
+        ]
+    }
+
+
+class HistoryAnalyzeRequest(BaseModel):
+    keywords: list[str]
+
+@app.post("/profile/analyze-history")
+async def analyze_history(
+    body: HistoryAnalyzeRequest,
+    user=Depends(get_current_user),
+):
+    """
+    온보딩 Step2 — 유튜브 검색 기록 키워드를 받아 관심 카테고리 + 의도 유형 추론.
+    cluster_ai로 토픽 그룹화 → 상위 카테고리명 반환.
+    intent_ai로 전체 키워드 의도 분류 → intent_type 반환.
+    """
+    from agents.cluster_ai import cluster_topics
+    from agents.intent_ai import classify_intent
+
+    keywords = [kw.strip() for kw in body.keywords if kw.strip()]
+    if not keywords:
+        return {"categories": [], "intent_type": "지식형"}
+
+    # 키워드 수 제한 (Gemini 컨텍스트 과부하 방지)
+    keywords = keywords[:100]
+
+    clusters, intent_result = await asyncio.gather(
+        cluster_topics(keywords, max_topics=8),
+        classify_intent(keywords[:10], []),
+    )
+
+    categories = [c["topic"] for c in clusters if c.get("topic")]
+    intent_type = intent_result.get("intent_type", "지식형")
+
+    logger.info(
+        f"[analyze-history] user={user['user_id']} "
+        f"keywords={len(keywords)} → categories={categories}, intent={intent_type}"
+    )
+    return {"categories": categories, "intent_type": intent_type}
+
+
 @app.delete("/my/subscription")
 async def unsubscribe(
     user=Depends(get_current_user),
@@ -709,28 +780,63 @@ async def send_now(
 async def analyze_search(
     keyword: str = Query(..., min_length=1),
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     검색어 기반 즉석 분석 — popup/search_dashboard에서 호출.
     pipeA_orchestrator: selector_ai + intent_ai + analyzer_ai 병렬 실행.
-    keyword 기준 인메모리 캐시로 Gemini 중복 호출 방지.
+    사용자별 구독 채널/관심사/시청 이력을 개인화 파라미터로 전달.
+    (user_id + keyword) 기준 인메모리 캐시로 Gemini 중복 호출 방지.
     """
     from pipeA_orchestrator import run_pipeline_a
 
-    if keyword in _search_analysis_cache:
-        return JSONResponse(_search_analysis_cache[keyword])
+    user_id = user.get("sub", "")
+    cache_key = f"{user_id}:{keyword}"
+
+    if cache_key in _search_analysis_cache:
+        return JSONResponse(_search_analysis_cache[cache_key])
 
     async with _search_analysis_lock:
-        # double-check: 락 대기 중 다른 코루틴이 채웠을 수 있음
-        if keyword in _search_analysis_cache:
-            return JSONResponse(_search_analysis_cache[keyword])
+        if cache_key in _search_analysis_cache:
+            return JSONResponse(_search_analysis_cache[cache_key])
+
+        # 개인화 파라미터 조회 (병렬)
+        sub_result, interest_result, click_result = await asyncio.gather(
+            db.execute(
+                select(UserSubscription.channel_id).where(UserSubscription.user_id == user_id)
+            ),
+            db.execute(
+                select(UserInterest.category)
+                .where(UserInterest.user_id == user_id)
+                .order_by(UserInterest.weight.desc())
+                .limit(10)
+            ),
+            db.execute(
+                select(UserSubscription.channel_id)  # clicked = 구독 채널 중 로그 있는 채널 (근사값)
+                .where(UserSubscription.user_id == user_id)
+            ),
+        )
+        subscribed_channel_ids = [row[0] for row in sub_result.all()]
+        user_categories         = [row[0] for row in interest_result.all()]
+        # 클릭 이력: BehaviorLog에서 채널 ID 추출
+        click_log_result = await db.execute(
+            select(UserSubscription.channel_id)
+            .where(UserSubscription.user_id == user_id)
+        )
+        # BehaviorLog에서 video_url로 채널 구분이 어려우므로 구독 채널을 근사값으로 사용
+        clicked_channel_ids = subscribed_channel_ids  # 향후 BehaviorLog.channel_id 컬럼 추가 시 교체
 
         try:
-            result = await run_pipeline_a(keyword=keyword)
+            result = await run_pipeline_a(
+                keyword=keyword,
+                subscribed_channel_ids=subscribed_channel_ids,
+                user_categories=user_categories,
+                clicked_channel_ids=clicked_channel_ids,
+            )
         except ValueError:
             result = {"keyword": keyword, "videos": [], "common_facts": [], "controversies": []}
 
-        _search_analysis_cache[keyword] = result
+        _search_analysis_cache[cache_key] = result
 
     return JSONResponse(result)
 

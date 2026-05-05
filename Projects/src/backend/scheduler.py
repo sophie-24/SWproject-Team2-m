@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from database import AsyncSessionLocal, User, BehaviorLog, Newsletter, ReportBatch, UserInterest, UserSubscription
 from behavior_store import get_today_logs
 from trigger import get_triggered_topics
-from Projects.src.backend.agents.pipeB_orchestrator import run_pipeline
+from agents.pipeB_orchestrator import run_pipeline
 from mailer import send_email
 
 load_dotenv()
