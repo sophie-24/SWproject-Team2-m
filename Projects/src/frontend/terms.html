@@ -289,7 +289,7 @@
 
   <nav>
     <div class="nav-inner">
-      <a href="/" class="nav-logo">Tubify</a>
+      <a href="/intro.html" class="nav-logo" id="nav-logo">Tubify</a>
       <div class="nav-links" id="nav-auth-links" style="display:none">
         <a href="/" class="nav-link">홈</a>
         <a href="/dashboard.html" class="nav-link">마이페이지</a>
@@ -394,6 +394,7 @@
 
   <script>
     const token = localStorage.getItem("access_token");
+    document.getElementById("nav-logo").href = token ? "/home.html" : "/intro.html";
     if (token) {
       document.getElementById("nav-auth-links").style.display = "flex";
       document.getElementById("nav-auth-btn").textContent = "로그아웃";

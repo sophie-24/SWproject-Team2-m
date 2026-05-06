@@ -115,6 +115,10 @@ def privacy():
 def terms():
     return FileResponse(os.path.join(FRONTEND_DIR, "terms.html"))
 
+@app.get("/intro.html")
+def intro():
+    return FileResponse(os.path.join(FRONTEND_DIR, "intro.html"))
+
 # login.html / home.html 이 참조하는 정적 에셋 (/static/ 마운트와 별개로 루트 경로 노출)
 @app.get("/app.js")
 def serve_app_js():
