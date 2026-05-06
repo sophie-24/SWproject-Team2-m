@@ -107,6 +107,14 @@ def dashboard():
 def search_dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "search_dashboard.html"))
 
+@app.get("/privacy.html")
+def privacy():
+    return FileResponse(os.path.join(FRONTEND_DIR, "privacy.html"))
+
+@app.get("/terms.html")
+def terms():
+    return FileResponse(os.path.join(FRONTEND_DIR, "terms.html"))
+
 # login.html / home.html 이 참조하는 정적 에셋 (/static/ 마운트와 별개로 루트 경로 노출)
 @app.get("/app.js")
 def serve_app_js():
