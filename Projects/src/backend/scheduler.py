@@ -6,16 +6,16 @@ import asyncio
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from zoneinfo import ZoneInfo
-
+from sqlalchemy import or_
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from datetime import date as date_type
-from sqlalchemy import select, func, or_, update
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from dotenv import load_dotenv
 
-from database import AsyncSessionLocal, User, BehaviorLog, Newsletter, ReportBatch, UserInterest, UserSubscription
+from database import AsyncSessionLocal, User, BehaviorLog, Newsletter, ReportBatch, UserInterest
 from behavior_store import get_today_logs
 from trigger import get_triggered_topics
 from agents.pipeB_orchestrator import run_pipeline
@@ -30,15 +30,6 @@ scheduler = AsyncIOScheduler(timezone="Asia/Seoul")
 
 
 # -- util --
-
-async def _get_subscribed_channel_ids(user_id: str) -> List[str]:
-    """DB에서 유저의 구독 채널 ID 목록 조회."""
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(UserSubscription.channel_id)
-            .where(UserSubscription.user_id == user_id)
-        )
-        return [row[0] for row in result.all()]
 
 
 def _get_profile_keywords(user: User) -> List[str]:
@@ -68,13 +59,12 @@ async def _save_newsletter(
     newsletter: Dict[str, Any],
     batch_id: Optional[uuid.UUID] = None,
 ) -> Newsletter:
-    """뉴스레터를 DB에 저장하고 ORM 객체를 반환. delivery_status는 'pending'으로 시작."""
+    """뉴스레터를 DB에 저장하고 ORM 객체를 반환. delivery_status는 'generated'로 시작."""
     record = Newsletter(
         user_id=user.google_id,
         subject=newsletter.get("subject", ""),
         content_json=json.dumps(newsletter, ensure_ascii=False),
-        delivery_type=user.delivery_type,
-        delivery_status="pending",
+        delivery_status="generated",
         batch_id=batch_id,
     )
     db.add(record)
@@ -97,9 +87,11 @@ async def _deliver_newsletter(user: User, newsletter: Dict[str, Any]) -> Dict[st
 
 async def _update_user_interests(db, user_id: str, topics: List[str]) -> None:
     """Pipeline B 실행 후 cluster_ai 결과 토픽으로 user_interests weight 누적.
-    이미 존재하는 카테고리면 weight+1, 없으면 weight=1로 신규 생성.
+    이미 존재하는 카테고리면 weight+1 + last_seen_at 갱신, 없으면 weight=1로 신규 생성.
     Gemini 추가 호출 없음 -- merged_topics 재활용.
+    2차 설계: source='behavior', last_seen_at 기록 추가.
     """
+    now = datetime.now(timezone.utc)
     for topic in topics:
         stmt = (
             pg_insert(UserInterest)
@@ -107,18 +99,61 @@ async def _update_user_interests(db, user_id: str, topics: List[str]) -> None:
                 user_id=user_id,
                 category=topic,
                 weight=1,
-                updated_at=datetime.now(timezone.utc),
+                source="behavior",
+                last_seen_at=now,
+                updated_at=now,
             )
             .on_conflict_do_update(
                 constraint="uq_user_interest_category",
                 set_={
                     "weight": UserInterest.weight + 1,
-                    "updated_at": datetime.now(timezone.utc),
+                    "last_seen_at": now,
+                    "updated_at": now,
                 },
             )
         )
         await db.execute(stmt)
     await db.commit()
+
+
+# ── 뉴스레터 생성 우선순위 fallback ─────────────────────────────────────────────
+
+async def _get_fallback_topics(db, user: "User", today_logs: List[Dict]) -> List[str]:
+    """오늘 pending 로그의 distinct keyword 수를 기준으로 토픽 소스를 결정.
+    1순위: distinct keyword >= 2 → trigger.py 결과 반환 (오늘 로그 기반)
+    2순위: distinct keyword < 2 → user_interests 상위 토픽으로 보완
+    3순위: user_interests 없으면 → users.interest_categories (온보딩 관심사) 사용
+    """
+    # 1순위: 오늘 distinct keyword 수 확인
+    distinct_keywords = {
+        log.get("keyword", "").strip().lower()
+        for log in today_logs
+        if log.get("keyword")
+    } - {""}
+    MIN_DISTINCT = 2
+
+    if len(distinct_keywords) >= MIN_DISTINCT:
+        return []  # 오늘 로그 충분 → 호출부에서 triggered_topics를 그대로 사용
+
+    # 2순위: user_interests 상위 토픽으로 보완
+    interest_result = await db.execute(
+        select(UserInterest.category)
+        .where(UserInterest.user_id == str(user.google_id))
+        .order_by(UserInterest.weight.desc())
+        .limit(10)
+    )
+    interest_topics = [row[0] for row in interest_result.all()]
+    if interest_topics:
+        logger.info(f"  [fallback] {user.email} — user_interests 사용 ({len(interest_topics)}개)")
+        return interest_topics
+
+    # 3순위: 온보딩 관심사 (interest_categories)
+    onboarding_topics = _get_profile_keywords(user)
+    if onboarding_topics:
+        logger.info(f"  [fallback] {user.email} — interest_categories 사용 ({len(onboarding_topics)}개)")
+        return onboarding_topics
+
+    return []
 
 
 # -- duplicate send guard --
@@ -138,6 +173,15 @@ async def _already_sent_in_window(db, user_id: str, hours: int = 10) -> bool:
 
 # -- batch --
 
+def _parse_send_times(raw: str) -> List[str]:
+    """send_time JSON 배열 문자열 → HH:MM 리스트. 파싱 실패 시 ["21:00"] 반환."""
+    try:
+        times = json.loads(raw or '["21:00"]')
+        return times if isinstance(times, list) else ["21:00"]
+    except (json.JSONDecodeError, TypeError):
+        return ["21:00"]
+
+
 async def _run_batch_for_send_time(send_time: str) -> None:
     logger.info(f"[scheduler] {send_time} batch start")
 
@@ -151,12 +195,12 @@ async def _run_batch_for_send_time(send_time: str) -> None:
             time_filter = (User.send_time == send_time)
 
         result = await db.execute(
-            select(User).where(
-                time_filter,
-                User.is_subscribed == True,  # noqa: E712
-            )
+            select(User).where(User.is_subscribed == True)  # noqa: E712
         )
-        users = result.scalars().all()
+        all_users = result.scalars().all()
+
+        # send_time JSON 배열에 현재 시각이 포함된 유저만 추출
+        users = [u for u in all_users if send_time in _parse_send_times(u.send_time)]
         logger.info(f"[scheduler] {send_time} -> {len(users)} users")
 
         for user in users:
@@ -166,16 +210,31 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                     logger.warning(f"  [skip] {user.email} already sent today")
                     continue
 
-                # 1. ReportBatch 생성
-                batch = ReportBatch(user_id=str(user.google_id))
+                now = datetime.now(timezone.utc)
+
+                # 1. ReportBatch 생성 (status='created') — window_type / period_start / period_end 기록
+                today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                # send_time 배열 중 가장 이른 시각이고 2회 이상 발송 설정이면 before_cutoff
+                user_times = sorted(_parse_send_times(user.send_time))
+                window_type = (
+                    "before_cutoff" if len(user_times) > 1 and send_time == user_times[0]
+                    else "after_cutoff"
+                )
+                batch = ReportBatch(
+                    user_id=str(user.google_id),
+                    window_type=window_type,
+                    period_start=today_start,
+                    period_end=now,
+                )
                 db.add(batch)
                 await db.commit()
                 await db.refresh(batch)
 
+                # 파이프라인 진입 전 processing 상태로 전환
+                batch.status = "processing"
+                await db.commit()
+
                 # 2. 오늘의 pending 로그 ID 수집
-                today_start = datetime.now(timezone.utc).replace(
-                    hour=0, minute=0, second=0, microsecond=0
-                )
                 log_id_result = await db.execute(
                     select(BehaviorLog.id).where(
                         BehaviorLog.user_id == str(user.google_id),
@@ -185,11 +244,18 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                 )
                 log_ids = [row[0] for row in log_id_result.all()]
 
-                # 3. 트리거 분석 및 토픽 병합
+                # 3. 트리거 분석 + 우선순위 fallback
                 today_logs = await get_today_logs(db, user_id=str(user.google_id))
                 triggered_topics = get_triggered_topics(today_logs)
-                profile_keywords = _get_profile_keywords(user)
-                merged_topics = _merge_keywords(triggered_topics, profile_keywords)
+
+                fallback = await _get_fallback_topics(db, user, today_logs)
+                if fallback:
+                    # 2·3순위: user_interests 또는 interest_categories 보완
+                    merged_topics = _merge_keywords(fallback, [])
+                else:
+                    # 1순위: 오늘 로그 충분 → trigger 결과 + 프로필 병합
+                    profile_keywords = _get_profile_keywords(user)
+                    merged_topics = _merge_keywords(triggered_topics, profile_keywords)
 
                 if not merged_topics:
                     logger.warning(f"  [skip] {user.email} no topics")
@@ -198,21 +264,26 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                     await db.commit()
                     continue
 
-                # 4. 사용한 로그를 processed 로 마킹
+
+                # 4. 사용한 로그를 processed 로 마킹 — 2차 설계: processed_at 기록
                 if log_ids:
                     await db.execute(
                         update(BehaviorLog)
                         .where(BehaviorLog.id.in_(log_ids))
-                        .values(status="processed", batch_id=batch.id)
+                        .values(
+                            status="processed",
+                            batch_id=batch.id,
+                            processed_at=datetime.now(timezone.utc),
+                        )
                     )
                     await db.commit()
 
                 # 5. 파이프라인 실행
-                subscribed_channel_ids = await _get_subscribed_channel_ids(str(user.google_id))
+                # TODO: YouTube API로 구독 채널 실시간 조회 후 가중치 부여
                 newsletter = await run_pipeline(
                     user_id=str(user.google_id),
                     raw_keywords=triggered_topics,
-                    subscribed_channel_ids=subscribed_channel_ids,
+                    subscribed_channel_ids=[],
                     initial_intent=user.initial_intent,
                     today_logs=today_logs,
                 )
@@ -232,13 +303,12 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                 await db.commit()
 
                 # 8. ReportBatch 완료 마킹
-                batch.status = "done"
+                batch.status = "completed"
                 batch.finished_at = datetime.now(timezone.utc)
-                batch.log_count = len(log_ids)
                 batch.topic_count = len(merged_topics)
                 await db.commit()
 
-                # 9. 관심도 누적 (Gemini 추가 호출 없음)
+                # 9. 관심도 누적 — 2차 설계: source='behavior', last_seen_at 기록
                 await _update_user_interests(db, str(user.google_id), merged_topics)
 
             except Exception as e:

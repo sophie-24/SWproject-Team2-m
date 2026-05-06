@@ -1,4 +1,5 @@
 # SQLAlchemy ORM 모델 정의 및 비동기 DB 연결 (User, BehaviorLog, Newsletter, ReportBatch, UserInterest, UserSubscription)
+# 2차 DB 설계 반영: behavior_logs.processed_at / user_interests.(source,last_seen_at,created_at) / report_batches.(window_type,period_start,period_end)
 import os
 import uuid
 from datetime import datetime, timezone
@@ -48,15 +49,16 @@ class User(Base):
 class BehaviorLog(Base):
     __tablename__ = "behavior_logs"
 
-    id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id    = Column(String(255), nullable=False)   # google_id 기준
-    event_type = Column(String(10), nullable=False)    # 'search' | 'watch'
-    keyword    = Column(String(500), nullable=False)
-    video_id   = Column(String(50), nullable=True)
-    logged_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id      = Column(String(255), nullable=False)   # google_id 기준
+    event_type   = Column(String(10), nullable=False)    # 'search' | 'watch'
+    keyword      = Column(String(500), nullable=False)
+    video_id     = Column(String(50), nullable=True)
+    logged_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     # 배치 처리 상태 추적
-    status     = Column(String(20), nullable=False, default="pending")  # 'pending'|'processed'|'archived'
-    batch_id   = Column(UUID(as_uuid=True), nullable=True)              # 처리한 ReportBatch.id
+    status       = Column(String(20), nullable=False, default="pending")  # 'pending'|'processed'|'archived'
+    processed_at = Column(DateTime, nullable=True)                         # processed 상태로 바뀐 시점
+    batch_id     = Column(UUID(as_uuid=True), nullable=True)              # 처리한 ReportBatch.id
 
     __table_args__ = (
         # 스케줄러: user_id + status='pending' 필터링 → logged_at 정렬
@@ -74,9 +76,8 @@ class Newsletter(Base):
     subject          = Column(String(500), nullable=True)
     content_json     = Column(Text, nullable=False)       # newsletter_ai 출력값 JSON 문자열
     delivered_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    delivery_type    = Column(String(10), nullable=True)  # 'email'
     # 발송 결과 추적
-    delivery_status  = Column(String(20), nullable=False, default="pending")  # 'pending'|'sent'|'failed'
+    delivery_status  = Column(String(20), nullable=False, default="generated")  # 'generated'|'sent'|'failed'
     error_message    = Column(Text, nullable=True)        # 실패 시 오류 메시지
     batch_id         = Column(UUID(as_uuid=True), nullable=True)  # 생성한 ReportBatch.id
 
@@ -92,13 +93,16 @@ class ReportBatch(Base):
     """Pipeline B 1회 실행 단위. behavior_logs.batch_id → report_batches.id 로 역추적 가능."""
     __tablename__ = "report_batches"
 
-    id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id     = Column(String(255), nullable=False)   # google_id 기준
-    started_at  = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    finished_at = Column(DateTime, nullable=True)
-    status      = Column(String(20), nullable=False, default="running")  # 'running'|'done'|'failed'
-    log_count   = Column(Integer, nullable=True)    # 처리에 사용된 behavior_logs 수
-    topic_count = Column(Integer, nullable=True)    # cluster_ai가 뽑은 토픽 수
+    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id      = Column(String(255), nullable=False)   # google_id 기준
+    started_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    finished_at  = Column(DateTime, nullable=True)
+    status       = Column(String(20), nullable=False, default="created")  # 'created'|'processing'|'completed'|'failed'
+    topic_count  = Column(Integer, nullable=True)    # Pipeline B가 추출한 최종 토픽 수
+    # 2차 설계: 배치가 커버한 기간 및 발송 시점 구분
+    window_type  = Column(String(30), nullable=True)    # 'before_cutoff'|'after_cutoff' (오전/오후 발송 구분)
+    period_start = Column(DateTime, nullable=True)       # 이번 배치가 커버한 로그 시작 시점
+    period_end   = Column(DateTime, nullable=True)       # 이번 배치가 커버한 로그 종료 시점 (= 배치 실행 시각)
 
     __table_args__ = (
         # 유저별 배치 실행 이력 조회: user_id 필터 + started_at 정렬
@@ -110,14 +114,19 @@ class UserInterest(Base):
     """유저 카테고리별 관심도 누적 테이블.
     온보딩 시 weight=1 초기화, Pipeline B 실행마다 해당 토픽 weight++.
     Gemini 추가 호출 없이 cluster_ai 결과(merged_topics)를 그대로 재활용.
+    2차 설계: source(출처 구분) / last_seen_at(최근성 판단) / created_at(최초 등장) 추가.
     """
     __tablename__ = "user_interests"
 
-    id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id    = Column(String(255), nullable=False)   # google_id 기준
-    category   = Column(String(100), nullable=False)   # cluster_ai 토픽명 (ex: "아이폰 16")
-    weight     = Column(Integer, nullable=False, default=1)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id      = Column(String(255), nullable=False)   # google_id 기준
+    category     = Column(String(100), nullable=False)   # cluster_ai 토픽명 (ex: "아이폰 16")
+    weight       = Column(Integer, nullable=False, default=1)
+    source       = Column(String(20), nullable=False, default="behavior")  # 'behavior'|'onboarding'|'manual'
+    last_seen_at = Column(DateTime, nullable=True)        # 해당 토픽이 마지막으로 관찰된 시점
+    created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc),
+                          onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint("user_id", "category", name="uq_user_interest_category"),
@@ -125,25 +134,6 @@ class UserInterest(Base):
         Index("idx_user_interests_user", "user_id", "weight"),
     )
 
-
-class UserSubscription(Base):
-    """유저 YouTube 구독 채널 테이블.
-    로그인 시 자동 동기화 + /subscriptions/sync로 수동 갱신.
-    scheduler가 selector_ai에 subscribed_channel_ids 전달 시 여기서 조회.
-    """
-    __tablename__ = "user_subscriptions"
-
-    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id       = Column(String(255), nullable=False)    # google_id 기준
-    channel_id    = Column(String(100), nullable=False)    # YouTube channel ID
-    channel_title = Column(String(255), nullable=True)     # 채널명 (표시용)
-    synced_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                           onupdate=lambda: datetime.now(timezone.utc))
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "channel_id", name="uq_user_subscription"),
-        Index("idx_user_subscriptions_user", "user_id"),
-    )
 
 
 # ── DB 초기화 (테이블 생성) ────────────────────────────────────────────────────
