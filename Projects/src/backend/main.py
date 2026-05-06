@@ -351,7 +351,8 @@ def _validate_send_time(send_time: str) -> str:
 class SubscribeData(BaseModel):
     delivery_type: str = "email"
     email: Optional[str] = None
-    send_time: Optional[str] = None   # "HH:MM" 형식 (예: "08:00", "21:00")
+    send_time: Optional[str] = None          # "HH:MM" 저녁 발송 시간 (예: "21:00")
+    morning_send_time: Optional[str] = None  # "HH:MM" 아침 발송 시간 (예: "08:00")
 
 
 @app.post("/subscribe")
@@ -385,15 +386,18 @@ async def subscribe(
                 detail="이미 다른 계정에서 사용 중인 이메일입니다.",
             )
         db_user.email = data.email
+    import re as _re
     if data.send_time:
-        # HH:MM 형식 검증
-        import re as _re
         if not _re.match(r"^\d{2}:\d{2}$", data.send_time):
             raise HTTPException(status_code=400, detail="send_time은 HH:MM 형식이어야 합니다")
         db_user.send_time = data.send_time
+    if data.morning_send_time:
+        if not _re.match(r"^\d{2}:\d{2}$", data.morning_send_time):
+            raise HTTPException(status_code=400, detail="morning_send_time은 HH:MM 형식이어야 합니다")
+        db_user.morning_send_time = data.morning_send_time
 
     await db.commit()
-    print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
+    print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time} / morning={db_user.morning_send_time}")
     return {"success": True}
 
 # ── 마이페이지: 발송 시간 변경 ────────────────────────────────────────────────
@@ -489,6 +493,7 @@ async def my_profile(
     return {
         "email":               db_user.email,
         "send_time":           db_user.send_time,
+        "morning_send_time":   db_user.morning_send_time or "08:00",
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
         "is_subscribed":       db_user.is_subscribed,
@@ -497,7 +502,8 @@ async def my_profile(
 
 
 class ProfileUpdateData(BaseModel):
-    send_time:           Optional[str]       = None  # "HH:MM" 발송 시간
+    send_time:           Optional[str]       = None  # "HH:MM" 저녁 발송 시간
+    morning_send_time:   Optional[str]       = None  # "HH:MM" 아침 발송 시간
     interest_categories: Optional[list[str]] = None  # 관심사 카테고리 목록
 
 
@@ -525,6 +531,11 @@ async def update_my_profile(
         if not time_re.match(data.send_time):
             raise HTTPException(status_code=400, detail="send_time 형식은 HH:MM이어야 합니다.")
         db_user.send_time = data.send_time
+
+    if data.morning_send_time is not None:
+        if not time_re.match(data.morning_send_time):
+            raise HTTPException(status_code=400, detail="morning_send_time 형식은 HH:MM이어야 합니다.")
+        db_user.morning_send_time = data.morning_send_time
 
     if data.interest_categories is not None:
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
