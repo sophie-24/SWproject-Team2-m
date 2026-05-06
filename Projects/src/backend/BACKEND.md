@@ -4,12 +4,7 @@
 
 ---
 
-## 주의사항 (먼저 읽기)
-
-- `preprocessing.py`
-- `user_id`는 항상 `google_id` 문자열 기준 — `users.id` (UUID) 절대 혼용 금지
-- `google.generativeai` 직접 import 금지 → `agents/gemini_client.py`의 `call_gemini()`만 사용
-- `datetime.utcnow()` 사용 금지 → `datetime.now(timezone.utc)` 사용
+## 주의사항
 - 서버 재시작 시 OAuth credentials + `_search_analysis_cache` 초기화됨 → 재로그인 필요
 
 ---

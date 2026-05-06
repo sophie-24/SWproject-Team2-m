@@ -489,7 +489,6 @@ async def my_profile(
     return {
         "email":               db_user.email,
         "send_time":           db_user.send_time,
-        "morning_send_time":   db_user.morning_send_time,
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
         "is_subscribed":       db_user.is_subscribed,
@@ -498,8 +497,7 @@ async def my_profile(
 
 
 class ProfileUpdateData(BaseModel):
-    send_time:           Optional[str]       = None  # "HH:MM" 저녁 발송 시간
-    morning_send_time:   Optional[str]       = None  # "HH:MM" 아침 발송 시간
+    send_time:           Optional[str]       = None  # "HH:MM" 발송 시간
     interest_categories: Optional[list[str]] = None  # 관심사 카테고리 목록
 
 
@@ -527,11 +525,6 @@ async def update_my_profile(
         if not time_re.match(data.send_time):
             raise HTTPException(status_code=400, detail="send_time 형식은 HH:MM이어야 합니다.")
         db_user.send_time = data.send_time
-
-    if data.morning_send_time is not None:
-        if not time_re.match(data.morning_send_time):
-            raise HTTPException(status_code=400, detail="morning_send_time 형식은 HH:MM이어야 합니다.")
-        db_user.morning_send_time = data.morning_send_time
 
     if data.interest_categories is not None:
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
@@ -623,6 +616,54 @@ async def my_interests(
             for i in interests
         ]
     }
+
+
+class ProfileInitData(BaseModel):
+    initial_intent:      str            # '유희형'|'지식형'|'구매형'
+    interest_categories: list[str] = [] # 온보딩에서 선택한 관심사 목록
+
+
+@app.post("/profile/init")
+async def profile_init(
+    data: ProfileInitData,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    온보딩 Step2 완료 — initial_intent + interest_categories 저장.
+    user_interests 테이블에 weight=1 초기화 (신규 카테고리만).
+    """
+    import json as _json
+    from database import User
+    from datetime import datetime, timezone
+
+    if data.initial_intent not in {"유희형", "지식형", "구매형"}:
+        raise HTTPException(status_code=400, detail="initial_intent는 유희형|지식형|구매형 중 하나여야 합니다.")
+
+    result = await db.execute(select(User).where(User.google_id == user["user_id"]))
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="유저 없음")
+
+    db_user.initial_intent      = data.initial_intent
+    db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
+
+    for category in data.interest_categories:
+        stmt = (
+            pg_insert(UserInterest)
+            .values(
+                user_id=user["user_id"],
+                category=category,
+                weight=1,
+                updated_at=datetime.now(timezone.utc),
+            )
+            .on_conflict_do_nothing(constraint="uq_user_interest_category")
+        )
+        await db.execute(stmt)
+
+    await db.commit()
+    logger.info(f"[profile/init] {user['user_id']} intent={data.initial_intent} categories={data.interest_categories}")
+    return {"ok": True}
 
 
 class HistoryAnalyzeRequest(BaseModel):
