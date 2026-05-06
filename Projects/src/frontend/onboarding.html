@@ -165,16 +165,34 @@
       <div class="step" id="step3-dot"></div>
     </div>
 
-    <!-- Step 1: 이메일 주소 입력 -->
+    <!-- Step 1: 이메일 주소 + 발송 시각 입력 -->
     <div id="step1">
       <div class="card">
-        <h2>이메일 주소 입력</h2>
-        <p>매일 저녁 9시, 오늘의 유튜브 브리핑을 이메일로 보내드립니다.</p>
+        <h2>뉴스레터 설정</h2>
+        <p>매일 정해진 시간에 오늘의 유튜브 브리핑을 이메일로 보내드립니다.</p>
 
         <div class="input-group">
           <label>이메일 주소</label>
           <input type="email" id="input-email" placeholder="your@email.com"
             oninput="document.getElementById('btn-step1').disabled = !this.value.trim()">
+        </div>
+
+        <div class="input-group" style="margin-top:16px;">
+          <label>뉴스레터 발송 시각</label>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="time-preset-btn selected" id="time-btn-morning" onclick="selectSendTime('08:00', this)">
+              🌅 오전 8시
+            </button>
+            <button class="time-preset-btn" id="time-btn-evening" onclick="selectSendTime('21:00', this)">
+              🌙 저녁 9시
+            </button>
+          </div>
+          <div style="margin-top:8px; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.8rem; color:#888;">직접 입력:</span>
+            <input type="time" id="input-send-time-custom"
+              style="background:#111; border:1px solid #2a2a2a; border-radius:8px; color:#f1f1f1; padding:6px 10px; font-size:0.85rem;"
+              oninput="selectSendTime(this.value, null)">
+          </div>
         </div>
 
         <button class="btn-primary" id="btn-step1" onclick="goStep2()" disabled>
@@ -292,6 +310,19 @@
   </div>
 
   <style>
+    .time-preset-btn {
+      padding: 10px 18px;
+      background: #111;
+      border: 2px solid #2a2a2a;
+      border-radius: 10px;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: border-color 0.2s;
+    }
+    .time-preset-btn:hover { border-color: #555; }
+    .time-preset-btn.selected { border-color: #ff4444; color: #fff; }
+
     .intent-btn {
       padding: 10px 16px;
       background: #111;
@@ -328,6 +359,13 @@
 
     let selectedIntent = "지식형";
     let activeCategories = new Set();
+    let selectedSendTime = "08:00"; /* 기본값: 오전 8시 */
+
+    function selectSendTime(time, btn) {
+      selectedSendTime = time;
+      document.querySelectorAll(".time-preset-btn").forEach(b => b.classList.remove("selected"));
+      if (btn) btn.classList.add("selected");
+    }
 
     // ── URL에서 JWT 추출 → 저장 → 익스텐션으로 전달 ──
     const params = new URLSearchParams(window.location.search);
@@ -360,7 +398,7 @@
         const res = await fetch("/subscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
-          body: JSON.stringify({ delivery_type: "email", email }),
+          body: JSON.stringify({ delivery_type: "email", email, send_time: selectedSendTime }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));

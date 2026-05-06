@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TechVisibility — 대시보드</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       font-family: "Segoe UI", sans-serif;
@@ -38,7 +43,11 @@
       font-size: 0.82rem;
       cursor: pointer;
     }
-    .btn-logout:hover { border-color: #666; color: #f1f1f1; }
+
+    .btn-logout:hover {
+      border-color: #666;
+      color: #f1f1f1;
+    }
 
     .container {
       max-width: 720px;
@@ -101,15 +110,30 @@
       margin-bottom: 10px;
     }
 
-    .pros, .cons {
+    .pros,
+    .cons {
       flex: 1;
       font-size: 0.8rem;
       line-height: 1.6;
     }
 
-    .pros-title { color: #44cc44; font-weight: 700; margin-bottom: 4px; }
-    .cons-title { color: #ff6644; font-weight: 700; margin-bottom: 4px; }
-    .pros li, .cons li { color: #aaa; margin-left: 14px; }
+    .pros-title {
+      color: #44cc44;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .cons-title {
+      color: #ff6644;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .pros li,
+    .cons li {
+      color: #aaa;
+      margin-left: 14px;
+    }
 
     .sources {
       display: flex;
@@ -127,7 +151,10 @@
       border-radius: 6px;
       padding: 3px 8px;
     }
-    .source-link:hover { color: #99bbff; }
+
+    .source-link:hover {
+      color: #99bbff;
+    }
 
     /* 빈 상태 */
     .empty-state {
@@ -135,8 +162,16 @@
       padding: 64px 24px;
       color: #555;
     }
-    .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
-    .empty-state p { font-size: 0.9rem; line-height: 1.7; }
+
+    .empty-state .icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+    }
+
+    .empty-state p {
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
 
     .loading {
       text-align: center;
@@ -146,6 +181,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="header">
     <span class="logo">✦ Tubify</span>
@@ -172,9 +208,15 @@
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px" id="profile-cats"></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
-          <button onclick="toggleEdit()" style="padding:6px 14px;border:1px solid #333;background:transparent;color:#888;border-radius:6px;cursor:pointer;font-size:0.8rem">설정 편집</button>
-          <button onclick="toggleSubscription()" id="sub-toggle-btn" style="padding:6px 14px;border:1px solid #333;background:transparent;color:#cc6666;border-radius:6px;cursor:pointer;font-size:0.8rem">구독 해지</button>
-          <a href="/home.html" style="padding:6px 14px;border:1px solid #333;border-radius:6px;font-size:0.8rem;color:#888;text-decoration:none;text-align:center">관심사 편집</a>
+          <button onclick="toggleEdit()"
+            style="padding:6px 14px;border:1px solid #333;background:transparent;color:#888;border-radius:6px;cursor:pointer;font-size:0.8rem">설정
+            편집</button>
+          <button onclick="toggleSubscription()" id="sub-toggle-btn"
+            style="padding:6px 14px;border:1px solid #333;background:transparent;color:#cc6666;border-radius:6px;cursor:pointer;font-size:0.8rem">구독
+            해지</button>
+          <a href="/home.html"
+            style="padding:6px 14px;border:1px solid #333;border-radius:6px;font-size:0.8rem;color:#888;text-decoration:none;text-align:center">관심사
+            편집</a>
         </div>
       </div>
       <!-- 편집 패널 -->
@@ -182,14 +224,17 @@
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
           <div>
             <div style="font-size:0.75rem;color:#666;margin-bottom:4px">저녁 발송 시간</div>
-            <input type="time" id="edit-send-time" style="background:#111;border:1px solid #333;color:#f1f1f1;padding:6px 10px;border-radius:6px;font-size:0.85rem">
+            <input type="time" id="edit-send-time"
+              style="background:#111;border:1px solid #333;color:#f1f1f1;padding:6px 10px;border-radius:6px;font-size:0.85rem">
           </div>
           <div>
             <div style="font-size:0.75rem;color:#666;margin-bottom:4px">아침 발송 시간</div>
-            <input type="time" id="edit-morning-time" style="background:#111;border:1px solid #333;color:#f1f1f1;padding:6px 10px;border-radius:6px;font-size:0.85rem">
+            <input type="time" id="edit-morning-time"
+              style="background:#111;border:1px solid #333;color:#f1f1f1;padding:6px 10px;border-radius:6px;font-size:0.85rem">
           </div>
         </div>
-        <button onclick="saveProfile()" style="padding:7px 16px;background:#ff4444;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem">저장</button>
+        <button onclick="saveProfile()"
+          style="padding:7px 16px;background:#ff4444;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.82rem">저장</button>
       </div>
     </div>
 
@@ -213,12 +258,16 @@
 
     <!-- 관심사 추이 -->
     <div class="section-title">관심사 추이</div>
-    <div id="interests-chart" style="margin-bottom:24px"><div class="loading">불러오는 중...</div></div>
+    <div id="interests-chart" style="margin-bottom:24px">
+      <div class="loading">불러오는 중...</div>
+    </div>
 
     <!-- 내 수집 데이터 -->
     <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>내 수집 데이터</span>
-      <button onclick="toggleLogs()" id="logs-toggle-btn" style="padding:4px 10px;border:1px solid #333;background:transparent;color:#888;border-radius:6px;cursor:pointer;font-size:0.78rem">펼치기 ▾</button>
+      <button onclick="toggleLogs()" id="logs-toggle-btn"
+        style="padding:4px 10px;border:1px solid #333;background:transparent;color:#888;border-radius:6px;cursor:pointer;font-size:0.78rem">펼치기
+        ▾</button>
     </div>
     <div id="logs-panel" style="display:none;margin-bottom:24px">
       <div id="merged-topics-area" style="margin-bottom:10px"></div>
@@ -228,14 +277,18 @@
     <!-- 구독 채널 -->
     <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>내 구독 채널</span>
-      <button onclick="loadSubscriptions()" id="subs-load-btn" style="padding:4px 10px;border:1px solid #333;background:transparent;color:#888;border-radius:6px;cursor:pointer;font-size:0.78rem">불러오기 ▾</button>
+      <button onclick="loadSubscriptions()" id="subs-load-btn"
+        style="padding:4px 10px;border:1px solid #333;background:transparent;color:#888;border-radius:6px;cursor:pointer;font-size:0.78rem">불러오기
+        ▾</button>
     </div>
     <div id="subs-list" style="margin-bottom:24px"></div>
 
     <!-- 뉴스레터 히스토리 -->
     <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>내 뉴스레터 히스토리</span>
-      <button onclick="sendNow()" id="send-now-btn" style="padding:4px 10px;border:1px solid #ff4444;background:transparent;color:#ff4444;border-radius:6px;cursor:pointer;font-size:0.78rem">지금 발송 테스트</button>
+      <button onclick="sendNow()" id="send-now-btn"
+        style="padding:4px 10px;border:1px solid #ff4444;background:transparent;color:#ff4444;border-radius:6px;cursor:pointer;font-size:0.78rem">지금
+        발송 테스트</button>
     </div>
     <div id="newsletter-list">
       <div class="loading">불러오는 중...</div>
@@ -262,7 +315,7 @@
         if (res.status === 401) { doLogout(); return; }
         profileData = await res.json();
         renderProfile(profileData);
-      } catch(e) {}
+      } catch (e) { }
     }
 
     function renderProfile(p) {
@@ -300,7 +353,7 @@
     }
 
     async function saveProfile() {
-      const sendTime    = document.getElementById("edit-send-time").value.trim();
+      const sendTime = document.getElementById("edit-send-time").value.trim();
       const morningTime = document.getElementById("edit-morning-time").value.trim();
       try {
         const res = await fetch(`${API}/my/profile`, {
@@ -310,7 +363,7 @@
         });
         if (res.ok) { await loadProfile(); toggleEdit(); }
         else alert("저장 실패");
-      } catch(e) { alert("서버 연결 실패"); }
+      } catch (e) { alert("서버 연결 실패"); }
     }
 
     async function toggleSubscription() {
@@ -320,7 +373,7 @@
         if (!confirm("수신을 해지하면 더 이상 뉴스레터를 받지 못합니다. 계속할까요?")) return;
         await fetch(url, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
       } else {
-        await fetch(url, { method: "POST",   headers: { "Authorization": `Bearer ${token}` } });
+        await fetch(url, { method: "POST", headers: { "Authorization": `Bearer ${token}` } });
       }
       await loadProfile();
     }
@@ -331,10 +384,10 @@
         const res = await fetch(`${API}/my/stats`, { headers: { "Authorization": `Bearer ${token}` } });
         if (!res.ok) return;
         const data = await res.json();
-        document.getElementById("stat-logs").textContent  = data.today_log_count ?? "—";
+        document.getElementById("stat-logs").textContent = data.today_log_count ?? "—";
         document.getElementById("stat-total").textContent = data.total_newsletters ?? "—";
-        document.getElementById("stat-last").textContent  = data.last_sent_at
-          ? `${new Date(data.last_sent_at).getMonth()+1}/${new Date(data.last_sent_at).getDate()}` : "없음";
+        document.getElementById("stat-last").textContent = data.last_sent_at
+          ? `${new Date(data.last_sent_at).getMonth() + 1}/${new Date(data.last_sent_at).getDate()}` : "없음";
 
         const topics = data.triggered_topics || [];
         const topicsEl = document.getElementById("triggered-topics");
@@ -342,7 +395,7 @@
           topicsEl.innerHTML = `<div style="font-size:0.75rem;color:#555;margin-bottom:6px;width:100%">오늘 트리거된 토픽</div>` +
             topics.map(t => `<span style="font-size:0.78rem;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:20px;padding:3px 10px;color:#aaa">${escapeHtml(t)}</span>`).join("");
         }
-      } catch(e) {}
+      } catch (e) { }
     }
 
     // ── 관심사 차트 ───────────────────────────────────
@@ -369,14 +422,14 @@
               <div style="font-size:0.72rem;color:#555;width:24px;text-align:right">${item.weight}</div>
             </div>`;
           }).join("") + `</div>`;
-      } catch(e) { el.innerHTML = ""; }
+      } catch (e) { el.innerHTML = ""; }
     }
 
     // ── 내 수집 데이터 ────────────────────────────────
     var logsLoaded = false;
     async function toggleLogs() {
       const panel = document.getElementById("logs-panel");
-      const btn   = document.getElementById("logs-toggle-btn");
+      const btn = document.getElementById("logs-toggle-btn");
       if (panel.style.display === "none") {
         panel.style.display = "block";
         btn.textContent = "접기 ▴";
@@ -388,7 +441,7 @@
     }
 
     async function loadLogs() {
-      const listEl   = document.getElementById("logs-list");
+      const listEl = document.getElementById("logs-list");
       const topicsEl = document.getElementById("merged-topics-area");
       listEl.innerHTML = '<div class="loading">불러오는 중...</div>';
       try {
@@ -404,7 +457,7 @@
         if (!logs.length) { listEl.innerHTML = '<div style="color:#555;font-size:0.82rem;padding:12px 0">오늘 수집된 행동 로그가 없습니다.</div>'; return; }
         listEl.innerHTML = logs.map(log => {
           const d = new Date(log.logged_at);
-          const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2,"0")}`;
+          const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
           const typeColor = log.event_type === "watch" ? "#6ab4f5" : "#f5d06a";
           return `<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #1e1e1e">
             <span style="font-size:0.72rem;color:#555;flex-shrink:0;width:36px">${time}</span>
@@ -412,13 +465,13 @@
             <span style="font-size:0.82rem;color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(log.keyword || log.video_url || "")}</span>
           </div>`;
         }).join("");
-      } catch(e) { listEl.innerHTML = ""; }
+      } catch (e) { listEl.innerHTML = ""; }
     }
 
     // ── 구독 채널 ─────────────────────────────────────
     async function loadSubscriptions() {
       const listEl = document.getElementById("subs-list");
-      const btn    = document.getElementById("subs-load-btn");
+      const btn = document.getElementById("subs-load-btn");
       btn.disabled = true;
       btn.textContent = "불러오는 중...";
       try {
@@ -438,7 +491,7 @@
             </div>`
           ).join("") +
           `</div><div style="font-size:0.72rem;color:#444;margin-top:6px">${subs.length}개 채널</div>`;
-      } catch(e) { listEl.innerHTML = ""; }
+      } catch (e) { listEl.innerHTML = ""; }
       finally { btn.disabled = false; btn.textContent = "새로고침 ↻"; }
     }
 
@@ -456,7 +509,7 @@
         const data = await res.json();
         if (res.ok) { alert("발송 완료!\n" + (data.message || "")); await loadHistory(); }
         else alert("발송 실패: " + (data.detail || "알 수 없는 오류"));
-      } catch(e) { alert("서버 연결 실패"); }
+      } catch (e) { alert("서버 연결 실패"); }
       finally { btn.disabled = false; btn.textContent = "지금 발송 테스트"; }
     }
 
@@ -476,7 +529,7 @@
           return;
         }
         listEl.innerHTML = newsletters.map(renderCard).join("");
-      } catch(err) {
+      } catch (err) {
         listEl.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>불러오기 실패 — 백엔드 서버를 확인해주세요.</p></div>`;
       }
     }
@@ -507,8 +560,8 @@
           </div>
           <div class="sources">
             ${(topic.sources || []).map(s =>
-              `<a href="${escapeHtml(s.url)}" target="_blank" class="source-link">🔗 ${escapeHtml(s.title || s.url)}</a>`
-            ).join("")}
+        `<a href="${escapeHtml(s.url)}" target="_blank" class="source-link">🔗 ${escapeHtml(s.title || s.url)}</a>`
+      ).join("")}
           </div>
         </div>`).join("");
 
@@ -521,13 +574,14 @@
 
     // ── 유틸 ─────────────────────────────────────────
     function escapeHtml(str) {
-      return String(str ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    function logout()   { localStorage.removeItem("access_token"); window.location.href = "/"; }
+    function logout() { localStorage.removeItem("access_token"); window.location.href = "/"; }
     function doLogout() { localStorage.removeItem("access_token"); window.location.href = "/"; }
 
     init();
   </script>
 </body>
+
 </html>

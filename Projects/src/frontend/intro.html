@@ -427,7 +427,7 @@
         <a href="/intro.html" class="nav-link active">홈</a>
         <a href="/dashboard.html" class="nav-link" id="nav-mypage" style="display:none">마이페이지</a>
       </div>
-      <a href="/login.html" class="nav-btn" id="nav-auth-btn">로그인</a>
+      <a href="/" class="nav-btn" id="nav-auth-btn">로그인</a>
     </div>
   </nav>
 
@@ -443,7 +443,7 @@
         정제해 드립니다. 실시간 요약부터 맞춤형 메일링까지,<br>
         스마트한 AI 큐레이터 Tubify를 만나보세요.
       </p>
-      <a href="/login.html" class="hero-cta">지금 무료로 시작하기</a>
+      <a href="/" class="hero-cta">지금 무료로 시작하기</a>
     </div>
   </section>
 
@@ -515,7 +515,7 @@
       <h2 class="cta-title">
         지금 Tubify와 함께<br>스마트한 유튜브 생활을 시작하세요.
       </h2>
-      <a href="/login.html" class="cta-btn">지금 무료로 시작하기</a>
+      <a href="/" class="cta-btn">지금 무료로 시작하기</a>
     </div>
   </div>
 
@@ -533,7 +533,7 @@
 
   <script>
     const token = localStorage.getItem("access_token");
-    document.getElementById("nav-logo").href = token ? "/home.html" : "/intro.html";
+    document.getElementById("nav-logo").href = "/intro.html";
     if (token) {
       document.getElementById("nav-mypage").style.display = "block";
       const authBtn = document.getElementById("nav-auth-btn");
@@ -543,7 +543,7 @@
         e.preventDefault();
         localStorage.removeItem("access_token");
         sessionStorage.removeItem("loggedIn");
-        window.location.href = "/login.html";
+        window.location.href = "/";
       };
     }
   </script>

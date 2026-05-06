@@ -1,10 +1,11 @@
 const API = "";
-const EXTENSION_ID = "__EXTENSION_ID__";
+/* chrome://extensions/ 에서 Tubify 익스텐션 ID를 복사해 여기에 붙여넣기 */
+const EXTENSION_ID = "caaoacncggbohojcejagaijcpoigcpga"; //TODO: 실제 익스텐션 ID로 교체 필요
 
 window.onload = () => {
   const params = new URLSearchParams(location.search);
 
-  // OAuth 콜백 후 JWT를 URL 파라미터로 받아 저장
+  /* OAuth 콜백 후 JWT를 URL 파라미터로 받아 저장 후 home으로 이동 */
   const token = params.get("token");
   if (token) {
     localStorage.setItem("access_token", token);
@@ -14,19 +15,23 @@ window.onload = () => {
       chrome.runtime.sendMessage(
         EXTENSION_ID,
         { type: "SET_TOKEN", token },
-        () => { if (chrome.runtime.lastError) {} }
+        () => { if (chrome.runtime.lastError) { } }
       );
     }
-    history.replaceState({}, "", location.pathname);
     // 익스텐션 팝업이 window.open()으로 열었을 경우 자동 닫기
     if (window.opener !== null) { setTimeout(() => window.close(), 400); return; }
+    window.location.href = "/intro.html";
+    return;
   }
 
   if (params.get("loggedIn") === "1") {
     sessionStorage.setItem("loggedIn", "1");
     history.replaceState({}, "", location.pathname);
   }
-  if (sessionStorage.getItem("loggedIn") || localStorage.getItem("access_token")) showMain();
+  /* 이미 로그인된 유저 → home으로 바로 이동 */
+  if (sessionStorage.getItem("loggedIn") || localStorage.getItem("access_token")) {
+    window.location.href = "/intro.html";
+  }
 };
 
 function getJwt() {
@@ -219,7 +224,7 @@ async function doAnalyze() {
     if (!res.ok) throw new Error("서버 오류");
     const d = await res.json();
 
-    const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const intentBadge = { "유희형": "🎉 유희형", "지식형": "📚 지식형", "구매형": "🛒 구매형" }[d.intent_type] || d.intent_type || "";
     const summaryHtml = (d.summary_lines || []).map(l => `<div style="margin:4px 0;color:#ccc">• ${esc(l)}</div>`).join("");
     const factsHtml = (d.common_facts || []).map(f => `<div style="margin:3px 0;color:#bbb;font-size:0.83rem">• ${esc(f)}</div>`).join("");
@@ -256,7 +261,7 @@ async function doAnalyze() {
         ${consHtml ? `<div><div style="font-size:0.75rem;color:#888;margin-bottom:6px">단점</div>${consHtml}</div>` : ""}
       </div>` : ""}
       ${videosHtml ? `<div><div style="font-size:0.75rem;color:#888;margin-bottom:8px">관련 영상</div>${videosHtml}</div>` : ""}`;
-  } catch(e) {
+  } catch (e) {
     resultEl.innerHTML = `<div style="color:#f5a6a6;text-align:center;padding:16px">분석 실패 — 잠시 후 다시 시도해주세요.</div>`;
   } finally {
     btn.disabled = false;
