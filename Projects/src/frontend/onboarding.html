@@ -382,6 +382,8 @@
       const jwt   = getJwt();
 
       try {
+        /* 아침·저녁 두 시간을 각각 send_time / morning_send_time으로 전달
+           → 백엔드 PUT /my/profile에서 JSON 배열로 합산해 저장 */
         const res = await fetch("/my/profile", {
           method: "PUT",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },

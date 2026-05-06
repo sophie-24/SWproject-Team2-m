@@ -199,12 +199,8 @@ async def _run_batch_for_send_time(send_time: str) -> None:
         )
         all_users = result.scalars().all()
 
-        # send_time 배열 또는 morning_send_time 컬럼 중 하나라도 일치하는 유저 추출
-        users = [
-            u for u in all_users
-            if send_time in _parse_send_times(u.send_time)
-            or (u.morning_send_time and send_time == u.morning_send_time)
-        ]
+        # send_time JSON 배열에 현재 시각이 포함된 유저만 추출
+        users = [u for u in all_users if send_time in _parse_send_times(u.send_time)]
         logger.info(f"[scheduler] {send_time} -> {len(users)} users")
 
         for user in users:
