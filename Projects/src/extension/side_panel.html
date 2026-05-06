@@ -1,161 +1,185 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TechVisibility 검색 분석</title>
+  <title>Tubify</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
-      background: #0f0f0f;
+      background: #111;
       color: #f1f1f1;
       min-height: 100vh;
       font-size: 13px;
+      display: flex;
+      flex-direction: column;
     }
 
-    /* ── 헤더 ── */
     .header {
       background: #1a1a1a;
       border-bottom: 1px solid #2a2a2a;
-      padding: 14px 16px;
+      padding: 10px 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .logo { font-weight: 800; color: #ff4444; font-size: 0.95rem; }
-    .keyword-badge {
-      background: #2a2a2a;
-      border: 1px solid #3a3a3a;
-      border-radius: 6px;
-      padding: 4px 8px;
-      font-size: 0.75rem;
-      color: #ccc;
-      max-width: 180px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      flex-shrink: 0;
     }
 
-    /* ── 로딩 ── */
-    .loading {
-      padding: 32px 16px;
-      text-align: center;
-    }
-    .loading-steps { display: flex; flex-direction: column; gap: 14px; }
-    .step-row {
+    .header-left {
       display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .logo {
+      font-weight: 800;
+      color: #ff4444;
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+    }
+
+    .logo-sub {
+      font-size: 0.6rem;
+      color: #555;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
       align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 8px;
-      transition: all 0.3s;
-    }
-    .step-row.active  { border-color: #ff4444; background: #1f1010; }
-    .step-row.done    { border-color: #44cc66; background: #0f1f14; }
-    .step-icon { font-size: 1rem; width: 20px; text-align: center; }
-    .step-label { font-size: 0.82rem; color: #aaa; }
-    .step-row.active .step-label { color: #ff4444; }
-    .step-row.done  .step-label { color: #44cc66; }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner {
-      display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid #333;
-      border-top-color: #ff4444;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
     }
 
-    /* ── 에러 ── */
-    .error-box {
-      margin: 24px 16px;
-      background: #1f1010;
-      border: 1px solid #cc3333;
-      border-radius: 10px;
-      padding: 16px;
-      text-align: center;
+    .icon-btn {
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      transition: color 0.15s;
+      line-height: 1;
     }
-    .error-box .err-icon { font-size: 1.8rem; margin-bottom: 8px; }
-    .error-box .err-msg  { color: #ff6666; font-size: 0.85rem; line-height: 1.6; }
-    .error-box .err-sub  { color: #666; font-size: 0.75rem; margin-top: 6px; }
-    .btn-retry {
-      margin-top: 12px;
-      padding: 8px 20px;
-      background: #ff4444;
-      color: #fff;
+
+    .icon-btn:hover {
+      color: #aaa;
+    }
+
+    .body-wrap {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .tab-nav {
+      width: 42px;
+      background: #161616;
+      border-right: 1px solid #2a2a2a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px 0;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 8px 4px;
+      background: none;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 0.82rem;
+      width: 36px;
+      transition: background 0.15s;
     }
-    .btn-retry:hover { background: #cc2222; }
 
-    /* ── 결과 영역 ── */
-    #results { display: none; padding: 12px; }
-
-    /* 영상 카드 */
-    .video-card {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 10px;
-      margin-bottom: 10px;
-      overflow: hidden;
-    }
-    .video-card-header {
-      display: flex;
-      gap: 10px;
-      padding: 10px 12px;
-      align-items: flex-start;
-    }
-    .video-thumb {
-      width: 72px;
-      height: 46px;
-      object-fit: cover;
-      border-radius: 4px;
-      flex-shrink: 0;
+    .tab-btn:hover {
       background: #222;
     }
-    .video-meta { flex: 1; min-width: 0; }
-    .video-title {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #eee;
-      line-height: 1.4;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      margin-bottom: 5px;
-    }
-    .video-title a { color: inherit; text-decoration: none; }
-    .video-title a:hover { color: #ff4444; }
-    .video-badges { display: flex; gap: 5px; flex-wrap: wrap; }
-    .badge {
-      font-size: 0.68rem;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-weight: 600;
-    }
-    .badge.ad       { background: #2a1010; color: #ff5555; border: 1px solid #441111; }
-    .badge.no-ad    { background: #0f1f14; color: #44cc66; border: 1px solid #1a3a22; }
-    .badge.cred     { background: #111827; color: #6699ff; border: 1px solid #1e2d4a; }
 
-    .video-summary {
-      font-size: 0.75rem;
-      color: #888;
-      padding: 0 12px 10px;
-      line-height: 1.6;
+    .tab-btn.active {
+      background: #2a1010;
     }
 
-    /* 섹션 블록 */
+    .tab-icon {
+      font-size: 1rem;
+      color: #555;
+      transition: color 0.15s;
+    }
+
+    .tab-btn.active .tab-icon {
+      color: #ff4444;
+    }
+
+    .tab-label {
+      font-size: 0.52rem;
+      color: #444;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .tab-btn.active .tab-label {
+      color: #ff4444;
+    }
+
+    .content-wrap {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .content-wrap::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .content-wrap::-webkit-scrollbar-track {
+      background: #111;
+    }
+
+    .content-wrap::-webkit-scrollbar-thumb {
+      background: #2a2a2a;
+      border-radius: 2px;
+    }
+
+    .tab-panel {
+      display: none;
+      padding: 14px 12px;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .keyword-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #f1f1f1;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+
+    .keyword-underline {
+      width: 36px;
+      height: 3px;
+      background: #ff4444;
+      border-radius: 2px;
+      margin-bottom: 14px;
+    }
+
     .section-block {
       background: #1a1a1a;
       border: 1px solid #2a2a2a;
@@ -163,288 +187,451 @@
       padding: 12px;
       margin-bottom: 10px;
     }
-    .section-title {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
     }
-    .fact-item, .controversy-item {
+
+    .section-icon-box {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .icon-red {
+      background: #3a0f0f;
+      color: #ff6655;
+    }
+
+    .icon-blue {
+      background: #0f1a2e;
+      color: #6699ff;
+    }
+
+    .icon-yellow {
+      background: #1f1800;
+      color: #ffcc44;
+    }
+
+    .icon-gray {
+      background: #1e1e1e;
+      color: #888;
+    }
+
+    .section-title-text {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #ddd;
+      line-height: 1.3;
+    }
+
+    .bullet-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .bullet-item {
+      display: flex;
+      gap: 7px;
+      align-items: flex-start;
       font-size: 0.78rem;
       color: #ccc;
-      padding: 5px 0;
-      border-bottom: 1px solid #222;
-      line-height: 1.5;
+      line-height: 1.55;
     }
-    .fact-item:last-child, .controversy-item:last-child { border-bottom: none; }
-    .fact-item::before       { content: "✓ "; color: #44cc66; }
-    .controversy-item::before { content: "⚡ "; color: #ffaa44; }
 
-    /* 로그인 필요 */
-    .login-needed {
-      margin: 32px 16px;
-      text-align: center;
+    .bullet-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
     }
-    .login-needed p { color: #888; font-size: 0.85rem; line-height: 1.8; }
-    .btn-login {
-      margin-top: 14px;
-      padding: 10px 24px;
+
+    .dot-red {
       background: #ff4444;
-      color: #fff;
+    }
+
+    .dot-blue {
+      background: #6699ff;
+    }
+
+    .dot-yellow {
+      background: #ffcc44;
+    }
+
+    .conclusion-box {
+      background: #111;
+      border-left: 3px solid #ff4444;
+      border-radius: 0 8px 8px 0;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 0.78rem;
+      color: #bbb;
+      line-height: 1.65;
+    }
+
+    .source-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .source-title-text {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #666;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .view-all-btn {
+      font-size: 0.68rem;
+      color: #ff4444;
+      background: none;
       border: none;
-      border-radius: 8px;
       cursor: pointer;
-      font-size: 0.88rem;
+    }
+
+    .video-card {
+      background: #1a1a1a;
+      border: 1px solid #252525;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+
+    .video-card:hover {
+      border-color: #3a3a3a;
+    }
+
+    .video-card-inner {
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      align-items: flex-start;
+    }
+
+    .video-thumb {
+      width: 76px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 5px;
+      flex-shrink: 0;
+      background: #222;
+    }
+
+    .video-thumb-placeholder {
+      width: 76px;
+      height: 48px;
+      border-radius: 5px;
+      background: #222;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #444;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .video-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .video-title-text {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #e0e0e0;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-break: break-all;
+      margin-bottom: 5px;
+      text-decoration: none;
+    }
+
+    .video-title-text:hover {
+      color: #ff6655;
+    }
+
+    .video-subtitle {
+      font-size: 0.7rem;
+      color: #777;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 6px;
+    }
+
+    .video-meta-row {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .channel-badge {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+      background: #222;
+      color: #888;
+      border: 1px solid #2a2a2a;
+    }
+
+    .badge {
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 3px;
       font-weight: 600;
     }
-    .btn-login:hover { background: #cc2222; }
 
-    /* 키워드 없음 */
-    .no-keyword {
-      margin: 32px 16px;
+    .badge-ad {
+      background: #2a1010;
+      color: #ff5555;
+      border: 1px solid #441111;
+    }
+
+    .badge-noad {
+      background: #0f1f14;
+      color: #44cc66;
+      border: 1px solid #1a3a22;
+    }
+
+    .badge-cred {
+      background: #111827;
+      color: #6699ff;
+      border: 1px solid #1e2d4a;
+    }
+
+    .loading-wrap {
+      padding: 24px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .step-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      transition: all 0.3s;
+    }
+
+    .step-row.active {
+      border-color: #ff4444;
+      background: #1f1010;
+    }
+
+    .step-row.done {
+      border-color: #44cc66;
+      background: #0f1f14;
+    }
+
+    .step-icon-wrap {
+      width: 20px;
+      text-align: center;
+    }
+
+    .step-label-text {
+      font-size: 0.8rem;
+      color: #666;
+    }
+
+    .step-row.active .step-label-text {
+      color: #ff4444;
+    }
+
+    .step-row.done .step-label-text {
+      color: #44cc66;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 13px;
+      height: 13px;
+      border: 2px solid #333;
+      border-top-color: #ff4444;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .state-screen {
+      padding: 40px 16px;
       text-align: center;
       color: #555;
       font-size: 0.85rem;
       line-height: 1.8;
     }
-    .no-keyword span { font-size: 2rem; display: block; margin-bottom: 10px; }
 
-    .hidden { display: none !important; }
+    .state-screen .icon {
+      font-size: 2rem;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .btn-primary {
+      margin-top: 14px;
+      padding: 9px 22px;
+      background: #ff4444;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: #cc2222;
+    }
+
+    .btn-retry {
+      margin-top: 10px;
+      padding: 7px 18px;
+      background: #2a1010;
+      color: #ff6655;
+      border: 1px solid #441111;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .btn-retry:hover {
+      background: #3a1515;
+    }
+
+    .error-msg {
+      color: #ff6666;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    .error-sub {
+      color: #555;
+      font-size: 0.75rem;
+      margin-top: 4px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
   </style>
 </head>
+
 <body>
 
-  <!-- 헤더 -->
   <div class="header">
-    <div class="logo">✦ TechVisibility</div>
-    <div class="keyword-badge" id="keyword-badge">분석 중...</div>
+    <div class="header-left">
+      <div class="logo">Tubify</div>
+      <div class="logo-sub">The Intelligent Curator</div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="btn-refresh" title="새로고침">&#8635;</button>
+    </div>
   </div>
 
-  <!-- 로그인 필요 -->
-  <div id="login-needed" class="login-needed hidden">
-    <p>🔒<br>AI 분석을 보려면<br>로그인이 필요합니다.</p>
-    <button class="btn-login" id="btn-login">Google 로그인</button>
+  <div id="screen-login" class="state-screen hidden">
+    <span class="icon">&#128274;</span>
+    AI 분석을 보려면<br>로그인이 필요합니다.
+    <br><button class="btn-primary" id="btn-login">Google 로그인</button>
   </div>
 
-  <!-- 키워드 없음 -->
-  <div id="no-keyword" class="no-keyword hidden">
-    <span>🔍</span>
-    유튜브에서 검색하면<br>
-    AI 분석이 시작됩니다.
+  <div id="screen-empty" class="state-screen hidden">
+    <span class="icon">&#128269;</span>
+    유튜브에서 검색하면<br>AI 분석이 시작됩니다.
   </div>
 
-  <!-- 로딩 -->
-  <div id="loading" class="loading">
-    <div class="loading-steps">
+  <div id="screen-loading" class="hidden">
+    <div class="loading-wrap">
       <div class="step-row" id="s1">
-        <span class="step-icon">🔍</span>
-        <span class="step-label">영상 검색 중...</span>
+        <div class="step-icon-wrap" id="s1-icon">&#128269;</div><span class="step-label-text">영상 검색 중...</span>
       </div>
       <div class="step-row" id="s2">
-        <span class="step-icon">📝</span>
-        <span class="step-label">자막 분석 중...</span>
+        <div class="step-icon-wrap" id="s2-icon">&#128221;</div><span class="step-label-text">자막 분석 중...</span>
       </div>
       <div class="step-row" id="s3">
-        <span class="step-icon">🤖</span>
-        <span class="step-label">AI 교차 분석 중...</span>
+        <div class="step-icon-wrap" id="s3-icon">&#129302;</div><span class="step-label-text">AI 교차 분석 중...</span>
       </div>
     </div>
   </div>
 
-  <!-- 에러 -->
-  <div id="error-box" class="error-box hidden">
-    <div class="err-icon">⚠️</div>
-    <div class="err-msg" id="err-msg">분석 중 오류가 발생했습니다.</div>
-    <div class="err-sub" id="err-sub"></div>
+  <div id="screen-error" class="state-screen hidden">
+    <span class="icon">&#9888;&#65039;</span>
+    <div class="error-msg" id="err-msg">분석 중 오류가 발생했습니다.</div>
+    <div class="error-sub" id="err-sub"></div>
     <button class="btn-retry" id="btn-retry">다시 시도</button>
   </div>
 
-  <!-- 결과 -->
-  <div id="results">
-    <div id="videos-section"></div>
-    <div id="common-section"></div>
-    <div id="controversy-section"></div>
+  <div id="screen-results" class="body-wrap hidden">
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="summary" title="요약">
+        <span class="tab-icon">&#128203;</span>
+        <span class="tab-label">SUMM</span>
+      </button>
+      <button class="tab-btn" data-tab="insights" title="인사이트">
+        <span class="tab-icon">&#128161;</span>
+        <span class="tab-label">INSIG</span>
+      </button>
+      <button class="tab-btn" data-tab="sources" title="소스">
+        <span class="tab-icon">&#128279;</span>
+        <span class="tab-label">SRC</span>
+      </button>
+    </div>
+    <div class="content-wrap">
+      <div id="tab-summary" class="tab-panel active">
+        <div class="keyword-title" id="kw-title-s">-</div>
+        <div class="keyword-underline"></div>
+        <div id="summary-sections"></div>
+      </div>
+      <div id="tab-insights" class="tab-panel">
+        <div class="keyword-title" id="kw-title-i">-</div>
+        <div class="keyword-underline"></div>
+        <div id="insights-sections"></div>
+      </div>
+      <div id="tab-sources" class="tab-panel">
+        <div class="source-header">
+          <span class="source-title-text">주요 소스 및 통찰</span>
+          <button class="view-all-btn">VIEW ALL</button>
+        </div>
+        <div id="sources-list"></div>
+      </div>
+    </div>
   </div>
 
-  <script>
-    const API = "http://localhost:8000";
+  <script src="config.js"></script>
+  <script src="side_panel.js"></script>
 
-    // ── 상태 변수 ──────────────────────────────────────────────
-    let currentKeyword = "";
-    let currentJwt     = "";
-
-    // ── 유틸 ──────────────────────────────────────────────────
-    function esc(s) {
-      return String(s ?? "")
-        .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-        .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    }
-
-    function setStep(n, state) {
-      const el = document.getElementById(`s${n}`);
-      if (!el) return;
-      el.classList.remove("active","done");
-      if (state) el.classList.add(state);
-      const icon = el.querySelector(".step-icon");
-      if (state === "active") icon.innerHTML = `<span class="spinner"></span>`;
-      if (state === "done")   icon.textContent = "✅";
-      if (!state)             icon.textContent = ["","🔍","📝","🤖"][n];
-    }
-
-    function showError(msg, sub = "") {
-      document.getElementById("loading").classList.add("hidden");
-      document.getElementById("results").style.display = "none";
-      const box = document.getElementById("error-box");
-      box.classList.remove("hidden");
-      document.getElementById("err-msg").textContent = msg;
-      document.getElementById("err-sub").textContent = sub;
-    }
-
-    // ── 메인 분석 ─────────────────────────────────────────────
-    async function analyze(keyword, jwt) {
-      currentKeyword = keyword;
-      currentJwt     = jwt;
-
-      document.getElementById("keyword-badge").textContent = `"${keyword}"`;
-      document.getElementById("loading").classList.remove("hidden");
-      document.getElementById("error-box").classList.add("hidden");
-      document.getElementById("results").style.display = "none";
-      setStep(1,"active"); setStep(2,""); setStep(3,"");
-
-      let data;
-      try {
-        // Step 1 → 2 애니메이션
-        await new Promise(r => setTimeout(r, 600));
-        setStep(1,"done"); setStep(2,"active");
-        await new Promise(r => setTimeout(r, 600));
-        setStep(2,"done"); setStep(3,"active");
-
-        const res = await fetch(
-          `${API}/analyze_search?keyword=${encodeURIComponent(keyword)}`,
-          { headers: { "Authorization": `Bearer ${jwt}` } }
-        );
-
-        if (res.status === 401) {
-          showError("세션이 만료됐습니다.", "팝업에서 다시 로그인해주세요.");
-          return;
-        }
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          showError(err.detail || `서버 오류 (${res.status})`, "잠시 후 다시 시도해주세요.");
-          return;
-        }
-        data = await res.json();
-      } catch (e) {
-        showError("백엔드에 연결할 수 없습니다.", "백엔드 서버가 실행 중인지 확인하세요.");
-        return;
-      }
-
-      setStep(3,"done");
-      await new Promise(r => setTimeout(r, 300));
-      document.getElementById("loading").classList.add("hidden");
-      renderResults(data);
-    }
-
-    // ── 결과 렌더링 ──────────────────────────────────────────
-    function renderResults(data) {
-      const videos       = data.videos || [];
-      const commonFacts  = data.common_facts || [];
-      const controversies= data.controversies || [];
-
-      // ── 영상 카드 ──
-      const videosHTML = videos.map(v => {
-        const adBadge = v.ad_detected
-          ? `<span class="badge ad">광고 포함</span>`
-          : `<span class="badge no-ad">광고 없음</span>`;
-        const credBadge = v.credibility_score != null
-          ? `<span class="badge cred">신뢰도 ${Math.round(v.credibility_score * 100)}%</span>`
-          : "";
-        const thumb = v.thumbnail_url
-          ? `<img class="video-thumb" src="${esc(v.thumbnail_url)}" alt="">`
-          : `<div class="video-thumb" style="display:flex;align-items:center;justify-content:center;color:#444;">▶</div>`;
-
-        return `
-        <div class="video-card">
-          <div class="video-card-header">
-            ${thumb}
-            <div class="video-meta">
-              <div class="video-title">
-                <a href="https://youtube.com/watch?v=${esc(v.video_id)}" target="_blank">${esc(v.title)}</a>
-              </div>
-              <div class="video-badges">${adBadge}${credBadge}</div>
-            </div>
-          </div>
-          ${v.summary ? `<div class="video-summary">${esc(v.summary)}</div>` : ""}
-        </div>`;
-      }).join("");
-
-      document.getElementById("videos-section").innerHTML = videosHTML;
-
-      // ── 공통 사실 ──
-      if (commonFacts.length) {
-        document.getElementById("common-section").innerHTML = `
-        <div class="section-block">
-          <div class="section-title">📋 공통 사실</div>
-          ${commonFacts.map(f => `<div class="fact-item">${esc(f)}</div>`).join("")}
-        </div>`;
-      }
-
-      // ── 쟁점 ──
-      if (controversies.length) {
-        document.getElementById("controversy-section").innerHTML = `
-        <div class="section-block">
-          <div class="section-title">⚡ 쟁점</div>
-          ${controversies.map(c => `<div class="controversy-item">${esc(c)}</div>`).join("")}
-        </div>`;
-      }
-
-      document.getElementById("results").style.display = "block";
-    }
-
-    // ── 초기화 ──────────────────────────────────────────────
-    document.getElementById("btn-retry").addEventListener("click", () => {
-      if (currentKeyword && currentJwt) analyze(currentKeyword, currentJwt);
-    });
-
-    document.getElementById("btn-login").addEventListener("click", () => {
-      chrome.tabs.create({ url: `${API}/auth/login` });
-    });
-
-    (async function init() {
-      // JWT 확인
-      const { jwt, loggedIn } = await new Promise(r =>
-        chrome.storage.local.get(["jwt","loggedIn"], r)
-      );
-
-      if (!jwt || !loggedIn) {
-        document.getElementById("loading").classList.add("hidden");
-        document.getElementById("login-needed").classList.remove("hidden");
-        return;
-      }
-
-      // 현재 탭 URL에서 키워드 추출
-      const tabs = await new Promise(r =>
-        chrome.tabs.query({ active: true, currentWindow: true }, r)
-      );
-      const tab = tabs[0];
-      let keyword = "";
-      try {
-        const u = new URL(tab?.url || "");
-        if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
-          keyword = u.searchParams.get("search_query") || "";
-        }
-      } catch {}
-
-      if (!keyword) {
-        document.getElementById("loading").classList.add("hidden");
-        document.getElementById("no-keyword").classList.remove("hidden");
-        return;
-      }
-
-      analyze(keyword, jwt);
-    })();
-  </script>
 </body>
+
 </html>

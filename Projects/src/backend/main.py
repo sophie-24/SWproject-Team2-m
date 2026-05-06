@@ -485,6 +485,7 @@ async def my_profile(
         except Exception:
             pass
 
+<<<<<<< HEAD
     # send_time JSON 배열에서 아침(첫 번째)·저녁(마지막) 분리해서 반환
     import json as _json_p
     try:
@@ -499,6 +500,11 @@ async def my_profile(
         "email":               db_user.email,
         "send_time":           evening_time,
         "morning_send_time":   morning_time,
+=======
+    return {
+        "email":               db_user.email,
+        "send_time":           db_user.send_time,
+>>>>>>> main
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
         "is_subscribed":       db_user.is_subscribed,
@@ -507,8 +513,12 @@ async def my_profile(
 
 
 class ProfileUpdateData(BaseModel):
+<<<<<<< HEAD
     send_time:           Optional[str]       = None  # "HH:MM" 저녁 발송 시간
     morning_send_time:   Optional[str]       = None  # "HH:MM" 아침 발송 시간 — 내부적으로 send_time JSON 배열에 합산
+=======
+    send_time:           Optional[str]       = None  # "HH:MM" 발송 시간
+>>>>>>> main
     interest_categories: Optional[list[str]] = None  # 관심사 카테고리 목록
 
 
@@ -532,6 +542,7 @@ async def update_my_profile(
 
     time_re = re.compile(r'^\d{2}:\d{2}$')
 
+<<<<<<< HEAD
     # send_time / morning_send_time → JSON 배열로 합산해 저장
     if data.send_time is not None or data.morning_send_time is not None:
         if data.send_time and not time_re.match(data.send_time):
@@ -551,6 +562,12 @@ async def update_my_profile(
         new_morning = data.morning_send_time if data.morning_send_time is not None else cur_morning
         new_evening = data.send_time         if data.send_time         is not None else cur_evening
         db_user.send_time = _json.dumps(sorted(list({new_morning, new_evening})), ensure_ascii=False)
+=======
+    if data.send_time is not None:
+        if not time_re.match(data.send_time):
+            raise HTTPException(status_code=400, detail="send_time 형식은 HH:MM이어야 합니다.")
+        db_user.send_time = data.send_time
+>>>>>>> main
 
     if data.interest_categories is not None:
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)

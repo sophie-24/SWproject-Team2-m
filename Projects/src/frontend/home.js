@@ -1,16 +1,16 @@
 const API = "";
 
-// ── 온보딩 / 마이페이지 컨텍스트 파악 ─────────────────────────────────────────
-const _urlParams     = new URLSearchParams(window.location.search);
+// ── 온보딩 / 마이페이지 컨텍스트 파악 ────────────────────────────────────────────────────────────────────
+const _urlParams      = new URLSearchParams(window.location.search);
 const _fromOnboarding = _urlParams.get("from") === "onboarding";
 
-// ── pill 토글 (이벤트 위임) ───────────────────────────────────────────────────
+// ── pill 토글 (이벤트 위임) ────────────────────────────────────────────────────────────────────
 document.getElementById("interest-grid").addEventListener("click", (e) => {
   const pill = e.target.closest(".interest-pill");
   if (pill) pill.classList.toggle("selected");
 });
 
-// ── 검색: 필터링 + Enter/추가버튼으로 새 관심사 생성 ─────────────────────────
+// ── 검색: 필터링 + Enter/추가버튼으로 새 관심사 생성 ────────────────────────────────────────────────────────────────────
 const searchInput = document.querySelector(".search-input");
 const addBtn      = document.querySelector(".search-add-btn");
 
@@ -63,7 +63,7 @@ function _addCustomPill(value, selected) {
   grid.appendChild(pill);
 }
 
-// ── 페이지 로드 시 기존 관심사 불러와 선택 표시 ──────────────────────────────
+// ── 페이지 로드 시 기존 관심사 불러와 선택 표시 ────────────────────────────────────────────────────────────────────
 async function loadExistingInterests() {
   const jwt = localStorage.getItem("access_token") || "";
   if (!jwt) return;
@@ -98,7 +98,7 @@ async function loadExistingInterests() {
   }
 }
 
-// ── 저장 ─────────────────────────────────────────────────────────────────────
+// ── 저장 ────────────────────────────────────────────────────────────────────
 async function saveSettings() {
   const selected = [...document.querySelectorAll(".interest-pill.selected")]
     .map(el => el.dataset.value);
@@ -133,7 +133,7 @@ async function saveSettings() {
   }
 }
 
-// ── 유틸 ─────────────────────────────────────────────────────────────────────
+// ── 유틸 ────────────────────────────────────────────────────────────────────
 function _escapeHtml(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
@@ -147,5 +147,5 @@ function logout() {
   window.location.href = "/";
 }
 
-// ── 초기화 ───────────────────────────────────────────────────────────────────
+// ── 초기화 ────────────────────────────────────────────────────────────────────
 loadExistingInterests();

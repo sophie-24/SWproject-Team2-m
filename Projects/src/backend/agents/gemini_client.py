@@ -12,13 +12,20 @@ _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 _MODEL  = "gemini-2.5-flash-lite"
 
 
-def call_gemini(prompt: str, temperature: float = 0.3) -> str:
+def call_gemini(
+    prompt: str,
+    temperature: float = 0.3,
+    json_mode: bool = False,
+) -> str:
     """
     Gemini API 호출 후 응답 텍스트 반환.
 
     Args:
         prompt:      전송할 프롬프트 문자열
         temperature: 생성 다양성 (0.0 ~ 1.0, 기본 0.3)
+        json_mode:   True이면 response_mime_type="application/json" 적용.
+                     Gemini가 마크다운 코드블록 없이 순수 JSON만 반환하도록 강제한다.
+                     JSON 구조화 응답이 필요한 에이전트(cluster_ai 등)에서만 사용.
 
     Returns:
         Gemini 응답 텍스트
@@ -26,10 +33,14 @@ def call_gemini(prompt: str, temperature: float = 0.3) -> str:
     Raises:
         ValueError: 응답이 비어 있거나 안전 필터에 걸린 경우
     """
+    config = types.GenerateContentConfig(
+        temperature=temperature,
+        response_mime_type="application/json" if json_mode else None,
+    )
     response = _client.models.generate_content(
         model=_MODEL,
         contents=prompt,
-        config=types.GenerateContentConfig(temperature=temperature),
+        config=config,
     )
     if not response.text:
         finish = response.candidates[0].finish_reason if response.candidates else "UNKNOWN"

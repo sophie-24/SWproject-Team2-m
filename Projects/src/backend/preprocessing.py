@@ -1,3 +1,4 @@
+# 자막 텍스트 전처리 — 노이즈 제거(이모지·반복어), 청킹 (수정 주의 ⚠️)
 import re
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 

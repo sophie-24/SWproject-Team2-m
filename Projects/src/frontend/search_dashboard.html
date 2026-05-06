@@ -211,6 +211,52 @@
       text-decoration: none;
     }
     .footer-row a:hover { text-decoration: underline; }
+
+    /* 직접 검색 폼 (키워드 없이 접근 시) */
+    #search-form {
+      display: none;
+      max-width: 520px;
+      margin: 60px auto 0;
+      text-align: center;
+    }
+    #search-form h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #f1f1f1;
+      margin-bottom: 8px;
+    }
+    #search-form p {
+      font-size: 0.82rem;
+      color: #666;
+      margin-bottom: 24px;
+    }
+    .search-input-row {
+      display: flex;
+      gap: 10px;
+    }
+    .search-input-row input {
+      flex: 1;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #f1f1f1;
+      font-size: 0.92rem;
+      outline: none;
+    }
+    .search-input-row input:focus { border-color: #ff4444; }
+    .search-input-row button {
+      background: #ff4444;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .search-input-row button:hover { background: #cc3333; }
   </style>
 </head>
 <body>
@@ -237,6 +283,16 @@
   <div id="error">
     <p id="error-msg">분석 중 오류가 발생했습니다.</p>
     <a href="javascript:location.reload()">다시 시도</a>
+  </div>
+
+  <!-- 직접 검색 폼 (키워드 없이 접근 시) -->
+  <div id="search-form">
+    <h2>🔍 AI 검색 분석</h2>
+    <p>키워드를 입력하면 유튜브 영상을 수집하고 AI가 분석 결과를 정리해드립니다.</p>
+    <div class="search-input-row">
+      <input id="keyword-input" type="text" placeholder="키워드 입력 (예: 아이폰16, 파이썬, 재테크)" />
+      <button onclick="startSearch()">분석 시작</button>
+    </div>
   </div>
 
   <!-- 결과 -->
@@ -270,15 +326,50 @@
 <script>
   const API = "";  // 같은 서버에서 서빙
   const params = new URLSearchParams(location.search);
-  const keyword = params.get("keyword") || "";
-  const token   = params.get("token") || "";
+  let keyword = params.get("keyword") || "";
+  // URL param 우선, 없으면 localStorage fallback
+  const token = params.get("token") || localStorage.getItem("access_token") || "";
 
-  // 키워드 없으면 에러
+  // URL에 token이 있으면 localStorage에도 저장 (익스텐션 → 웹 전환 시 세션 유지)
+  if (params.get("token")) {
+    localStorage.setItem("access_token", params.get("token"));
+  }
+
   if (!keyword) {
-    showError("검색어가 없습니다. 유튜브에서 검색 후 익스텐션 버튼을 눌러주세요.");
+    // 키워드 없으면 검색 폼 표시
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("search-form").style.display = "block";
+    if (!token) {
+      // 폼 아래에 로그인 안내 추가
+      const note = document.createElement("p");
+      note.style.cssText = "margin-top:16px;font-size:0.8rem;color:#555;";
+      note.innerHTML = '로그인이 필요합니다. <a href="/auth/login" style="color:#ff4444;">Google 로그인</a>';
+      document.getElementById("search-form").appendChild(note);
+    }
+    // Enter 키 바인딩
+    document.getElementById("keyword-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") startSearch();
+    });
   } else if (!token) {
     showError('로그인이 필요합니다. <a href="/auth/login">Google 로그인</a>');
   } else {
+    document.getElementById("keyword-display").textContent = `"${keyword}"`;
+    document.title = `${keyword} — TechVisibility`;
+    runAnalysis();
+  }
+
+  // ── 폼에서 검색 시작 ─────────────────────────────────────────────────────
+
+  function startSearch() {
+    const input = document.getElementById("keyword-input").value.trim();
+    if (!input) return;
+    if (!token) {
+      window.location.href = `/auth/login`;
+      return;
+    }
+    keyword = input;
+    document.getElementById("search-form").style.display = "none";
+    document.getElementById("loading").style.display = "block";
     document.getElementById("keyword-display").textContent = `"${keyword}"`;
     document.title = `${keyword} — TechVisibility`;
     runAnalysis();
@@ -321,7 +412,7 @@
       renderResult(data);
     } catch (e) {
       clearInterval(stepTimer);
-      showError(`서버 연결 실패 — 백엔드(localhost:8000)를 확인해주세요.`);
+      showError(`서버 연결 실패 — 잠시 후 다시 시도해주세요.`);
     }
   }
 
