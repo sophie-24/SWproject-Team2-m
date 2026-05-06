@@ -38,8 +38,7 @@ class User(Base):
     initial_intent       = Column(String(20), nullable=True)   # '유희형'|'지식형'|'구매형'
     interest_categories  = Column(Text, nullable=True)         # JSON 문자열 — 관심사 카테고리 목록
     # 사용자 설정 발송 시간
-    morning_send_time    = Column(String(5), nullable=False, default="08:00", server_default="08:00")  # "HH:MM" KST 오전 발송
-    send_time            = Column(String(5), nullable=False, default="21:00", server_default="21:00")  # "HH:MM" KST 오후 발송
+    send_time            = Column(String(5), nullable=False, default="21:00", server_default="21:00")  # "HH:MM" KST 발송 시간
     # 수신 동의 여부 — False이면 배치에서 완전히 제외
     is_subscribed        = Column(Boolean, nullable=False, default=True)
     unsubscribed_at      = Column(DateTime, nullable=True)
