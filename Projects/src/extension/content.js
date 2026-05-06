@@ -167,4 +167,69 @@ function createFloatBtn() {
       return;
     }
 
-    // background.js에 사이드 패널 오픈 요청 (keyword 포함 → storage에 
+    /* background.js에 사이드 패널 오픈 요청 (keyword 포함 → storage에 저장 후 open) */
+    try {
+      chrome.runtime.sendMessage({
+        type:    "OPEN_SIDE_PANEL",
+        tabId:   null,
+        keyword: keyword,
+      });
+    } catch (e) {
+      /* 익스텐션 재로드 후 탭 미갱신 시 context invalidated — 페이지 새로고침 안내 */
+      console.warn("[Tubify] 익스텐션이 재로드됐습니다. 페이지를 새로고침(F5)해주세요.");
+      label.textContent = "페이지를 새로고침해주세요";
+      btn.style.maxWidth = "210px";
+      btn.style.padding = "10px 14px 10px 10px";
+      label.style.maxWidth = "180px";
+      label.style.opacity = "1";
+      label.style.marginLeft = "8px";
+      setTimeout(() => {
+        label.textContent = "유튜브 검색 요약보기";
+        btn.style.maxWidth = "36px";
+        btn.style.padding = "10px 8px";
+        label.style.maxWidth = "0";
+        label.style.opacity = "0";
+        label.style.marginLeft = "0";
+      }, 3000);
+    }
+  });
+
+  document.body.appendChild(btn);
+}
+
+// ── 페이지 타입 판별 ──────────────────────────────────────────────────────────
+
+function isSearchPage() {
+  return window.location.pathname === "/results";
+}
+
+function isWatchPage() {
+  return window.location.pathname === "/watch";
+}
+
+// ── 초기화 ────────────────────────────────────────────────────────────────────
+
+function init() {
+  if (isSearchPage()) {
+    createFloatBtn();
+    maybeCollectSearch();
+  } else if (isWatchPage()) {
+    createFloatBtn();
+    maybeCollectWatch();
+  } else {
+    /* 검색/시청 페이지 아니면 버튼 제거 */
+    const existing = document.getElementById(BTN_ID);
+    if (existing) existing.remove();
+  }
+}
+
+// ── YouTube SPA 네비게이션 감지 ───────────────────────────────────────────────
+
+window.addEventListener("yt-navigate-finish", () => {
+  init();
+  if (isSearchPage())  debouncedCollectSearch();
+  if (isWatchPage())   debouncedCollectWatch();
+});
+
+/* 최초 페이지 로드 */
+init();

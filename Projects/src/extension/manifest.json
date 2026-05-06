@@ -12,8 +12,16 @@
     "sidePanel"
   ],
 
+  "background": {
+    "service_worker": "background.js"
+  },
+
   "side_panel": {
     "default_path": "side_panel.html"
+  },
+
+  "externally_connectable": {
+    "matches": ["http://localhost:8000/*"]
   },
 
   "host_permissions": [
