@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS report_batches (
     started_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
     finished_at TIMESTAMP    NULL,
     status      VARCHAR(20)  NOT NULL DEFAULT 'running',
-    log_count   INTEGER      NULL,
     topic_count INTEGER      NULL
 );
 
@@ -63,15 +62,53 @@ ALTER TABLE users
     ADD COLUMN IF NOT EXISTS initial_intent     VARCHAR(20) NULL,
     ADD COLUMN IF NOT EXISTS interest_categories TEXT       NULL;
 
--- 6) user_subscriptions 테이블 신규 생성 (YouTube 구독 채널 영구 저장)
-CREATE TABLE IF NOT EXISTS user_subscriptions (
-    id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id       VARCHAR(255) NOT NULL,
-    channel_id    VARCHAR(100) NOT NULL,
-    channel_title VARCHAR(255) NULL,
-    synced_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_user_subscription UNIQUE (user_id, channel_id)
-);
+-- 6) user_subscriptions — 구독 채널 DB 저장 방식 폐기, YouTube API 실시간 조회로 대체
+
+-- ============================================================
+-- Migration v2: 2차 DB 설계 반영
+-- ============================================================
+
+-- v2-1) behavior_logs: processed_at 추가
+ALTER TABLE behavior_logs
+    ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP NULL;
+
+-- v2-2) user_interests: source / last_seen_at / created_at 추가
+ALTER TABLE user_interests
+    ADD COLUMN IF NOT EXISTS source       VARCHAR(20) NOT NULL DEFAULT 'behavior',
+    ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP   NULL,
+    ADD COLUMN IF NOT EXISTS created_at   TIMESTAMP   NOT NULL DEFAULT NOW();
+
+-- 온보딩에서 생성된 기존 관심사 source → 'onboarding' 으로 소급 적용 (선택적)
+-- UPDATE user_interests SET source = 'onboarding' WHERE created_at = updated_at;
+
+-- v2-3) report_batches: window_type / period_start / period_end 추가
+ALTER TABLE report_batches
+    ADD COLUMN IF NOT EXISTS window_type  VARCHAR(30) NULL,
+    ADD COLUMN IF NOT EXISTS period_start TIMESTAMP   NULL,
+    ADD COLUMN IF NOT EXISTS period_end   TIMESTAMP   NULL;
+
+-- ============================================================
+-- Migration v3: send_time JSON 배열 통합, morning_send_time 제거
+-- ============================================================
+
+-- v3-1) send_time 컬럼 타입 먼저 TEXT로 변경 (VARCHAR(5) → TEXT)
+ALTER TABLE users
+    ALTER COLUMN send_time TYPE TEXT,
+    ALTER COLUMN send_time SET DEFAULT '["21:00"]';
+
+-- v3-2) 기존 send_time 값을 JSON 배열 형태로 변환 ("21:00" → '["21:00"]')
+UPDATE users
+SET send_time = '["' || send_time || '"]'
+WHERE send_time IS NOT NULL
+  AND send_time NOT LIKE '[%';
+
+-- v3-3) morning_send_time 컬럼 제거
+ALTER TABLE users
+    DROP COLUMN IF EXISTS morning_send_time;
+
+-- v3-4) newsletters.delivery_type 컬럼 제거
+ALTER TABLE newsletters
+    DROP COLUMN IF EXISTS delivery_type;
 
 -- 7) 인덱스
 CREATE INDEX IF NOT EXISTS idx_behavior_logs_status    ON behavior_logs      (user_id, status, logged_at);
@@ -80,4 +117,3 @@ CREATE INDEX IF NOT EXISTS idx_newsletters_history     ON newsletters         (u
 CREATE INDEX IF NOT EXISTS idx_newsletters_delivery    ON newsletters         (user_id, delivery_status);
 CREATE INDEX IF NOT EXISTS idx_report_batches_user     ON report_batches      (user_id, started_at);
 CREATE INDEX IF NOT EXISTS idx_user_interests_user     ON user_interests      (user_id, weight DESC);
-CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user ON user_subscriptions  (user_id);
