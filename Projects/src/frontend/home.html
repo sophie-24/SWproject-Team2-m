@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tubify — 관심사 설정</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="home.css" />
+</head>
+
+<body>
+  <nav class="nav">
+    <span class="nav-logo">Tubify</span>
+    <div class="nav-links">
+      <a href="#">홈</a>
+      <a href="#">마이페이지</a>
+    </div>
+    <button class="nav-logout" onclick="logout()">로그아웃</button>
+  </nav>
+
+  <main class="main">
+    <div class="header-section">
+      <h1 class="page-title">나만의 <span class="highlight">관심사</span> 피드 맞춤 설정</h1>
+      <p class="page-desc">
+        지난 1년간의 시청 기록을 바탕으로 추출된 관심사에요.<br />
+        당신의 관심사를 추가적으로 설정하여 직접 큐레이션 해보세요.
+      </p>
+    </div>
+
+    <div class="interest-grid" id="interest-grid">
+      <button class="interest-pill" data-value="여행"><span class="pill-icon">✈️</span>여행</button>
+      <button class="interest-pill" data-value="테크놀로지"><span class="pill-icon">💻</span>테크놀로지</button>
+      <button class="interest-pill" data-value="경제"><span class="pill-icon">📈</span>경제</button>
+      <button class="interest-pill" data-value="디자인"><span class="pill-icon">✏️</span>디자인</button>
+      <button class="interest-pill" data-value="정치"><span class="pill-icon">🏛️</span>정치</button>
+      <button class="interest-pill" data-value="과학"><span class="pill-icon">⚗️</span>과학</button>
+      <button class="interest-pill" data-value="라이프스타일"><span class="pill-icon">🌿</span>라이프스타일</button>
+      <button class="interest-pill" data-value="뷰티"><span class="pill-icon">💄</span>뷰티</button>
+      <button class="interest-pill" data-value="철학"><span class="pill-icon">💭</span>철학</button>
+      <button class="interest-pill" data-value="예술"><span class="pill-icon">🎨</span>예술</button>
+      <button class="interest-pill" data-value="역사"><span class="pill-icon">📖</span>역사</button>
+      <button class="interest-pill" data-value="기후"><span class="pill-icon">🌍</span>기후</button>
+      <button class="interest-pill" data-value="웰니스"><span class="pill-icon">💪</span>웰니스</button>
+      <button class="interest-pill" data-value="우주"><span class="pill-icon">🚀</span>우주</button>
+      <button class="interest-pill" data-value="미식"><span class="pill-icon">🍽️</span>미식</button>
+      <button class="interest-pill" data-value="기타"><span class="pill-icon">···</span>기타</button>
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" type="text" placeholder="키워드 검색 또는 직접 추가 (Enter)" />
+      <button class="search-add-btn" style="display:none;" onclick="addFromSearch()">+ 추가</button>
+    </div>
+
+    <div class="bottom-action">
+      <button class="save-btn" onclick="saveSettings()">설정 저장하기</button>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span class="footer-logo">Tubify</span>
+    <div class="footer-links">
+      <a href="#">개인정보처리방침</a>
+      <a href="#">이용약관</a>
+      <a href="#">고객센터</a>
+    </div>
+    <span class="footer-copy">© 2026 Tubify. 보고 싶은 것만. 핵심만.</span>
+  </footer>
+
+  <script src="home.js"></script>
+</body>
+
+</html>
