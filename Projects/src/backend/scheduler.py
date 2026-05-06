@@ -146,13 +146,9 @@ async def _run_batch_for_send_time(send_time: str) -> None:
             time_filter = or_(
                 User.send_time == send_time,
                 User.send_time == None,  # noqa: E711
-                User.morning_send_time == send_time,
             )
         else:
-            time_filter = or_(
-                User.send_time == send_time,
-                User.morning_send_time == send_time,
-            )
+            time_filter = (User.send_time == send_time)
 
         result = await db.execute(
             select(User).where(
