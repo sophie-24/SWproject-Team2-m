@@ -1,3 +1,4 @@
+# 사용자 행동 로그 DB 저장·조회 — search/watch 이벤트 수집 (Pipeline B 트리거 원천 데이터)
 from datetime import datetime, timezone
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +8,7 @@ from database import BehaviorLog
 async def save_behavior(
     db: AsyncSession,
     user_id: str,
-    event_type: str,
+    event_type: str,       # "search" | "watch"
     keyword: str,
     video_id: str = None,
 ) -> dict:

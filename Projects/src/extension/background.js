@@ -1,9 +1,17 @@
+// ── 설치 시 사이드패널 동작 설정 ───────────────────────────────────────────────
+chrome.runtime.onInstalled.addListener(() => {
+  // 툴바 아이콘 클릭 시 사이드패널이 자동으로 열리지 않도록 설정
+  // (플로팅 버튼으로만 열림)
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(() => {});
+  console.log("[Tubify] 익스텐션 설치/업데이트 완료");
+});
+
 // ── 웹사이트로부터 JWT 수신 → storage에 저장 ─────────────────────────────────
 chrome.runtime.onMessageExternal.addListener(
   (message, sender, sendResponse) => {
     if (message.type === "SET_TOKEN") {
       chrome.storage.local.set({ jwt: message.token, loggedIn: true }, () => {
-        console.log("[TechVisibility] JWT 저장 완료");
+        console.log("[Tubify] JWT 저장 완료");
         sendResponse({ success: true });
       });
       return true;
@@ -27,10 +35,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: false, error: "tabId 없음" });
       return;
     }
-    chrome.sidePanel
-      .open({ tabId })
-      .then(() => sendResponse({ success: true }))
-      .catch(e => sendResponse({ success: false, error: e.message }));
-    return true; // 비동기 응답
+
+    // keyword를 storage에 미리 저장 → side_panel이 init() 시 읽어감
+    const storeAndOpen = () =>
+      chrome.sidePanel
+        .open({ tabId })
+        .then(() => sendResponse({ success: true }))
+        .catch(e => {
+          console.error("[Tubify] sidePanel.open 실패:", e.message);
+          sendResponse({ success: false, error: e.message });
+        });
+
+    if (message.keyword) {
+      chrome.storage.local.set({ pendingKeyword: message.keyword }, storeAndOpen);
+    } else {
+      storeAndOpen();
+    }
+
+    return true; // 비동기 sendResponse 유지
   }
 });

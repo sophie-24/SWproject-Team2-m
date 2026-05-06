@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "TechVisibility",
+  "name": "Tubify",
   "version": "1.0.0",
   "description": "유튜브 검색 결과 상단에 AI 요약 대시보드를 오버레이로 표시합니다.",
 
@@ -24,14 +24,14 @@
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["content.js"],
+      "js": ["config.js", "content.js"],
       "run_at": "document_idle"
     }
   ],
 
   "action": {
     "default_popup": "popup.html",
-    "default_title": "TechVisibility"
+    "default_title": "Tubify"
   },
 
   "icons": {
