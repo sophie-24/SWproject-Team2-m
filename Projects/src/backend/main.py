@@ -82,7 +82,15 @@ def get_current_user(token=Depends(security)):
 
 @app.get("/")
 def root():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+    # login.html 에 EXTENSION_ID 주입
+    with open(os.path.join(FRONTEND_DIR, "login.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("__EXTENSION_ID__", EXTENSION_ID)
+    return HTMLResponse(content=html)
+
+@app.get("/home.html")
+def home():
+    return FileResponse(os.path.join(FRONTEND_DIR, "home.html"))
 
 @app.get("/onboarding.html")
 def onboarding():
@@ -98,6 +106,23 @@ def dashboard():
 @app.get("/search_dashboard.html")
 def search_dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "search_dashboard.html"))
+
+# login.html / home.html 이 참조하는 정적 에셋 (/static/ 마운트와 별개로 루트 경로 노출)
+@app.get("/app.js")
+def serve_app_js():
+    return FileResponse(os.path.join(FRONTEND_DIR, "app.js"), media_type="application/javascript")
+
+@app.get("/style.css")
+def serve_style_css():
+    return FileResponse(os.path.join(FRONTEND_DIR, "style.css"), media_type="text/css")
+
+@app.get("/home.js")
+def serve_home_js():
+    return FileResponse(os.path.join(FRONTEND_DIR, "home.js"), media_type="application/javascript")
+
+@app.get("/home.css")
+def serve_home_css():
+    return FileResponse(os.path.join(FRONTEND_DIR, "home.css"), media_type="text/css")
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────

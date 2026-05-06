@@ -53,15 +53,23 @@
 
   <div id="main-screen">
     <header>
-      <h1>SWProjectTeam2</h1>
-      <button class="logout-btn" onclick="logout()">로그아웃</button>
+      <h1>Tubify</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        <a href="/dashboard.html" style="color:#888;font-size:0.82rem;text-decoration:none;">대시보드</a>
+        <button class="logout-btn" onclick="logout()">로그아웃</button>
+      </div>
     </header>
 
     <div class="search-bar">
       <input id="search-input" type="text" placeholder="키워드 입력 (예: 파이썬, AI, 클라우드)" />
       <button onclick="doSearch()">검색</button>
+      <button onclick="doAnalyze()" id="analyze-btn"
+        style="background:#1a3a5c;color:#6ab4f5;border:1px solid #2a5a8c;border-radius:8px;padding:12px 18px;font-size:1rem;cursor:pointer;font-weight:600;white-space:nowrap">
+        AI 분석
+      </button>
     </div>
 
+    <div id="analyze-result" style="display:none;margin:0 0 20px;background:#111;border:1px solid #2a2a2a;border-radius:10px;padding:16px"></div>
     <div id="results"></div>
   </div>
 
