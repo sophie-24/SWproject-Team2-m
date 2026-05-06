@@ -52,7 +52,7 @@ Pipeline B — 뉴스레터 (배치)
 ### 1. 저장소 클론
 
 ```bash
-git clone https://github.com/yijuuuun/SWproject-Team2.git
+git clone https://github.com/sophie-24/SWproject-Team2-m.git
 cd SWproject-Team2
 ```
 

@@ -137,11 +137,6 @@ async_refactoring.md
 token_optimization.md
 todo.md
 .claude/*
-frontend/*
-admin.html
-dashboard.html
-index.html
-onboarding.html
-search_dashboard.html
+problem.md
 
 # End of https://www.toptal.com/developers/gitignore/api/xcode,macos,swift,swiftpackagemanager,cocoapods
