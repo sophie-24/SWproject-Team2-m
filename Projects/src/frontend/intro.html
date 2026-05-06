@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tubify — 유튜브 시청을 지식으로</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans KR", sans-serif;
+      background: #f7f9fb;
+      color: #191c1e;
+      overflow-x: hidden;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(247, 249, 251, 0.8);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 100;
+    }
+
+    .nav-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 32px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      font-size: 24px;
+      font-weight: 800;
+      color: red;
+      letter-spacing: -0.02em;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .nav-link {
+      font-size: 18px;
+      font-weight: 500;
+      color: #191c1e;
+      text-decoration: none;
+      letter-spacing: -0.025em;
+    }
+
+    .nav-link.active {
+      font-weight: 600;
+      color: #bc0100;
+      border-bottom: 2px solid #bc0100;
+      padding-bottom: 2px;
+    }
+
+    .nav-btn {
+      padding: 8px 24px;
+      background: #e6e8ea;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+    }
+
+    .nav-btn:hover { background: #d4d6d8; }
+
+    /* ── Hero ── */
+    .hero {
+      padding-top: 80px; /* nav height */
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding-bottom: 80px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: -2%;
+      right: 0;
+      height: 1000px;
+      transform: translateY(-50%);
+      background: rgba(255, 0, 0, 0.03);
+      border-radius: 9999px;
+      filter: blur(60px);
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      max-width: 1280px;
+      width: 100%;
+      padding: 0 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-title {
+      font-size: 72px;
+      font-weight: 800;
+      color: #191c1e;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      margin-bottom: 32px;
+    }
+
+    .hero-title .accent { color: #bc0100; }
+
+    .hero-subtitle {
+      font-size: 24px;
+      font-weight: 400;
+      color: #515f74;
+      line-height: 1.33;
+      max-width: 528px;
+      margin-bottom: 48px;
+    }
+
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, #bc0100 0%, #eb0000 100%);
+      border: none;
+      border-radius: 12.8px;
+      font-size: 18px;
+      font-weight: 500;
+      color: white;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      letter-spacing: -0.01em;
+      transition: opacity 0.2s;
+    }
+
+    .hero-cta:hover { opacity: 0.9; }
+
+    /* ── Feature 1: Extension ── */
+    .feature-extension {
+      background: rgba(242, 244, 246, 0.33);
+      padding: 80px 0 128px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-extension-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .feature-screenshot {
+      width: 100%;
+      max-width: 1056px;
+      border-radius: 32px;
+      box-shadow: 15px 20px 40px rgba(25, 28, 30, 0.1);
+      display: block;
+      margin-bottom: 80px;
+    }
+
+    .feature-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 24px;
+    }
+
+    .feature-badge.gray {
+      background: #d5e3fc;
+      color: #57657a;
+    }
+
+    .feature-badge.blue {
+      background: #0071e8;
+      color: white;
+    }
+
+    .feature-heading {
+      font-size: 48px;
+      font-weight: 800;
+      color: #191c1e;
+      text-align: center;
+      line-height: 1.35;
+      margin-bottom: 24px;
+    }
+
+    .feature-desc {
+      font-size: 20px;
+      color: #515f74;
+      text-align: center;
+      line-height: 1.46;
+      max-width: 629px;
+      margin-bottom: 40px;
+    }
+
+    .feature-list {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      text-align: left;
+    }
+
+    .feature-item-icon {
+      width: 20px;
+      height: 24px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .feature-item-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #191c1e;
+      margin-bottom: 2px;
+    }
+
+    .feature-item-desc {
+      font-size: 16px;
+      color: #515f74;
+    }
+
+    /* ── Feature 2: Mailing ── */
+    .feature-mailing {
+      padding: 128px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .feature-mailing-inner {
+      max-width: 1280px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 44px;
+    }
+
+    .feature-mailing-text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .mailing-desc {
+      font-size: 18px;
+      color: #515f74;
+      text-align: center;
+      line-height: 1.55;
+      max-width: 672px;
+    }
+
+    .mailing-screenshot {
+      width: 100%;
+      max-width: 960px;
+      border-radius: 32px;
+      display: block;
+    }
+
+    /* ── Final CTA ── */
+    .cta-section {
+      padding: 0 32px 128px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .cta-card {
+      max-width: 1024px;
+      width: 100%;
+      background: linear-gradient(141deg, rgba(188, 1, 0, 0.85) 0%, rgba(235, 0, 0, 0.85) 100%);
+      border-radius: 24px;
+      padding: 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(25, 28, 30, 0.06);
+    }
+
+    .cta-card::before {
+      content: '';
+      position: absolute;
+      top: -128px;
+      right: -128px;
+      width: 256px;
+      height: 256px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 9999px;
+      filter: blur(40px);
+      pointer-events: none;
+    }
+
+    .cta-title {
+      font-size: 48px;
+      font-weight: 800;
+      color: white;
+      line-height: 1.35;
+      margin-bottom: 48px;
+      position: relative;
+    }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px 40px;
+      background: white;
+      border: none;
+      border-radius: 12.8px;
+      font-size: 18px;
+      font-weight: 500;
+      color: #bc0100;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      position: relative;
+      transition: opacity 0.2s;
+    }
+
+    .cta-btn:hover { opacity: 0.9; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid #e2e8f0;
+      padding: 48px 24px;
+    }
+
+    .footer-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .footer-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: red;
+      flex-shrink: 0;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 32px;
+    }
+
+    .footer-links a {
+      font-size: 14px;
+      color: #71717a;
+      text-decoration: none;
+    }
+
+    .footer-links a:hover { color: #191c1e; }
+
+    .footer-copy {
+      margin-left: auto;
+      font-size: 14px;
+      color: #71717a;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 768px) {
+      .hero-title { font-size: 44px; }
+      .hero-subtitle { font-size: 18px; }
+      .feature-heading { font-size: 32px; }
+      .cta-title { font-size: 32px; }
+      .cta-card { padding: 48px 32px; }
+      .footer-inner { flex-wrap: wrap; }
+      .footer-copy { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-inner">
+      <a href="/intro.html" class="nav-logo" id="nav-logo">Tubify</a>
+      <div class="nav-links">
+        <a href="/intro.html" class="nav-link active">홈</a>
+        <a href="/dashboard.html" class="nav-link" id="nav-mypage" style="display:none">마이페이지</a>
+      </div>
+      <a href="/login.html" class="nav-btn" id="nav-auth-btn">로그인</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <h1 class="hero-title">
+        유튜브 시청을<br>
+        <span class="accent">지식</span>으로 바꿉니다.
+      </h1>
+      <p class="hero-subtitle">
+        수많은 영상 속에서 당신에게 꼭 필요한 인사이트만<br>
+        정제해 드립니다. 실시간 요약부터 맞춤형 메일링까지,<br>
+        스마트한 AI 큐레이터 Tubify를 만나보세요.
+      </p>
+      <a href="/login.html" class="hero-cta">지금 무료로 시작하기</a>
+    </div>
+  </section>
+
+  <!-- Feature 1: Extension -->
+  <section class="feature-extension">
+    <div class="feature-extension-inner">
+      <img
+        class="feature-screenshot"
+        src="https://www.figma.com/api/mcp/asset/e11d0dbe-cf23-42ab-a57d-2af2205c034e"
+        alt="Tubify 유튜브 확장 서비스 화면"
+      />
+      <span class="feature-badge gray">INTELLIGENT EXTENSION</span>
+      <h2 class="feature-heading">
+        영상을 보는 동시에<br>핵심을 짚어냅니다
+      </h2>
+      <p class="feature-desc">
+        유튜브 창 옆의 플로팅 버튼 하나로 끝.<br>
+        실시간 검색어와 영상 내용을 분석하여 요약해 드립니다.<br>
+        모든 정보에는 영상 링크가 포함되어 출처를 즉시 확인할 수 있습니다.
+      </p>
+      <div class="feature-list">
+        <div class="feature-item">
+          <svg class="feature-item-icon" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 2C6.13 2 3 5.13 3 9C3 14.25 10 22 10 22C10 22 17 14.25 17 9C17 5.13 13.87 2 10 2ZM10 11.5C8.62 11.5 7.5 10.38 7.5 9C7.5 7.62 8.62 6.5 10 6.5C11.38 6.5 12.5 7.62 12.5 9C12.5 10.38 11.38 11.5 10 11.5Z" fill="#bc0100"/>
+          </svg>
+          <div>
+            <div class="feature-item-title">원클릭 플로팅 버튼</div>
+            <div class="feature-item-desc">어떤 영상에서든 즉시 요약을 시작하세요.</div>
+          </div>
+        </div>
+        <div class="feature-item">
+          <svg class="feature-item-icon" viewBox="0 0 20 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="8" stroke="#bc0100" stroke-width="1.5"/>
+            <path d="M10 6V10L13 13" stroke="#bc0100" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <div>
+            <div class="feature-item-title">타임스탬프 자동 생성</div>
+            <div class="feature-item-desc">핵심 장면으로 바로 이동할 수 있는 링크를 제공합니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature 2: Mailing -->
+  <section class="feature-mailing">
+    <div class="feature-mailing-inner">
+      <div class="feature-mailing-text">
+        <span class="feature-badge blue">DAILY MAIL</span>
+        <h2 class="feature-heading">
+          당신의 관심사를 담아<br>원하는 시간에 메일함으로
+        </h2>
+        <p class="mailing-desc">
+          어제 본 영상, 최근 검색한 키워드, 그리고 당신의 관심사를 분석합니다.<br>
+          넘쳐나는 정보 속에서 당신이 놓치지 말아야 할 핵심 인사이트만 골라 전송합니다.
+        </p>
+      </div>
+      <img
+        class="mailing-screenshot"
+        src="https://www.figma.com/api/mcp/asset/dd290027-75a6-4446-b555-ce30a8b655e2"
+        alt="Tubify 뉴스레터 메일 화면"
+      />
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <div class="cta-section">
+    <div class="cta-card">
+      <h2 class="cta-title">
+        지금 Tubify와 함께<br>스마트한 유튜브 생활을 시작하세요.
+      </h2>
+      <a href="/login.html" class="cta-btn">지금 무료로 시작하기</a>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <span class="footer-logo">Tubify</span>
+      <div class="footer-links">
+        <a href="/privacy.html">개인정보처리방침</a>
+        <a href="/terms.html">이용약관</a>
+      </div>
+      <span class="footer-copy">© 2026 Tubify. 보고 싶은 것만. 핵심만.</span>
+    </div>
+  </footer>
+
+  <script>
+    const token = localStorage.getItem("access_token");
+    document.getElementById("nav-logo").href = token ? "/home.html" : "/intro.html";
+    if (token) {
+      document.getElementById("nav-mypage").style.display = "block";
+      const authBtn = document.getElementById("nav-auth-btn");
+      authBtn.textContent = "로그아웃";
+      authBtn.href = "#";
+      authBtn.onclick = function(e) {
+        e.preventDefault();
+        localStorage.removeItem("access_token");
+        sessionStorage.removeItem("loggedIn");
+        window.location.href = "/login.html";
+      };
+    }
+  </script>
+</body>
+</html>
