@@ -19,7 +19,7 @@ from youtube_search import search_videos, get_subscriptions
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
 from shared_cache import search_analysis_cache as _search_analysis_cache_shared
-from database import init_db, get_db, Newsletter, UserInterest, UserSubscription
+from database import init_db, get_db, Newsletter, UserInterest
 from behavior_store import save_behavior, get_today_logs
 from trigger import get_triggered_topics
 from agents.pipeB_orchestrator import run_pipeline
@@ -485,6 +485,7 @@ async def my_profile(
         except Exception:
             pass
 
+<<<<<<< HEAD
     # send_time JSON 배열에서 아침(첫 번째)·저녁(마지막) 분리해서 반환
     import json as _json_p
     try:
@@ -499,6 +500,18 @@ async def my_profile(
         "email":               db_user.email,
         "send_time":           evening_time,
         "morning_send_time":   morning_time,
+=======
+    # send_time JSON 배열 파싱 후 반환
+    try:
+        times = _json.loads(db_user.send_time or '["21:00"]')
+        times = times if isinstance(times, list) and times else ["21:00"]
+    except Exception:
+        times = ["21:00"]
+
+    return {
+        "email":               db_user.email,
+        "send_times":          times,
+>>>>>>> feature/onboarding-time-interest-flow-fe
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
         "is_subscribed":       db_user.is_subscribed,
@@ -507,8 +520,12 @@ async def my_profile(
 
 
 class ProfileUpdateData(BaseModel):
+<<<<<<< HEAD
     send_time:           Optional[str]       = None  # "HH:MM" 저녁 발송 시간
     morning_send_time:   Optional[str]       = None  # "HH:MM" 아침 발송 시간 — 내부적으로 send_time JSON 배열에 합산
+=======
+    send_times:          Optional[list[str]] = None  # ["HH:MM", ...] — send_time 컬럼에 JSON 배열로 저장
+>>>>>>> feature/onboarding-time-interest-flow-fe
     interest_categories: Optional[list[str]] = None  # 관심사 카테고리 목록
 
 
@@ -532,6 +549,7 @@ async def update_my_profile(
 
     time_re = re.compile(r'^\d{2}:\d{2}$')
 
+<<<<<<< HEAD
     # send_time / morning_send_time → JSON 배열로 합산해 저장
     if data.send_time is not None or data.morning_send_time is not None:
         if data.send_time and not time_re.match(data.send_time):
@@ -551,6 +569,14 @@ async def update_my_profile(
         new_morning = data.morning_send_time if data.morning_send_time is not None else cur_morning
         new_evening = data.send_time         if data.send_time         is not None else cur_evening
         db_user.send_time = _json.dumps(sorted(list({new_morning, new_evening})), ensure_ascii=False)
+=======
+    # send_times → 유효성 검사 후 JSON 배열로 저장
+    if data.send_times is not None:
+        for t in data.send_times:
+            if not time_re.match(t):
+                raise HTTPException(status_code=400, detail=f"send_times 형식은 HH:MM이어야 합니다: {t}")
+        db_user.send_time = _json.dumps(sorted(data.send_times), ensure_ascii=False)
+>>>>>>> feature/onboarding-time-interest-flow-fe
 
     if data.interest_categories is not None:
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
@@ -904,31 +930,17 @@ async def analyze_search(
         if cache_key in _search_analysis_cache:
             return JSONResponse(_search_analysis_cache[cache_key])
 
-        # 개인화 파라미터 조회 (병렬)
-        sub_result, interest_result, click_result = await asyncio.gather(
-            db.execute(
-                select(UserSubscription.channel_id).where(UserSubscription.user_id == user_id)
-            ),
-            db.execute(
-                select(UserInterest.category)
-                .where(UserInterest.user_id == user_id)
-                .order_by(UserInterest.weight.desc())
-                .limit(10)
-            ),
-            db.execute(
-                select(UserSubscription.channel_id)  # clicked = 구독 채널 중 로그 있는 채널 (근사값)
-                .where(UserSubscription.user_id == user_id)
-            ),
+        # 개인화 파라미터 조회
+        # TODO: user_subscriptions 테이블 제거됨 — 구독 채널 ID는 빈 리스트로 대체
+        interest_result = await db.execute(
+            select(UserInterest.category)
+            .where(UserInterest.user_id == user_id)
+            .order_by(UserInterest.weight.desc())
+            .limit(10)
         )
-        subscribed_channel_ids = [row[0] for row in sub_result.all()]
-        user_categories         = [row[0] for row in interest_result.all()]
-        # 클릭 이력: BehaviorLog에서 채널 ID 추출
-        click_log_result = await db.execute(
-            select(UserSubscription.channel_id)
-            .where(UserSubscription.user_id == user_id)
-        )
-        # BehaviorLog에서 video_url로 채널 구분이 어려우므로 구독 채널을 근사값으로 사용
-        clicked_channel_ids = subscribed_channel_ids  # 향후 BehaviorLog.channel_id 컬럼 추가 시 교체
+        subscribed_channel_ids = []
+        user_categories        = [row[0] for row in interest_result.all()]
+        clicked_channel_ids    = []
 
         try:
             result = await run_pipeline_a(
