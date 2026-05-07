@@ -351,7 +351,7 @@ def _validate_send_time(send_time: str) -> str:
 class SubscribeData(BaseModel):
     delivery_type: str = "email"
     email: Optional[str] = None
-    send_time: Optional[str] = None   # "HH:MM" 형식 (예: "08:00", "21:00")
+    send_time: Optional[str] = None   # "HH:MM" 단일 시간 — 온보딩 Step1에서는 미사용
 
 
 @app.post("/subscribe")
@@ -386,7 +386,6 @@ async def subscribe(
             )
         db_user.email = data.email
     if data.send_time:
-        # HH:MM 형식 검증
         import re as _re
         if not _re.match(r"^\d{2}:\d{2}$", data.send_time):
             raise HTTPException(status_code=400, detail="send_time은 HH:MM 형식이어야 합니다")
@@ -486,9 +485,20 @@ async def my_profile(
         except Exception:
             pass
 
+    # send_time JSON 배열에서 아침(첫 번째)·저녁(마지막) 분리해서 반환
+    import json as _json_p
+    try:
+        times = _json_p.loads(db_user.send_time or '["21:00"]')
+        times = times if isinstance(times, list) and times else ["21:00"]
+    except Exception:
+        times = ["21:00"]
+    morning_time = times[0] if len(times) > 1 else "08:00"
+    evening_time = times[-1]
+
     return {
         "email":               db_user.email,
-        "send_time":           db_user.send_time,
+        "send_time":           evening_time,
+        "morning_send_time":   morning_time,
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
         "is_subscribed":       db_user.is_subscribed,
@@ -497,7 +507,8 @@ async def my_profile(
 
 
 class ProfileUpdateData(BaseModel):
-    send_time:           Optional[str]       = None  # "HH:MM" 발송 시간
+    send_time:           Optional[str]       = None  # "HH:MM" 저녁 발송 시간
+    morning_send_time:   Optional[str]       = None  # "HH:MM" 아침 발송 시간 — 내부적으로 send_time JSON 배열에 합산
     interest_categories: Optional[list[str]] = None  # 관심사 카테고리 목록
 
 
@@ -521,10 +532,25 @@ async def update_my_profile(
 
     time_re = re.compile(r'^\d{2}:\d{2}$')
 
-    if data.send_time is not None:
-        if not time_re.match(data.send_time):
+    # send_time / morning_send_time → JSON 배열로 합산해 저장
+    if data.send_time is not None or data.morning_send_time is not None:
+        if data.send_time and not time_re.match(data.send_time):
             raise HTTPException(status_code=400, detail="send_time 형식은 HH:MM이어야 합니다.")
-        db_user.send_time = data.send_time
+        if data.morning_send_time and not time_re.match(data.morning_send_time):
+            raise HTTPException(status_code=400, detail="morning_send_time 형식은 HH:MM이어야 합니다.")
+
+        # 기존 배열에서 아침/저녁 추출
+        try:
+            existing = _json.loads(db_user.send_time or '["21:00"]')
+            existing = existing if isinstance(existing, list) and existing else ["21:00"]
+        except Exception:
+            existing = ["21:00"]
+        cur_morning = existing[0] if len(existing) > 1 else "08:00"
+        cur_evening = existing[-1]
+
+        new_morning = data.morning_send_time if data.morning_send_time is not None else cur_morning
+        new_evening = data.send_time         if data.send_time         is not None else cur_evening
+        db_user.send_time = _json.dumps(sorted(list({new_morning, new_evening})), ensure_ascii=False)
 
     if data.interest_categories is not None:
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
