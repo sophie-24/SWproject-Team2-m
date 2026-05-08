@@ -30,7 +30,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 32px;
-      background: rgba(247, 249, 251, 0.85);
+      background: rgba(247, 249, 251, 0.8);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       border-bottom: 1px solid rgba(0, 0, 0, 0.04);
@@ -101,7 +101,6 @@
       padding-bottom: 80px;
     }
 
-    /* 페이지 제목 */
     .page-title {
       font-size: 36px;
       font-weight: 800;
@@ -117,15 +116,6 @@
       border-radius: 12px;
       box-shadow: 0 20px 40px rgba(25, 28, 30, 0.04);
       padding: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .profile-info {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
     }
 
     .profile-name {
@@ -140,50 +130,33 @@
       font-weight: 400;
       color: #515f74;
       line-height: 1.5;
+      margin-top: 4px;
     }
-
-    .btn-edit {
-      background: #e6e8ea;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 24px;
-      font-size: 16px;
-      font-weight: 600;
-      color: #191c1e;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background 0.15s;
-      flex-shrink: 0;
-    }
-
-    .btn-edit:hover { background: #d1d5db; }
 
     /* ── 관심사 섹션 ── */
-    .interest-section {
+    .section-card {
       background: #f2f4f6;
       border-radius: 12px;
       box-shadow: 0 20px 20px rgba(25, 28, 30, 0.04);
       padding: 32px;
       display: flex;
       flex-direction: column;
-      gap: 0;
     }
 
-    .interest-header {
+    .section-header {
       display: flex;
       align-items: center;
       gap: 8px;
       margin-bottom: 24px;
     }
 
-    .interest-icon {
+    .section-icon {
       width: 22px;
       height: 22px;
       flex-shrink: 0;
-      color: red;
     }
 
-    .interest-title {
+    .section-title {
       font-size: 20px;
       font-weight: 700;
       color: #191c1e;
@@ -230,9 +203,39 @@
       box-shadow: 0 0 10px rgba(188, 1, 0, 0.1);
       transition: background 0.15s;
       text-decoration: none;
+      align-self: flex-start;
     }
 
     .btn-edit-interest:hover { background: #9a0000; }
+
+    /* ── Delivery Schedule ── */
+    .schedule-desc {
+      font-size: 14px;
+      color: #515f74;
+      margin-bottom: 32px;
+    }
+
+    .schedule-btns {
+      display: flex;
+      gap: 16px;
+    }
+
+    .btn-schedule {
+      flex: 1;
+      background: #fff;
+      border: 2px solid red;
+      border-radius: 12px;
+      padding: 18px 26px;
+      font-size: 16px;
+      font-weight: 700;
+      color: red;
+      text-align: center;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-schedule:hover { background: #fff5f5; }
 
     /* ── 액션 행 ── */
     .action-row {
@@ -243,24 +246,17 @@
       padding: 34px 0 33px;
     }
 
-    .action-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
+    .action-info { display: flex; flex-direction: column; gap: 2px; }
 
     .action-title {
       font-size: 16px;
       font-weight: 600;
       color: #191c1e;
-      line-height: 1.5;
     }
 
     .action-desc {
       font-size: 14px;
-      font-weight: 400;
       color: #515f74;
-      line-height: 1.43;
     }
 
     .btn-action {
@@ -282,13 +278,157 @@
 
     .btn-action:hover { background: #d1d5db; }
 
-    .btn-action.danger {
-      color: #dc2626;
+    .btn-action.danger { color: #dc2626; }
+    .btn-action.danger:hover { background: #fee2e2; }
+
+    /* ── 모달 ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(25, 28, 30, 0.4);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
     }
 
-    .btn-action.danger:hover {
-      background: #fee2e2;
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
     }
+
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(25, 28, 30, 0.06);
+      width: 100%;
+      max-width: 520px;
+      overflow: hidden;
+      transform: translateY(12px);
+      transition: transform 0.2s;
+    }
+
+    .modal-overlay.open .modal { transform: translateY(0); }
+
+    .modal-header {
+      padding: 40px 32px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #191c1e;
+      letter-spacing: -0.025em;
+      text-align: center;
+    }
+
+    .modal-subtitle {
+      font-size: 14px;
+      color: #515f74;
+      text-align: center;
+    }
+
+    .modal-body {
+      padding: 0 32px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    .time-picker-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .time-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #515f74;
+      letter-spacing: 0.02em;
+    }
+
+    .time-input-wrap {
+      position: relative;
+    }
+
+    .time-input-wrap .time-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      pointer-events: none;
+    }
+
+    .time-input {
+      width: 100%;
+      background: #f2f4f6;
+      border: none;
+      border-radius: 12px;
+      padding: 16px 16px 16px 48px;
+      font-size: 16px;
+      font-weight: 500;
+      color: #191c1e;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .time-input:focus {
+      outline: 2px solid red;
+      outline-offset: -2px;
+    }
+
+    .modal-footer {
+      background: rgba(242, 244, 246, 0.5);
+      padding: 24px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-modal-cancel {
+      width: 145px;
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid #a6a6a6;
+      border-radius: 12px;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #515f74;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-modal-cancel:hover { background: #f2f4f6; }
+
+    .btn-modal-save {
+      flex: 1;
+      background: linear-gradient(135deg, #bc0100 0%, #eb0000 100%);
+      border: none;
+      border-radius: 12px;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 20px 20px rgba(25, 28, 30, 0.06);
+      transition: opacity 0.15s;
+    }
+
+    .btn-modal-save:hover { opacity: 0.9; }
 
     /* ── 푸터 ── */
     .footer {
@@ -299,16 +439,9 @@
       gap: 32px;
     }
 
-    .footer-logo {
-      font-size: 18px;
-      font-weight: 700;
-      color: red;
-    }
+    .footer-logo { font-size: 18px; font-weight: 700; color: red; }
 
-    .footer-links {
-      display: flex;
-      gap: 32px;
-    }
+    .footer-links { display: flex; gap: 32px; }
 
     .footer-links a {
       font-size: 14px;
@@ -319,11 +452,7 @@
 
     .footer-links a:hover { color: #191c1e; }
 
-    .footer-copy {
-      margin-left: auto;
-      font-size: 14px;
-      color: #71717a;
-    }
+    .footer-copy { margin-left: auto; font-size: 14px; color: #71717a; }
   </style>
 </head>
 
@@ -343,31 +472,46 @@
   <main class="main">
     <div class="page-container">
 
-      <!-- 페이지 제목 -->
       <h1 class="page-title">마이페이지</h1>
 
       <!-- 프로필 카드 -->
       <div class="profile-card">
-        <div class="profile-info">
-          <div class="profile-name" id="profile-name">-</div>
-          <div class="profile-email" id="profile-email">-</div>
-        </div>
-        <button class="btn-edit" onclick="alert('프로필 수정 기능은 준비 중입니다.')">Edit Profile</button>
+        <div class="profile-name" id="profile-name">-</div>
+        <div class="profile-email" id="profile-email">-</div>
       </div>
 
       <!-- 관심사 섹션 -->
-      <div class="interest-section">
-        <div class="interest-header">
-          <!-- 스파클 아이콘 -->
-          <svg class="interest-icon" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M11 2L12.5 9L19 11L12.5 13L11 20L9.5 13L3 11L9.5 9L11 2Z" fill="currentColor"/>
+      <div class="section-card">
+        <div class="section-header">
+          <svg class="section-icon" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11 2L12.5 9L19 11L12.5 13L11 20L9.5 13L3 11L9.5 9L11 2Z" fill="red"/>
           </svg>
-          <span class="interest-title" id="interest-title">관심사</span>
+          <span class="section-title" id="interest-title">관심사</span>
         </div>
         <div class="interest-tags" id="interest-tags">
           <span class="interest-tags-empty">관심사를 불러오는 중...</span>
         </div>
         <a href="/home.html?from=dashboard" class="btn-edit-interest">관심사 수정</a>
+      </div>
+
+      <!-- Delivery Schedule -->
+      <div class="section-card">
+        <div class="section-header">
+          <svg class="section-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="8.5" stroke="#191c1e" stroke-width="1.5"/>
+            <path d="M10 6V10.5L13 12.5" stroke="#191c1e" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span class="section-title">Delivery Schedule</span>
+        </div>
+        <p class="schedule-desc">하루 두 번, 요약 레포트 수신 시간을 설정하세요.</p>
+        <div class="schedule-btns">
+          <button class="btn-schedule" id="btn-morning" onclick="openModal('morning')">
+            1차: <span id="morning-display">오전 08:00</span>
+          </button>
+          <button class="btn-schedule" id="btn-evening" onclick="openModal('evening')">
+            2차: <span id="evening-display">오후 09:00</span>
+          </button>
+        </div>
       </div>
 
       <!-- 이용 가이드 -->
@@ -401,6 +545,43 @@
     <span class="footer-copy">© 2026 Tubify. 보고 싶은 것만. 핵심만.</span>
   </footer>
 
+  <!-- 수신 시간 설정 모달 -->
+  <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">수신 시간 설정</h2>
+        <p class="modal-subtitle">인사이트를 받아보실 최적의 시간을 선택해주세요.</p>
+      </div>
+      <div class="modal-body">
+        <div class="time-picker-group">
+          <label class="time-label" for="input-morning">1차 수신 시간</label>
+          <div class="time-input-wrap">
+            <svg class="time-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="8.5" stroke="#515f74" stroke-width="1.5"/>
+              <path d="M10 6V10.5L13 12.5" stroke="#515f74" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input class="time-input" type="time" id="input-morning" value="08:00" />
+          </div>
+        </div>
+        <div class="time-picker-group">
+          <label class="time-label" for="input-evening">2차 수신 시간</label>
+          <div class="time-input-wrap">
+            <svg class="time-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="8.5" stroke="#515f74" stroke-width="1.5"/>
+              <path d="M10 6V10.5L13 12.5" stroke="#515f74" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M7 3.5L10 2L13 3.5" stroke="#515f74" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            <input class="time-input" type="time" id="input-evening" value="21:00" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" onclick="closeModal()">취소</button>
+        <button class="btn-modal-save" onclick="saveSchedule()">저장하기</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API = "";
 
@@ -425,15 +606,69 @@
         document.getElementById("interest-title").textContent = `${name} 님의 관심사`;
 
         const tagsEl = document.getElementById("interest-tags");
-        if (interests.length > 0) {
-          tagsEl.innerHTML = interests.map(
-            t => `<span class="interest-tag">${escHtml(t)}</span>`
-          ).join("");
-        } else {
-          tagsEl.innerHTML = `<span class="interest-tags-empty">아직 설정된 관심사가 없어요.</span>`;
-        }
+        tagsEl.innerHTML = interests.length > 0
+          ? interests.map(t => `<span class="interest-tag">${escHtml(t)}</span>`).join("")
+          : `<span class="interest-tags-empty">아직 설정된 관심사가 없어요.</span>`;
+
+        // 발송 시간 로드
+        const morning = data.morning_send_time || "08:00";
+        const evening = data.send_time || "21:00";
+        document.getElementById("input-morning").value = morning;
+        document.getElementById("input-evening").value = evening;
+        updateScheduleDisplay(morning, evening);
       } catch (e) {
         console.warn("[mypage] 프로필 로드 실패:", e);
+      }
+    }
+
+    function updateScheduleDisplay(morning, evening) {
+      document.getElementById("morning-display").textContent = formatTime(morning);
+      document.getElementById("evening-display").textContent = formatTime(evening);
+    }
+
+    function formatTime(hhmm) {
+      const [h, m] = hhmm.split(":").map(Number);
+      const ampm = h < 12 ? "오전" : "오후";
+      const hour = h % 12 || 12;
+      return `${ampm} ${String(hour).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+
+    function openModal(target) {
+      document.getElementById("modal-overlay").classList.add("open");
+      const focusEl = target === "morning" ? "input-morning" : "input-evening";
+      setTimeout(() => document.getElementById(focusEl).focus(), 100);
+    }
+
+    function closeModal() {
+      document.getElementById("modal-overlay").classList.remove("open");
+    }
+
+    function handleOverlayClick(e) {
+      if (e.target === document.getElementById("modal-overlay")) closeModal();
+    }
+
+    async function saveSchedule() {
+      const jwt = localStorage.getItem("access_token");
+      const morning = document.getElementById("input-morning").value;
+      const evening = document.getElementById("input-evening").value;
+
+      try {
+        const res = await fetch(`${API}/my/profile`, {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${jwt}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ morning_send_time: morning, send_time: evening })
+        });
+        if (res.ok) {
+          updateScheduleDisplay(morning, evening);
+          closeModal();
+        } else {
+          alert("저장에 실패했습니다. 다시 시도해주세요.");
+        }
+      } catch (e) {
+        alert("서버에 연결할 수 없습니다.");
       }
     }
 
@@ -469,6 +704,10 @@
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
     }
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") closeModal();
+    });
 
     loadProfile();
   </script>
