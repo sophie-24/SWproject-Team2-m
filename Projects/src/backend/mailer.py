@@ -15,196 +15,177 @@ RESEND_FROM      = os.getenv("RESEND_FROM_EMAIL", "curator@tubify.com")
 resend.api_key = RESEND_API_KEY
 
 
-_INTENT_COLOR = {
-    "유희형": "#FF6B35",
-    "지식형": "#4A90D9",
-    "구매형": "#27AE60",
+_HEADER_TITLE = {
+    "search":   "방금 찾은 내용, 한눈에 정리해드립니다",
+    "interest": "관심사 기반 추천 영상 요약 도착했습니다",
 }
-
-_INTENT_LABEL = {
-    "유희형": "😄 엔터테인먼트",
-    "지식형": "🧠 지식 탐구",
-    "구매형": "🛒 구매 가이드",
+_HEADER_BADGE = {
+    "search":   "검색어 기반 요약",
+    "interest": "관심사 기반 요약",
 }
 
 
-def _controversy_badges(controversies: List[str], accent: str) -> str:
-    """쟁점 목록 → 뱃지 HTML. 없으면 빈 문자열 반환."""
-    if not controversies:
+def _keyword_pills(topics: List[Dict[str, Any]]) -> str:
+    """토픽 목록 → 키워드 필터 필 HTML"""
+    if not topics:
         return ""
-    badges = "".join(
-        f'<span style="display:inline-block; background:rgba(231,76,60,0.1); '
-        f'color:#c0392b; border:1px solid rgba(231,76,60,0.3); '
-        f'border-radius:20px; padding:3px 10px; font-size:0.78em; '
-        f'font-weight:600; margin:3px 4px 3px 0; line-height:1.4;">'
-        f'⚡ {c}</span>'
-        for c in controversies if c
+    pills = "".join(
+        f'<td style="padding:0 6px 0 0;">'
+        f'<span style="display:inline-block; background:#ffffff; border:1px solid #eceef0; '
+        f'border-radius:9999px; padding:7px 18px; font-size:13px; color:#191c1e; '
+        f'white-space:nowrap;">{t.get("topic","")}</span></td>'
+        for t in topics if t.get("topic")
     )
-    return f'''
-        <div style="margin-bottom:14px;">
-          <div style="font-size:0.78em; font-weight:700; color:#c0392b;
-                      text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">
-            🔥 주요 쟁점
-          </div>
-          <div>{badges}</div>
-        </div>'''
+    return f'<table cellpadding="0" cellspacing="0" style="margin-bottom:48px;"><tr>{pills}</tr></table>'
 
 
-def _common_facts_block(common_facts: List[str]) -> str:
-    """공통 사실 → HTML 블록. 없으면 빈 문자열."""
-    if not common_facts:
-        return ""
-    items = "".join(
-        f'<li style="margin-bottom:5px; color:#444;">{f}</li>'
-        for f in common_facts if f
-    )
-    return f'''
-        <div style="background:#eef4fb; border-radius:8px; padding:13px 14px;
-                    margin-bottom:14px; border-left:3px solid #4A90D9;">
-          <div style="font-weight:700; color:#2471a3; font-size:0.82em;
-                      text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
-            📌 공통 사실
-          </div>
-          <ul style="margin:0; padding-left:18px; font-size:0.88em; line-height:1.7;">{items}</ul>
-        </div>'''
-
-
-def _source_cards(sources: List[Dict[str, Any]], accent: str) -> str:
-    """출처 영상 목록 → 썸네일 + 채널명 포함 카드 HTML."""
+def _source_cards(sources: List[Dict[str, Any]]) -> str:
+    """출처 영상 목록 → Figma 스타일 카드 HTML (세로 스택)"""
     if not sources:
         return ""
 
-    cards = []
-    for s in sources:
+    rows = []
+    for s in sources[:4]:
         title         = s.get("title", "")
         url           = s.get("url", "#")
-        channel_title = s.get("channel_title", "")
+        channel_title = s.get("channel_title", "").upper()
         thumbnail_url = s.get("thumbnail_url", "")
 
         thumb_html = (
-            f'<img src="{thumbnail_url}" alt="" '
-            f'style="width:100%; height:72px; object-fit:cover; '
-            f'border-radius:6px 6px 0 0; display:block;">'
-            if thumbnail_url else ""
+            f'<img src="{thumbnail_url}" alt="" width="126" height="71" '
+            f'style="display:block; width:126px; height:71px; object-fit:cover; '
+            f'border-radius:6px; border:0;">'
+        ) if thumbnail_url else (
+            f'<div style="width:126px; height:71px; background:#e2e8f0; border-radius:6px; '
+            f'display:flex; align-items:center; justify-content:center;">'
+            f'<span style="font-size:20px;">&#9654;</span></div>'
         )
-        channel_html = (
-            f'<div style="font-size:0.75em; color:#888; margin-top:3px;">'
-            f'📺 {channel_title}</div>'
-            if channel_title else ""
-        )
+        channel_badge = (
+            f'<span style="display:inline-block; background:#d5e3fc; border-radius:9999px; '
+            f'padding:2px 8px; font-size:10px; font-weight:600; color:#57657a; '
+            f'letter-spacing:0.5px;">{channel_title}</span>'
+        ) if channel_title else ""
 
-        cards.append(
-            f'<a href="{url}" style="display:block; text-decoration:none; '
-            f'background:#fff; border:1px solid #e8e8e8; border-radius:8px; '
-            f'overflow:hidden; width:160px; flex-shrink:0; '
-            f'transition:box-shadow 0.2s;">'
-            f'{thumb_html}'
-            f'<div style="padding:8px 10px;">'
-            f'<div style="font-size:0.82em; color:#1a1a1a; font-weight:600; '
-            f'line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; '
-            f'-webkit-box-orient:vertical; overflow:hidden;">▶ {title}</div>'
-            f'{channel_html}'
-            f'</div></a>'
-        )
+        rows.append(f'''
+        <tr>
+          <td style="padding:0 0 12px 0;">
+            <table cellpadding="0" cellspacing="0" width="100%"
+                   style="background:#f2f4f6; border-radius:10px; overflow:hidden;">
+              <tr>
+                <td width="126" style="padding:14px 16px 14px 14px; vertical-align:middle;">
+                  <a href="{url}" style="text-decoration:none;">{thumb_html}</a>
+                </td>
+                <td style="padding:14px 14px 14px 0; vertical-align:middle;">
+                  <a href="{url}" style="text-decoration:none; font-size:17px; font-weight:400;
+                     color:#191c1e; line-height:1.4; display:block; margin-bottom:6px;">{title}</a>
+                  <div style="font-size:13px; color:#515f74; margin-bottom:10px;">
+                    <span style="color:#603e39;">핵심 통찰: </span>
+                  </div>
+                  <div>{channel_badge}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>''')
 
-    return (
-        '<div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:4px;">' +
-        "".join(cards) +
-        '</div>'
-    )
+    return f'<table cellpadding="0" cellspacing="0" width="100%">{"".join(rows)}</table>'
 
 
-def _build_topic_card(topic_data: Dict[str, Any], accent: str) -> str:
-    """주제 1개 → 카드형 HTML 블록 (썸네일, 채널명, 쟁점 배지, 공통 사실 포함)"""
-    topic        = topic_data.get("topic", "")
-    summary      = topic_data.get("summary", [])
-    pros         = topic_data.get("pros", [])
-    cons         = topic_data.get("cons", [])
-    common_facts = topic_data.get("common_facts", [])
-    controversies= topic_data.get("controversies", [])
-    sources      = topic_data.get("sources", [])
+def _build_topic_section(topic_data: Dict[str, Any]) -> str:
+    """주제 1개 → Figma 디자인 기반 섹션 HTML"""
+    topic         = topic_data.get("topic", "")
+    summary       = topic_data.get("summary", [])
+    cons          = topic_data.get("cons", [])
+    controversies = topic_data.get("controversies", [])
+    sources       = topic_data.get("sources", [])
 
-    summary_items = "".join(
-        f'<li style="margin-bottom:6px;">{s}</li>' for s in summary if s
-    )
-    pros_items = "".join(
-        f'<li style="margin-bottom:4px;">{p}</li>' for p in pros if p
-    )
-    cons_items = "".join(
-        f'<li style="margin-bottom:4px;">{c}</li>' for c in cons if c
-    )
+    # 왼쪽: 요약 (주요 스펙 및 혁신 포인트)
+    summary_text = " ".join(summary) if summary else "요약 정보가 없습니다."
 
-    pros_block = f'''
-        <div style="flex:1; background:#f0faf4; border-radius:8px; padding:12px;">
-          <div style="font-weight:700; color:#27AE60; margin-bottom:8px;">✅ 장점</div>
-          <ul style="margin:0; padding-left:18px; color:#444; font-size:0.88em;">{pros_items}</ul>
-        </div>''' if pros_items else ""
+    # 오른쪽: 우려/쟁점 (시장 기대 및 우려)
+    concern_items = [c for c in (cons + controversies) if c]
+    concern_text  = " ".join(concern_items) if concern_items else "관련 분석 정보가 없습니다."
 
-    cons_block = f'''
-        <div style="flex:1; background:#fdf0f0; border-radius:8px; padding:12px;">
-          <div style="font-weight:700; color:#E74C3C; margin-bottom:8px;">⚠️ 주의점</div>
-          <ul style="margin:0; padding-left:18px; color:#444; font-size:0.88em;">{cons_items}</ul>
-        </div>''' if cons_items else ""
-
-    pros_cons_row = (
-        f'<div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px;">' +
-        pros_block + cons_block +
-        '</div>'
-    ) if (pros_items or cons_items) else ""
-
-    controversy_html  = _controversy_badges(controversies, accent)
-    common_facts_html = _common_facts_block(common_facts)
-    source_html       = _source_cards(sources, accent)
+    source_html = _source_cards(sources)
 
     return f'''
-    <div style="background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08);
-                margin-bottom:24px; overflow:hidden; border-top:4px solid {accent};">
-      <!-- 주제 헤더 -->
-      <div style="padding:20px 24px 14px;">
-        <div style="font-size:1.05em; font-weight:800; color:#1a1a1a; margin-bottom:12px;">{topic}</div>
-
-        <!-- 쟁점 배지 -->
-        {controversy_html}
-
-        <!-- 요약 -->
-        <div style="background:#f8f9fa; border-radius:8px; padding:14px; margin-bottom:14px;">
-          <div style="font-weight:700; color:#555; font-size:0.82em;
-                      text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
-            📋 핵심 요약
+    <!-- 섹션: {topic} -->
+    <table cellpadding="0" cellspacing="0" width="100%"
+           style="margin-bottom:60px;">
+      <!-- 섹션 헤딩 -->
+      <tr>
+        <td style="padding-bottom:28px;">
+          <table cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="48" style="padding-right:14px; vertical-align:middle;">
+                <div style="width:48px; height:6px; border-radius:9999px;
+                            background:linear-gradient(135deg,#ff0000 0%,#eb0000 100%);"></div>
+              </td>
+              <td style="vertical-align:middle;">
+                <span style="font-size:26px; font-weight:700; color:#191c1e;
+                             letter-spacing:-0.5px;">{topic}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <!-- 2열 분석 -->
+      <tr>
+        <td style="padding-bottom:28px;">
+          <table cellpadding="0" cellspacing="0" width="100%">
+            <tr valign="top">
+              <!-- 왼쪽: 주요 스펙 -->
+              <td width="48%" style="padding-right:16px;">
+                <div style="margin-bottom:10px;">
+                  <span style="font-size:11px; font-weight:400; color:#ff0000;
+                               letter-spacing:1.2px; text-transform:uppercase;">
+                    &#9650; 주요 스펙 및 혁신 포인트
+                  </span>
+                </div>
+                <div style="font-size:16px; font-weight:400; color:#191c1e;
+                            line-height:1.625;">{summary_text}</div>
+              </td>
+              <!-- 오른쪽: 시장 기대 및 우려 -->
+              <td width="48%" style="padding-left:16px;">
+                <div style="margin-bottom:10px;">
+                  <span style="font-size:11px; font-weight:400; color:#0059ba;
+                               letter-spacing:1.2px; text-transform:uppercase;">
+                    &#8593; 시장 기대 및 우려
+                  </span>
+                </div>
+                <div style="font-size:16px; font-weight:400; color:#191c1e;
+                            line-height:1.625;">{concern_text}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <!-- 주요 소스 -->
+      <tr>
+        <td style="padding-top:10px;">
+          <div style="font-size:12px; font-weight:400; color:#515f74;
+                      letter-spacing:1.4px; text-transform:uppercase; margin-bottom:16px;">
+            주요 소스
           </div>
-          <ul style="margin:0; padding-left:18px; color:#333; font-size:0.9em; line-height:1.7;">
-            {summary_items}
-          </ul>
-        </div>
-
-        <!-- 공통 사실 -->
-        {common_facts_html}
-
-        <!-- 장단점 -->
-        {pros_cons_row}
-      </div>
-
-      <!-- 출처 영상 (썸네일 + 채널명) -->
-      <div style="background:#f8f9fa; padding:14px 20px; border-top:1px solid #eee;">
-        <div style="font-size:0.78em; color:#888; font-weight:600;
-                    text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">
-          🔗 출처 영상
-        </div>
-        {source_html}
-      </div>
-    </div>'''
+          {source_html}
+        </td>
+      </tr>
+    </table>'''
 
 
-def _format_html(newsletter: Dict[str, Any]) -> str:
-    """뉴스레터 딕셔너리 → 카드형 HTML 이메일 본문"""
-    subject      = newsletter.get("subject", "오늘의 유튜브 브리핑 🎬")
-    intent_type  = newsletter.get("intent_type", "지식형")
-    topics       = newsletter.get("topics", [])
+def _format_html(newsletter: Dict[str, Any], user_email: str = "",
+                 newsletter_type: str = "search") -> str:
+    """뉴스레터 딕셔너리 → Figma 디자인 기반 HTML 이메일"""
+    import datetime
+    subject  = newsletter.get("subject", "오늘의 유튜브 브리핑")
+    topics   = newsletter.get("topics", [])
+    now_str  = datetime.datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
 
-    accent       = _INTENT_COLOR.get(intent_type, "#4A90D9")
-    intent_label = _INTENT_LABEL.get(intent_type, "")
+    header_title = _HEADER_TITLE.get(newsletter_type, _HEADER_TITLE["search"])
+    header_badge = _HEADER_BADGE.get(newsletter_type, _HEADER_BADGE["search"])
 
-    cards = "".join(_build_topic_card(t, accent) for t in topics)
+    pills   = _keyword_pills(topics)
+    sections = "".join(_build_topic_section(t) for t in topics)
 
     return f'''<!DOCTYPE html>
 <html lang="ko">
@@ -213,39 +194,82 @@ def _format_html(newsletter: Dict[str, Any]) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{subject}</title>
 </head>
-<body style="margin:0; padding:0; background:#f0f2f5; font-family:'Apple SD Gothic Neo',
-             'Noto Sans KR', 'Segoe UI', sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;">
-    <tr><td align="center" style="padding:32px 16px;">
+<body style="margin:0; padding:0; background:#f7f9fb;
+             font-family:'Apple SD Gothic Neo','Noto Sans KR','Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f7f9fb;">
+    <tr><td align="center" style="padding:40px 16px 60px;">
       <table width="600" cellpadding="0" cellspacing="0"
-             style="max-width:600px; width:100%;">
+             style="max-width:600px; width:100%; background:#ffffff;
+                    border-radius:12px; border:1px solid rgba(235,187,180,0.1);
+                    box-shadow:0 2px 8px rgba(0,0,0,0.05); overflow:hidden;">
 
-        <!-- 헤더 -->
-        <tr><td style="background:{accent}; border-radius:12px 12px 0 0;
-                        padding:28px 32px 24px;">
-          <div style="color:rgba(255,255,255,0.8); font-size:0.78em;
-                      font-weight:600; letter-spacing:0.5px; margin-bottom:6px;">
-            ✦ Tubify &nbsp;·&nbsp; {intent_label}
-          </div>
-          <div style="color:#fff; font-size:1.4em; font-weight:800;
-                      line-height:1.3;">
-            {subject}
-          </div>
-        </td></tr>
+        <!-- 이메일 헤더 -->
+        <tr>
+          <td style="background:#f2f4f6; padding:28px 28px 24px;
+                     border-bottom:1px solid rgba(235,187,180,0.1);">
+            <!-- 제목 -->
+            <div style="font-size:22px; font-weight:600; color:#191c1e;
+                        letter-spacing:-0.5px; margin-bottom:12px; line-height:1.3;">
+              {header_title}
+            </div>
+            <!-- 뱃지 + 메타 -->
+            <table cellpadding="0" cellspacing="0">
+              <tr valign="middle">
+                <td style="padding-right:14px;">
+                  <span style="display:inline-block; background:#ff0000; border-radius:6px;
+                               padding:2px 10px; font-size:11px; color:#ffffff;
+                               font-weight:400; white-space:nowrap;">
+                    {header_badge}
+                  </span>
+                </td>
+                <td>
+                  <span style="font-size:13px; color:#515f74;">
+                    보낸사람:&nbsp;<strong style="color:#191c1e;">curator@tubify.com</strong>
+                    &nbsp;&nbsp;
+                    받는사람:&nbsp;<strong style="color:#191c1e;">{user_email or "subscriber@reader.com"}</strong>
+                    &nbsp;&nbsp;
+                    일시:&nbsp;<span style="color:#191c1e;">{now_str}</span>
+                  </span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-        <!-- 본문 -->
-        <tr><td style="background:#f0f2f5; padding:24px 0;">
-          {cards}
-        </td></tr>
+        <!-- 이메일 본문 -->
+        <tr>
+          <td style="background:#ffffff; padding:40px 28px 20px;">
+            <!-- 키워드 필터 필 -->
+            {pills}
+            <!-- 주제별 섹션 -->
+            {sections}
+          </td>
+        </tr>
 
-        <!-- 푸터 -->
-        <tr><td style="background:#fff; border-radius:0 0 12px 12px;
-                        padding:20px 32px; text-align:center;">
-          <p style="color:#aaa; font-size:0.78em; margin:0; line-height:1.6;">
-            Tubify — 유튜브 알고리즘 대신, 오늘 당신이 관심 가진 주제를 분석해드립니다.<br>
-            수신 거부는 대시보드에서 설정할 수 있습니다.
-          </p>
-        </td></tr>
+        <!-- 이메일 푸터 -->
+        <tr>
+          <td style="padding:48px 28px 36px; border-top:1px solid rgba(235,187,180,0.15);
+                     text-align:center;">
+            <div style="font-size:22px; font-weight:800; color:#ff0000;
+                        margin-bottom:24px; letter-spacing:-0.3px;">Tubify</div>
+            <table cellpadding="0" cellspacing="0" align="center">
+              <tr>
+                <td style="padding-right:10px;">
+                  <a href="https://tubify.app/mypage" style="display:inline-block;
+                     background:#e6e8ea; border-radius:8px; padding:10px 28px;
+                     font-size:13px; color:#191c1e; text-decoration:none;
+                     font-weight:400;">설정 관리</a>
+                </td>
+                <td>
+                  <a href="https://tubify.app/unsubscribe" style="display:inline-block;
+                     background:#e6e8ea; border-radius:8px; padding:10px 28px;
+                     font-size:13px; color:#191c1e; text-decoration:none;
+                     font-weight:400;">구독 해지</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
       </table>
     </td></tr>
@@ -257,19 +281,21 @@ def _format_html(newsletter: Dict[str, Any]) -> str:
 def send_email(
     user_email: str,
     newsletter: Dict[str, Any],
+    newsletter_type: str = "search",
 ) -> Dict[str, bool]:
     """
     Resend API를 통한 뉴스레터 발송
 
     INPUT:
-      - user_email (str)  — 수신자 이메일
-      - newsletter (Dict) — newsletter_ai 출력값
+      - user_email      (str)  — 수신자 이메일
+      - newsletter      (Dict) — newsletter_ai 출력값
+      - newsletter_type (str)  — "search" | "interest" (기본: "search")
 
     OUTPUT:
       - {"success": bool}
 
     ENV:
-      - RESEND_API_KEY   — Resend API 키 (필수)
+      - RESEND_API_KEY    — Resend API 키 (필수)
       - RESEND_FROM_EMAIL — 발신자 주소 (기본: curator@tubify.com)
     """
     if not RESEND_API_KEY:
@@ -277,7 +303,7 @@ def send_email(
         return {"success": False}
 
     subject   = newsletter.get("subject", "오늘의 유튜브 브리핑 🎬")
-    html_body = _format_html(newsletter)
+    html_body = _format_html(newsletter, user_email=user_email, newsletter_type=newsletter_type)
 
     try:
         response = resend.Emails.send({

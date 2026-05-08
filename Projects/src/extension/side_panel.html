@@ -5,6 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tubify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     * {
       box-sizing: border-box;
@@ -13,133 +16,191 @@
     }
 
     body {
-      font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
-      background: #111;
-      color: #f1f1f1;
+      font-family: "Noto Sans KR", "Segoe UI", sans-serif;
+      background: #f7f9fb;
+      color: #191c1e;
       min-height: 100vh;
-      font-size: 13px;
       display: flex;
       flex-direction: column;
+      font-size: 13px;
     }
 
+    /* ── 헤더 ── */
     .header {
-      background: #1a1a1a;
-      border-bottom: 1px solid #2a2a2a;
-      padding: 10px 14px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid #f2f4f6;
+      height: 64px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding: 0 20px 0 16px;
       flex-shrink: 0;
     }
 
-    .header-left {
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-logo-box {
+      width: 32px;
+      height: 32px;
+      background: red;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .header-logo-box svg {
+      width: 14px;
+      height: 14px;
+      fill: #fff;
+    }
+
+    .header-brand-text {
       display: flex;
       flex-direction: column;
-      gap: 1px;
+      gap: 2px;
     }
 
-    .logo {
-      font-weight: 800;
-      color: #ff4444;
-      font-size: 0.95rem;
-      letter-spacing: 0.5px;
+    .header-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #191c1e;
+      line-height: 1;
+      letter-spacing: -0.3px;
     }
 
-    .logo-sub {
-      font-size: 0.6rem;
-      color: #555;
-      letter-spacing: 1.5px;
+    .header-subtitle {
+      font-size: 9px;
+      font-weight: 500;
+      color: #515f74;
+      letter-spacing: 1px;
       text-transform: uppercase;
+      line-height: 1;
     }
 
     .header-actions {
       display: flex;
-      gap: 8px;
       align-items: center;
+      gap: 2px;
     }
 
     .icon-btn {
       background: none;
       border: none;
-      color: #555;
       cursor: pointer;
-      padding: 4px;
-      border-radius: 4px;
-      font-size: 0.9rem;
-      transition: color 0.15s;
+      padding: 8px;
+      border-radius: 9999px;
+      color: #515f74;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
       line-height: 1;
     }
 
     .icon-btn:hover {
-      color: #aaa;
+      background: #f2f4f6;
+      color: #191c1e;
     }
 
+    .icon-btn svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    /* ── 바디 레이아웃 ── */
     .body-wrap {
       display: flex;
       flex: 1;
       overflow: hidden;
     }
 
+    /* ── 사이드 탭 네비 ── */
     .tab-nav {
-      width: 42px;
-      background: #161616;
-      border-right: 1px solid #2a2a2a;
+      width: 56px;
+      background: #f8fafc;
+      border-right: 1px solid rgba(226, 232, 240, 0.6);
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 14px 0;
-      gap: 6px;
+      padding: 16px 0;
       flex-shrink: 0;
+      gap: 4px;
     }
 
     .tab-btn {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
-      padding: 8px 4px;
+      gap: 4px;
+      padding: 10px 4px;
       background: none;
       border: none;
-      border-radius: 6px;
+      border-right: 3px solid transparent;
+      border-radius: 2px 0 0 2px;
       cursor: pointer;
-      width: 36px;
-      transition: background 0.15s;
+      width: 100%;
+      transition: background 0.15s, border-color 0.15s;
     }
 
     .tab-btn:hover {
-      background: #222;
+      background: rgba(0, 0, 0, 0.04);
     }
 
     .tab-btn.active {
-      background: #2a1010;
+      border-right-color: red;
+      background: rgba(255, 0, 0, 0.06);
     }
 
     .tab-icon {
-      font-size: 1rem;
-      color: #555;
+      font-size: 16px;
+      color: #94a3b8;
+      line-height: 1;
       transition: color 0.15s;
     }
 
     .tab-btn.active .tab-icon {
-      color: #ff4444;
+      color: red;
     }
 
     .tab-label {
-      font-size: 0.52rem;
-      color: #444;
-      letter-spacing: 0.5px;
+      font-size: 7px;
+      font-weight: 800;
+      color: #94a3b8;
+      letter-spacing: 0.8px;
       text-transform: uppercase;
-      font-weight: 600;
+      line-height: 1;
+      transition: color 0.15s;
     }
 
     .tab-btn.active .tab-label {
-      color: #ff4444;
+      color: red;
     }
 
+    .tab-nav-spacer {
+      flex: 1;
+    }
+
+    .tab-btn-settings {
+      margin-top: auto;
+    }
+
+    /* ── 콘텐츠 영역 ── */
     .content-wrap {
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
+      background: #fff;
     }
 
     .content-wrap::-webkit-scrollbar {
@@ -147,200 +208,199 @@
     }
 
     .content-wrap::-webkit-scrollbar-track {
-      background: #111;
+      background: transparent;
     }
 
     .content-wrap::-webkit-scrollbar-thumb {
-      background: #2a2a2a;
+      background: #e6e8ea;
       border-radius: 2px;
     }
 
     .tab-panel {
       display: none;
-      padding: 14px 12px;
+      padding: 20px 16px;
     }
 
     .tab-panel.active {
       display: block;
     }
 
+    /* ── 키워드 타이틀 ── */
     .keyword-title {
-      font-size: 1.3rem;
-      font-weight: 800;
-      color: #f1f1f1;
-      margin-bottom: 4px;
-      line-height: 1.3;
+      font-size: 28px;
+      font-weight: 700;
+      color: #191c1e;
+      letter-spacing: -0.9px;
+      line-height: 1.25;
+      margin-bottom: 8px;
     }
 
     .keyword-underline {
-      width: 36px;
-      height: 3px;
-      background: #ff4444;
-      border-radius: 2px;
-      margin-bottom: 14px;
+      width: 40px;
+      height: 4px;
+      background: red;
+      border-radius: 9999px;
+      margin-bottom: 20px;
     }
 
+    /* ── 섹션 카드 ── */
     .section-block {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 10px;
+      background: #f2f4f6;
+      border-radius: 12px;
+      padding: 16px 16px 16px 20px;
+      margin-bottom: 12px;
+      border-left: 4px solid transparent;
+    }
+
+    .section-block.border-red {
+      border-left-color: red;
+    }
+
+    .section-block.border-gray {
+      border-left-color: #515f74;
     }
 
     .section-header {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
 
     .section-icon-box {
-      width: 26px;
-      height: 26px;
-      border-radius: 6px;
+      width: 20px;
+      height: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.85rem;
+      font-size: 13px;
       flex-shrink: 0;
     }
 
-    .icon-red {
-      background: #3a0f0f;
-      color: #ff6655;
-    }
-
-    .icon-blue {
-      background: #0f1a2e;
-      color: #6699ff;
-    }
-
-    .icon-yellow {
-      background: #1f1800;
-      color: #ffcc44;
-    }
-
-    .icon-gray {
-      background: #1e1e1e;
-      color: #888;
-    }
+    .icon-red   { color: red; }
+    .icon-blue  { color: #515f74; }
+    .icon-gray  { color: #515f74; }
+    .icon-yellow { color: #f59e0b; }
 
     .section-title-text {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #ddd;
-      line-height: 1.3;
+      font-size: 14px;
+      font-weight: 600;
+      color: #191c1e;
+      line-height: 1.4;
     }
 
+    /* ── 불릿 리스트 ── */
     .bullet-list {
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 10px;
     }
 
     .bullet-item {
       display: flex;
-      gap: 7px;
+      gap: 10px;
       align-items: flex-start;
-      font-size: 0.78rem;
-      color: #ccc;
-      line-height: 1.55;
+      font-size: 13px;
+      color: #603e39;
+      line-height: 1.65;
     }
 
     .bullet-dot {
       width: 5px;
       height: 5px;
       border-radius: 50%;
-      margin-top: 5px;
+      margin-top: 6px;
       flex-shrink: 0;
     }
 
-    .dot-red {
-      background: #ff4444;
-    }
+    .dot-red    { background: red; }
+    .dot-blue   { background: #515f74; }
+    .dot-yellow { background: #f59e0b; }
 
-    .dot-blue {
-      background: #6699ff;
-    }
-
-    .dot-yellow {
-      background: #ffcc44;
-    }
-
+    /* ── 결론 박스 ── */
     .conclusion-box {
-      background: #111;
-      border-left: 3px solid #ff4444;
+      background: #f2f4f6;
+      border-left: 4px solid red;
       border-radius: 0 8px 8px 0;
-      padding: 10px 12px;
-      margin-bottom: 10px;
-      font-size: 0.78rem;
-      color: #bbb;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #515f74;
       line-height: 1.65;
     }
 
+    /* ── 소스 섹션 헤더 ── */
     .source-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 10px;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
     }
 
     .source-title-text {
-      font-size: 0.72rem;
+      font-size: 14px;
       font-weight: 700;
-      color: #666;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
+      color: #191c1e;
+      border-bottom: 2px solid red;
+      padding-bottom: 4px;
     }
 
     .view-all-btn {
-      font-size: 0.68rem;
-      color: #ff4444;
+      font-size: 10px;
+      font-weight: 600;
+      color: #515f74;
       background: none;
       border: none;
       cursor: pointer;
+      letter-spacing: -0.5px;
+      text-transform: uppercase;
     }
 
+    .view-all-btn:hover {
+      color: #191c1e;
+    }
+
+    /* ── 비디오 카드 ── */
     .video-card {
-      background: #1a1a1a;
-      border: 1px solid #252525;
-      border-radius: 8px;
-      margin-bottom: 8px;
-      overflow: hidden;
-      transition: border-color 0.15s;
+      margin-bottom: 16px;
     }
 
-    .video-card:hover {
-      border-color: #3a3a3a;
+    .video-card:last-child {
+      margin-bottom: 0;
     }
 
     .video-card-inner {
       display: flex;
-      gap: 10px;
-      padding: 10px;
+      gap: 12px;
       align-items: flex-start;
     }
 
-    .video-thumb {
-      width: 76px;
-      height: 48px;
-      object-fit: cover;
-      border-radius: 5px;
+    .video-thumb-wrap {
+      position: relative;
+      width: 96px;
       flex-shrink: 0;
-      background: #222;
+    }
+
+    .video-thumb {
+      width: 96px;
+      aspect-ratio: 16/9;
+      object-fit: cover;
+      border-radius: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+      display: block;
     }
 
     .video-thumb-placeholder {
-      width: 76px;
-      height: 48px;
-      border-radius: 5px;
-      background: #222;
+      width: 96px;
+      aspect-ratio: 16/9;
+      border-radius: 6px;
+      background: #e6e8ea;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #444;
-      font-size: 1.2rem;
+      color: #94a3b8;
+      font-size: 18px;
       flex-shrink: 0;
     }
 
@@ -350,33 +410,31 @@
     }
 
     .video-title-text {
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: #e0e0e0;
-      line-height: 1.4;
+      font-size: 12px;
+      font-weight: 500;
+      color: #191c1e;
+      line-height: 1.5;
       display: -webkit-box;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
-      line-clamp: 2;
       overflow: hidden;
       text-overflow: ellipsis;
-      word-break: break-all;
-      margin-bottom: 5px;
+      word-break: break-word;
+      margin-bottom: 4px;
       text-decoration: none;
     }
 
     .video-title-text:hover {
-      color: #ff6655;
+      color: red;
     }
 
     .video-subtitle {
-      font-size: 0.7rem;
-      color: #777;
-      line-height: 1.4;
+      font-size: 11px;
+      color: #515f74;
+      line-height: 1.5;
       display: -webkit-box;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
-      line-clamp: 2;
       overflow: hidden;
       text-overflow: ellipsis;
       margin-bottom: 6px;
@@ -384,254 +442,302 @@
 
     .video-meta-row {
       display: flex;
-      gap: 5px;
+      gap: 4px;
       flex-wrap: wrap;
       align-items: center;
     }
 
     .channel-badge {
-      font-size: 0.65rem;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-weight: 600;
-      background: #222;
-      color: #888;
-      border: 1px solid #2a2a2a;
+      font-size: 9px;
+      font-weight: 500;
+      color: #515f74;
+      text-transform: uppercase;
+      letter-spacing: -0.25px;
     }
 
     .badge {
-      font-size: 0.65rem;
+      font-size: 10px;
       padding: 2px 6px;
-      border-radius: 3px;
+      border-radius: 4px;
       font-weight: 600;
     }
 
-    .badge-ad {
-      background: #2a1010;
-      color: #ff5555;
-      border: 1px solid #441111;
-    }
+    .badge-ad   { background: #fee2e2; color: #dc2626; }
+    .badge-noad { background: #dcfce7; color: #16a34a; }
+    .badge-cred { background: #eff6ff; color: #2563eb; }
 
-    .badge-noad {
-      background: #0f1f14;
-      color: #44cc66;
-      border: 1px solid #1a3a22;
-    }
-
-    .badge-cred {
-      background: #111827;
-      color: #6699ff;
-      border: 1px solid #1e2d4a;
-    }
-
+    /* ── 로딩 ── */
     .loading-wrap {
-      padding: 24px 14px;
+      padding: 20px 0;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
     .step-row {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 12px;
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 8px;
+      padding: 12px 14px;
+      background: #f2f4f6;
+      border: 1px solid #e6e8ea;
+      border-radius: 10px;
       transition: all 0.3s;
     }
 
     .step-row.active {
-      border-color: #ff4444;
-      background: #1f1010;
+      background: #fff5f5;
+      border-color: rgba(255, 0, 0, 0.2);
     }
 
     .step-row.done {
-      border-color: #44cc66;
-      background: #0f1f14;
+      background: #f0fdf4;
+      border-color: rgba(22, 163, 74, 0.2);
     }
 
     .step-icon-wrap {
       width: 20px;
       text-align: center;
+      color: #94a3b8;
     }
+
+    .step-row.active .step-icon-wrap { color: red; }
+    .step-row.done  .step-icon-wrap  { color: #16a34a; }
 
     .step-label-text {
-      font-size: 0.8rem;
-      color: #666;
+      font-size: 13px;
+      color: #515f74;
+      font-weight: 500;
     }
 
-    .step-row.active .step-label-text {
-      color: #ff4444;
-    }
-
-    .step-row.done .step-label-text {
-      color: #44cc66;
-    }
+    .step-row.active .step-label-text { color: red; }
+    .step-row.done  .step-label-text  { color: #16a34a; }
 
     @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
+      to { transform: rotate(360deg); }
     }
 
     .spinner {
       display: inline-block;
-      width: 13px;
-      height: 13px;
-      border: 2px solid #333;
-      border-top-color: #ff4444;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #e6e8ea;
+      border-top-color: red;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
     }
 
+    /* ── 상태 화면 ── */
     .state-screen {
-      padding: 40px 16px;
+      padding: 48px 20px;
       text-align: center;
-      color: #555;
-      font-size: 0.85rem;
+      color: #515f74;
+      font-size: 14px;
       line-height: 1.8;
     }
 
     .state-screen .icon {
       font-size: 2rem;
       display: block;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
 
     .btn-primary {
-      margin-top: 14px;
-      padding: 9px 22px;
-      background: #ff4444;
+      margin-top: 16px;
+      padding: 10px 24px;
+      background: red;
       color: #fff;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-primary:hover { background: #cc0000; }
+
+    .btn-retry {
+      margin-top: 12px;
+      padding: 8px 20px;
+      background: #fff;
+      color: red;
+      border: 1px solid rgba(255, 0, 0, 0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-retry:hover { background: #fff5f5; }
+
+    .error-msg {
+      color: #dc2626;
+      font-size: 13px;
+      line-height: 1.6;
       font-weight: 600;
     }
 
-    .btn-primary:hover {
-      background: #cc2222;
-    }
-
-    .btn-retry {
-      margin-top: 10px;
-      padding: 7px 18px;
-      background: #2a1010;
-      color: #ff6655;
-      border: 1px solid #441111;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-
-    .btn-retry:hover {
-      background: #3a1515;
-    }
-
-    .error-msg {
-      color: #ff6666;
-      font-size: 0.82rem;
-      line-height: 1.6;
-    }
-
     .error-sub {
-      color: #555;
-      font-size: 0.75rem;
+      color: #515f74;
+      font-size: 12px;
       margin-top: 4px;
     }
 
-    .hidden {
-      display: none !important;
+    .hidden { display: none !important; }
+
+    /* ── 캐시 안내 ── */
+    .cache-notice {
+      margin-bottom: 12px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: #f2f4f6;
+      border: 1px solid #e6e8ea;
+      font-size: 11px;
+      color: #515f74;
+    }
+
+    /* ── 카테고리 뱃지 ── */
+    .category-badge {
+      display: inline-block;
+      margin-bottom: 14px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 9999px;
     }
   </style>
 </head>
 
 <body>
 
+  <!-- 헤더 -->
   <div class="header">
-    <div class="header-left">
-      <div class="logo">Tubify</div>
-      <div class="logo-sub">The Intelligent Curator</div>
+    <div class="header-brand">
+      <div class="header-logo-box">
+        <!-- 신문/요약 아이콘 -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="3" width="18" height="3" rx="1"/>
+          <rect x="3" y="9" width="11" height="2" rx="1"/>
+          <rect x="3" y="13" width="11" height="2" rx="1"/>
+          <rect x="3" y="17" width="7" height="2" rx="1"/>
+        </svg>
+      </div>
+      <div class="header-brand-text">
+        <span class="header-title">Tubify</span>
+        <span class="header-subtitle">THE INTELLIGENT CURATOR</span>
+      </div>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" id="btn-refresh" title="새로고침">&#8635;</button>
+      <!-- 새로고침 -->
+      <button class="icon-btn" id="btn-refresh" title="새로고침">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
     </div>
   </div>
 
+  <!-- 로그인 필요 -->
   <div id="screen-login" class="state-screen hidden">
-    <span class="icon">&#128274;</span>
+    <span class="icon">🔒</span>
     AI 분석을 보려면<br>로그인이 필요합니다.
     <br><button class="btn-primary" id="btn-login">Google 로그인</button>
   </div>
 
+  <!-- 유튜브에서 검색 유도 -->
   <div id="screen-empty" class="state-screen hidden">
-    <span class="icon">&#128269;</span>
+    <span class="icon">🔍</span>
     유튜브에서 검색하면<br>AI 분석이 시작됩니다.
   </div>
 
+  <!-- 로딩 -->
   <div id="screen-loading" class="hidden">
-    <div class="loading-wrap">
-      <div class="step-row" id="s1">
-        <div class="step-icon-wrap" id="s1-icon">&#128269;</div><span class="step-label-text">영상 검색 중...</span>
-      </div>
-      <div class="step-row" id="s2">
-        <div class="step-icon-wrap" id="s2-icon">&#128221;</div><span class="step-label-text">자막 분석 중...</span>
-      </div>
-      <div class="step-row" id="s3">
-        <div class="step-icon-wrap" id="s3-icon">&#129302;</div><span class="step-label-text">AI 교차 분석 중...</span>
+    <div style="padding: 20px 16px;">
+      <div class="loading-wrap">
+        <div class="step-row" id="s1">
+          <div class="step-icon-wrap" id="s1-icon">🔍</div>
+          <span class="step-label-text">영상 검색 중...</span>
+        </div>
+        <div class="step-row" id="s2">
+          <div class="step-icon-wrap" id="s2-icon">📝</div>
+          <span class="step-label-text">자막 분석 중...</span>
+        </div>
+        <div class="step-row" id="s3">
+          <div class="step-icon-wrap" id="s3-icon">🤖</div>
+          <span class="step-label-text">AI 교차 분석 중...</span>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- 오류 -->
   <div id="screen-error" class="state-screen hidden">
-    <span class="icon">&#9888;&#65039;</span>
+    <span class="icon">⚠️</span>
     <div class="error-msg" id="err-msg">분석 중 오류가 발생했습니다.</div>
     <div class="error-sub" id="err-sub"></div>
     <button class="btn-retry" id="btn-retry">다시 시도</button>
   </div>
 
+  <!-- 결과 -->
   <div id="screen-results" class="body-wrap hidden">
+
+    <!-- 사이드 탭 네비 -->
     <div class="tab-nav">
-      <button class="tab-btn active" data-tab="summary" title="요약">
-        <span class="tab-icon">&#128203;</span>
-        <span class="tab-label">SUMM</span>
+      <button class="tab-btn active" data-tab="summary" title="인사이트">
+        <span class="tab-icon">📋</span>
+        <span class="tab-label">INSIGHTS</span>
       </button>
-      <button class="tab-btn" data-tab="insights" title="인사이트">
-        <span class="tab-icon">&#128161;</span>
-        <span class="tab-label">INSIG</span>
+      <button class="tab-btn" data-tab="insights" title="AI 결론">
+        <span class="tab-icon">💡</span>
+        <span class="tab-label">AI</span>
       </button>
       <button class="tab-btn" data-tab="sources" title="소스">
-        <span class="tab-icon">&#128279;</span>
-        <span class="tab-label">SRC</span>
+        <span class="tab-icon">🔗</span>
+        <span class="tab-label">SOURCES</span>
+      </button>
+      <div class="tab-nav-spacer"></div>
+      <button class="tab-btn tab-btn-settings" title="설정" onclick="window.open('https://tubify.app/settings')">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-label">SETTINGS</span>
       </button>
     </div>
+
+    <!-- 콘텐츠 -->
     <div class="content-wrap">
+
+      <!-- 요약 탭 -->
       <div id="tab-summary" class="tab-panel active">
         <div class="keyword-title" id="kw-title-s">-</div>
         <div class="keyword-underline"></div>
         <div id="summary-sections"></div>
       </div>
+
+      <!-- 인사이트 탭 -->
       <div id="tab-insights" class="tab-panel">
         <div class="keyword-title" id="kw-title-i">-</div>
         <div class="keyword-underline"></div>
         <div id="insights-sections"></div>
       </div>
+
+      <!-- 소스 탭 -->
       <div id="tab-sources" class="tab-panel">
         <div class="source-header">
-          <span class="source-title-text">주요 소스 및 통찰</span>
+          <span class="source-title-text">주요 소스</span>
           <button class="view-all-btn">VIEW ALL</button>
         </div>
         <div id="sources-list"></div>
       </div>
+
     </div>
   </div>
 
   <script src="config.js"></script>
   <script src="side_panel.js"></script>
-
 </body>
 
 </html>

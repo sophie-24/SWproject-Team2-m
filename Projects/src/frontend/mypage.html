@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tubify — 마이페이지</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans KR", "Segoe UI", sans-serif;
+      background: #f7f9fb;
+      color: #191c1e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── 네비게이션 ── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      background: rgba(247, 249, 251, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    }
+
+    .nav-logo {
+      font-size: 24px;
+      font-weight: 800;
+      color: red;
+      letter-spacing: -0.02em;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .nav-link {
+      font-size: 18px;
+      font-weight: 500;
+      color: #191c1e;
+      text-decoration: none;
+      letter-spacing: -0.025em;
+      transition: color 0.15s;
+    }
+
+    .nav-link:hover { color: #bc0100; }
+
+    .nav-link.active {
+      font-weight: 600;
+      color: #bc0100;
+      border-bottom: 2px solid #bc0100;
+      padding-bottom: 2px;
+    }
+
+    .nav-logout {
+      background: #e6e8ea;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .nav-logout:hover { background: #d1d5db; }
+
+    /* ── 메인 ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 80px 24px 0;
+    }
+
+    .page-container {
+      width: 100%;
+      max-width: 848px;
+      display: flex;
+      flex-direction: column;
+      gap: 64px;
+      padding-bottom: 80px;
+    }
+
+    /* 페이지 제목 */
+    .page-title {
+      font-size: 36px;
+      font-weight: 800;
+      color: #191c1e;
+      text-align: center;
+      letter-spacing: -0.025em;
+      line-height: 1.1;
+    }
+
+    /* ── 프로필 카드 ── */
+    .profile-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(25, 28, 30, 0.04);
+      padding: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .profile-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .profile-name {
+      font-size: 24px;
+      font-weight: 700;
+      color: #191c1e;
+      line-height: 1.33;
+    }
+
+    .profile-email {
+      font-size: 16px;
+      font-weight: 400;
+      color: #515f74;
+      line-height: 1.5;
+    }
+
+    .btn-edit {
+      background: #e6e8ea;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #191c1e;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .btn-edit:hover { background: #d1d5db; }
+
+    /* ── 관심사 섹션 ── */
+    .interest-section {
+      background: #f2f4f6;
+      border-radius: 12px;
+      box-shadow: 0 20px 20px rgba(25, 28, 30, 0.04);
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .interest-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .interest-icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+      color: red;
+    }
+
+    .interest-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #191c1e;
+      line-height: 1.4;
+    }
+
+    .interest-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .interest-tag {
+      background: #fff;
+      border: 1px solid #e0e3e5;
+      border-radius: 9999px;
+      padding: 13px 25px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #57657a;
+      line-height: 1.5;
+      white-space: nowrap;
+    }
+
+    .interest-tags-empty {
+      font-size: 14px;
+      color: #515f74;
+      margin-bottom: 32px;
+    }
+
+    .btn-edit-interest {
+      display: inline-flex;
+      align-items: center;
+      background: #bc0100;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 48px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 0 10px rgba(188, 1, 0, 0.1);
+      transition: background 0.15s;
+      text-decoration: none;
+    }
+
+    .btn-edit-interest:hover { background: #9a0000; }
+
+    /* ── 액션 행 ── */
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid #e0e3e5;
+      padding: 34px 0 33px;
+    }
+
+    .action-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .action-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #191c1e;
+      line-height: 1.5;
+    }
+
+    .action-desc {
+      font-size: 14px;
+      font-weight: 400;
+      color: #515f74;
+      line-height: 1.43;
+    }
+
+    .btn-action {
+      background: #e6e8ea;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #191c1e;
+      cursor: pointer;
+      font-family: inherit;
+      flex-shrink: 0;
+      transition: background 0.15s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .btn-action:hover { background: #d1d5db; }
+
+    .btn-action.danger {
+      color: #dc2626;
+    }
+
+    .btn-action.danger:hover {
+      background: #fee2e2;
+    }
+
+    /* ── 푸터 ── */
+    .footer {
+      border-top: 1px solid rgba(244, 244, 245, 0.1);
+      padding: 48px 24px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .footer-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: red;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 32px;
+    }
+
+    .footer-links a {
+      font-size: 14px;
+      color: #71717a;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-links a:hover { color: #191c1e; }
+
+    .footer-copy {
+      margin-left: auto;
+      font-size: 14px;
+      color: #71717a;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- 네비게이션 -->
+  <nav class="nav">
+    <a href="/dashboard.html" class="nav-logo">Tubify</a>
+    <div class="nav-links">
+      <a href="/dashboard.html" class="nav-link">홈</a>
+      <a href="/mypage.html" class="nav-link active">마이페이지</a>
+    </div>
+    <button class="nav-logout" onclick="logout()">로그아웃</button>
+  </nav>
+
+  <!-- 메인 -->
+  <main class="main">
+    <div class="page-container">
+
+      <!-- 페이지 제목 -->
+      <h1 class="page-title">마이페이지</h1>
+
+      <!-- 프로필 카드 -->
+      <div class="profile-card">
+        <div class="profile-info">
+          <div class="profile-name" id="profile-name">-</div>
+          <div class="profile-email" id="profile-email">-</div>
+        </div>
+        <button class="btn-edit" onclick="alert('프로필 수정 기능은 준비 중입니다.')">Edit Profile</button>
+      </div>
+
+      <!-- 관심사 섹션 -->
+      <div class="interest-section">
+        <div class="interest-header">
+          <!-- 스파클 아이콘 -->
+          <svg class="interest-icon" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11 2L12.5 9L19 11L12.5 13L11 20L9.5 13L3 11L9.5 9L11 2Z" fill="currentColor"/>
+          </svg>
+          <span class="interest-title" id="interest-title">관심사</span>
+        </div>
+        <div class="interest-tags" id="interest-tags">
+          <span class="interest-tags-empty">관심사를 불러오는 중...</span>
+        </div>
+        <a href="/home.html?from=dashboard" class="btn-edit-interest">관심사 수정</a>
+      </div>
+
+      <!-- 이용 가이드 -->
+      <div class="action-row">
+        <div class="action-info">
+          <span class="action-title">이용 가이드</span>
+          <span class="action-desc">탈퇴 시 회원정보는 개인정보 처리방침에 의해 처리됩니다.</span>
+        </div>
+        <a href="/intro.html" class="btn-action">보러 가기</a>
+      </div>
+
+      <!-- 회원 탈퇴 -->
+      <div class="action-row">
+        <div class="action-info">
+          <span class="action-title">회원 탈퇴</span>
+          <span class="action-desc">탈퇴 시 회원정보는 개인정보 처리방침에 의해 처리됩니다.</span>
+        </div>
+        <button class="btn-action danger" onclick="confirmWithdraw()">회원 탈퇴</button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- 푸터 -->
+  <footer class="footer">
+    <span class="footer-logo">Tubify</span>
+    <div class="footer-links">
+      <a href="/privacy.html">개인정보처리방침</a>
+      <a href="/terms.html">이용약관</a>
+    </div>
+    <span class="footer-copy">© 2026 Tubify. 보고 싶은 것만. 핵심만.</span>
+  </footer>
+
+  <script>
+    const API = "";
+
+    async function loadProfile() {
+      const jwt = localStorage.getItem("access_token");
+      if (!jwt) { window.location.href = "/"; return; }
+
+      try {
+        const res = await fetch(`${API}/my/profile`, {
+          headers: { "Authorization": `Bearer ${jwt}` }
+        });
+        if (res.status === 401) { window.location.href = "/"; return; }
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const name = data.name || data.display_name || data.email?.split("@")[0] || "사용자";
+        const email = data.email || "";
+        const interests = Array.isArray(data.interest_categories) ? data.interest_categories : [];
+
+        document.getElementById("profile-name").textContent = name;
+        document.getElementById("profile-email").textContent = email;
+        document.getElementById("interest-title").textContent = `${name} 님의 관심사`;
+
+        const tagsEl = document.getElementById("interest-tags");
+        if (interests.length > 0) {
+          tagsEl.innerHTML = interests.map(
+            t => `<span class="interest-tag">${escHtml(t)}</span>`
+          ).join("");
+        } else {
+          tagsEl.innerHTML = `<span class="interest-tags-empty">아직 설정된 관심사가 없어요.</span>`;
+        }
+      } catch (e) {
+        console.warn("[mypage] 프로필 로드 실패:", e);
+      }
+    }
+
+    async function confirmWithdraw() {
+      if (!confirm("정말 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.")) return;
+
+      const jwt = localStorage.getItem("access_token");
+      try {
+        const res = await fetch(`${API}/my/withdraw`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${jwt}` }
+        });
+        if (res.ok) {
+          alert("탈퇴가 완료되었습니다.");
+          logout();
+        } else {
+          alert("탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+        }
+      } catch (e) {
+        alert("서버에 연결할 수 없습니다. 다시 시도해주세요.");
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem("access_token");
+      sessionStorage.removeItem("loggedIn");
+      window.location.href = "/";
+    }
+
+    function escHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    loadProfile();
+  </script>
+</body>
+
+</html>
