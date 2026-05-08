@@ -485,7 +485,6 @@ async def my_profile(
         except Exception:
             pass
 
-<<<<<<< HEAD
     # send_time JSON 배열에서 아침(첫 번째)·저녁(마지막) 분리해서 반환
     import json as _json_p
     try:
@@ -500,18 +499,6 @@ async def my_profile(
         "email":               db_user.email,
         "send_time":           evening_time,
         "morning_send_time":   morning_time,
-=======
-    # send_time JSON 배열 파싱 후 반환
-    try:
-        times = _json.loads(db_user.send_time or '["21:00"]')
-        times = times if isinstance(times, list) and times else ["21:00"]
-    except Exception:
-        times = ["21:00"]
-
-    return {
-        "email":               db_user.email,
-        "send_times":          times,
->>>>>>> feature/onboarding-time-interest-flow-fe
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
         "is_subscribed":       db_user.is_subscribed,
@@ -520,12 +507,8 @@ async def my_profile(
 
 
 class ProfileUpdateData(BaseModel):
-<<<<<<< HEAD
     send_time:           Optional[str]       = None  # "HH:MM" 저녁 발송 시간
     morning_send_time:   Optional[str]       = None  # "HH:MM" 아침 발송 시간 — 내부적으로 send_time JSON 배열에 합산
-=======
-    send_times:          Optional[list[str]] = None  # ["HH:MM", ...] — send_time 컬럼에 JSON 배열로 저장
->>>>>>> feature/onboarding-time-interest-flow-fe
     interest_categories: Optional[list[str]] = None  # 관심사 카테고리 목록
 
 
@@ -549,7 +532,6 @@ async def update_my_profile(
 
     time_re = re.compile(r'^\d{2}:\d{2}$')
 
-<<<<<<< HEAD
     # send_time / morning_send_time → JSON 배열로 합산해 저장
     if data.send_time is not None or data.morning_send_time is not None:
         if data.send_time and not time_re.match(data.send_time):
@@ -569,14 +551,6 @@ async def update_my_profile(
         new_morning = data.morning_send_time if data.morning_send_time is not None else cur_morning
         new_evening = data.send_time         if data.send_time         is not None else cur_evening
         db_user.send_time = _json.dumps(sorted(list({new_morning, new_evening})), ensure_ascii=False)
-=======
-    # send_times → 유효성 검사 후 JSON 배열로 저장
-    if data.send_times is not None:
-        for t in data.send_times:
-            if not time_re.match(t):
-                raise HTTPException(status_code=400, detail=f"send_times 형식은 HH:MM이어야 합니다: {t}")
-        db_user.send_time = _json.dumps(sorted(data.send_times), ensure_ascii=False)
->>>>>>> feature/onboarding-time-interest-flow-fe
 
     if data.interest_categories is not None:
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
@@ -808,6 +782,30 @@ async def resubscribe(
 
     logger.info(f"[resubscribe] {user['user_id']} 수신 재신청 완료")
     return {"success": True, "message": "수신 신청이 완료되었습니다."}
+
+
+@app.delete("/my/withdraw")
+async def withdraw(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    회원 탈퇴 — 사용자 계정 및 관련 데이터 삭제.
+    users, user_interests, behavior_logs, newsletters 모두 제거.
+    """
+    from database import User, UserInterest, BehaviorLog, Newsletter
+    from sqlalchemy import delete as sql_delete
+
+    user_id = user["user_id"]
+
+    await db.execute(sql_delete(Newsletter).where(Newsletter.user_id == user_id))
+    await db.execute(sql_delete(BehaviorLog).where(BehaviorLog.user_id == user_id))
+    await db.execute(sql_delete(UserInterest).where(UserInterest.user_id == user_id))
+    await db.execute(sql_delete(User).where(User.google_id == user_id))
+    await db.commit()
+
+    logger.info(f"[withdraw] {user_id} 회원 탈퇴 완료")
+    return {"success": True}
 
 
 # ── YouTube ───────────────────────────────────────────────────────────────────

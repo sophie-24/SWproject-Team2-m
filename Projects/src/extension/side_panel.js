@@ -68,24 +68,24 @@ function renderResults(data) {
   /* 캐시 히트 안내 배너 */
   var cacheNotice = "";
   if (cached) {
-    cacheNotice = '<div style="margin-bottom:10px;padding:5px 10px;border-radius:8px;background:#1a1a1a;border:1px solid #333;font-size:0.72rem;color:#888;">⚡ 기존 분석 결과입니다</div>';
+    cacheNotice = '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>';
   }
 
   var summaryHTML = cacheNotice;
   if (category) {
-    summaryHTML += '<div style="margin-bottom:10px;"><span style="font-size:0.68rem;font-weight:700;padding:3px 9px;border-radius:10px;background:' + theme.bg + ';color:' + theme.color + ';border:1px solid ' + theme.border + ';letter-spacing:.3px;">' + esc(category) + '</span></div>';
+    summaryHTML += '<div class="category-badge" style="background:' + theme.bg + ';color:' + theme.color + ';border:1px solid ' + theme.border + '">' + esc(category) + '</div>';
   }
   if (summaryLines.length) {
     var bullets = summaryLines.map(function (l) {
       return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
     }).join("");
-    summaryHTML += '<div class="section-block"><div class="section-header"><div class="section-icon-box icon-red">&#9889;</div><div class="section-title-text">주요 혁신 및 스펙 요약</div></div><div class="bullet-list">' + bullets + '</div></div>';
+    summaryHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">⚡</div><div class="section-title-text">주요 혁신 및 스펙 요약</div></div><div class="bullet-list">' + bullets + '</div></div>';
   }
   if (commonFacts.length) {
     var factBullets = commonFacts.map(function (f) {
       return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
     }).join("");
-    summaryHTML += '<div class="section-block"><div class="section-header"><div class="section-icon-box icon-gray">&#128202;</div><div class="section-title-text">시장 기대 및 전문가 분석</div></div><div class="bullet-list">' + factBullets + '</div></div>';
+    summaryHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">📊</div><div class="section-title-text">시장 기대 및 전문가 분석</div></div><div class="bullet-list">' + factBullets + '</div></div>';
   }
   document.getElementById("summary-sections").innerHTML = summaryHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">요약 정보가 없습니다.</div>';
 
@@ -105,13 +105,13 @@ function renderResults(data) {
     document.getElementById("sources-list").innerHTML = videos.map(function (v) {
       var vid = v.video_id || v.id || "";
       var thumb = v.thumbnail_url
-        ? '<img class="video-thumb" src="' + esc(v.thumbnail_url) + '" alt="" loading="lazy">'
-        : '<div class="video-thumb-placeholder">&#9654;</div>';
+        ? '<div class="video-thumb-wrap"><a href="https://youtube.com/watch?v=' + esc(vid) + '" target="_blank"><img class="video-thumb" src="' + esc(v.thumbnail_url) + '" alt="" loading="lazy"></a></div>'
+        : '<div class="video-thumb-placeholder">▶</div>';
       var adBadge   = v.ad_detected ? '<span class="badge badge-ad">광고 포함</span>' : '<span class="badge badge-noad">광고 없음</span>';
       var credBadge = v.credibility_score != null ? '<span class="badge badge-cred">신뢰도 ' + Math.round(v.credibility_score * 100) + '%</span>' : "";
-      var chBadge   = v.channel_title ? '<span class="channel-badge">' + esc(v.channel_title) + '</span>' : "";
+      var chBadge   = v.channel_title ? '<span class="channel-badge">' + esc(v.channel_title).toUpperCase() + '</span>' : "";
       var url = "https://youtube.com/watch?v=" + esc(vid);
-      return '<div class="video-card"><div class="video-card-inner"><a href="' + url + '" target="_blank">' + thumb + '</a><div class="video-info"><a class="video-title-text" href="' + url + '" target="_blank">' + esc(v.title) + '</a>' + (v.summary ? '<div class="video-subtitle">' + esc(v.summary) + '</div>' : "") + '<div class="video-meta-row">' + chBadge + adBadge + credBadge + '</div></div></div></div>';
+      return '<div class="video-card"><div class="video-card-inner">' + thumb + '<div class="video-info"><a class="video-title-text" href="' + url + '" target="_blank">' + esc(v.title) + '</a>' + (v.summary ? '<div class="video-subtitle">' + esc(v.summary) + '</div>' : "") + '<div class="video-meta-row">' + chBadge + adBadge + credBadge + '</div></div></div></div>';
     }).join("");
   } else {
     document.getElementById("sources-list").innerHTML = '<div style="color:#555;font-size:0.82rem;padding:10px 0;">영상 정보가 없습니다.</div>';

@@ -73,10 +73,12 @@ async def _save_newsletter(
     return record
 
 
-async def _deliver_newsletter(user: User, newsletter: Dict[str, Any]) -> Dict[str, Any]:
+async def _deliver_newsletter(
+    user: User, newsletter: Dict[str, Any], newsletter_type: str = "interest"
+) -> Dict[str, Any]:
     """이메일 발송 후 결과 딕셔너리 반환. {"success": bool, "error": str(optional)}"""
     try:
-        result = send_email(user_email=user.email, newsletter=newsletter)
+        result = send_email(user_email=user.email, newsletter=newsletter, newsletter_type=newsletter_type)
         if result is None:
             return {"success": True}
         return result
