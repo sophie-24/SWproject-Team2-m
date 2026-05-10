@@ -14,7 +14,7 @@ CREATE TABLE users (
     google_id VARCHAR(255) UNIQUE NOT NULL, -- 로그인 식별용
     email VARCHAR(255) UNIQUE NOT NULL,
     interest_categories JSONB DEFAULT '[]',
-    send_time TIME NOT NULL DEFAULT '["08:00", "20:00"]',
+    send_time JSONB NOT NULL DEFAULT '["08:00", "20:00"]'::jsonb,
     is_subscribed BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- started_at에서 변경
 );
