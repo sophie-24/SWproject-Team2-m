@@ -485,22 +485,6 @@ async def my_profile(
         except Exception:
             pass
 
-<<<<<<< HEAD
-    # send_time JSON 배열에서 아침(첫 번째)·저녁(마지막) 분리해서 반환
-    import json as _json_p
-    try:
-        times = _json_p.loads(db_user.send_time or '["21:00"]')
-        times = times if isinstance(times, list) and times else ["21:00"]
-    except Exception:
-        times = ["21:00"]
-    morning_time = times[0] if len(times) > 1 else "08:00"
-    evening_time = times[-1]
-
-    return {
-        "email":               db_user.email,
-        "send_time":           evening_time,
-        "morning_send_time":   morning_time,
-=======
     # send_time JSON 배열 파싱 후 반환
     try:
         times = _json.loads(db_user.send_time or '["21:00"]')
@@ -511,7 +495,6 @@ async def my_profile(
     return {
         "email":               db_user.email,
         "send_times":          times,
->>>>>>> feature/onboarding-time-interest-flow-fe
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
         "is_subscribed":       db_user.is_subscribed,
@@ -520,12 +503,10 @@ async def my_profile(
 
 
 class ProfileUpdateData(BaseModel):
-<<<<<<< HEAD
-    send_time:           Optional[str]       = None  # "HH:MM" 저녁 발송 시간
-    morning_send_time:   Optional[str]       = None  # "HH:MM" 아침 발송 시간 — 내부적으로 send_time JSON 배열에 합산
-=======
     send_times:          Optional[list[str]] = None  # ["HH:MM", ...] — send_time 컬럼에 JSON 배열로 저장
->>>>>>> feature/onboarding-time-interest-flow-fe
+    # ── 하위 호환 필드 (mypage.html 등 구형 프론트가 개별 필드로 전송하는 경우 수용) ─────────
+    send_time:           Optional[str]       = None  # "HH:MM" — 저녁 발송 시간 (단독 전송 시 사용)
+    morning_send_time:   Optional[str]       = None  # "HH:MM" — 아침 발송 시간 (단독 전송 시 사용)
     interest_categories: Optional[list[str]] = None  # 관심사 카테고리 목록
 
 
@@ -537,6 +518,7 @@ async def update_my_profile(
 ):
     """발송 시간 / 관심사 수정.
     관심사 변경 시 user_interests에 신규 카테고리만 추가 (기존 weight 유지).
+    send_times 배열 또는 구형 send_time/morning_send_time 개별 필드 모두 수용.
     """
     import re, json as _json
     from database import User
@@ -549,15 +531,18 @@ async def update_my_profile(
 
     time_re = re.compile(r'^\d{2}:\d{2}$')
 
-<<<<<<< HEAD
-    # send_time / morning_send_time → JSON 배열로 합산해 저장
-    if data.send_time is not None or data.morning_send_time is not None:
+    # ── 발송 시간 업데이트 ────────────────────────────────────────────────────────
+    # send_times 배열 우선, 없으면 구형 필드(send_time / morning_send_time)로 합산
+    if data.send_times is not None:
+        for t in data.send_times:
+            if not time_re.match(t):
+                raise HTTPException(status_code=400, detail=f"send_times 형식은 HH:MM이어야 합니다: {t}")
+        db_user.send_time = _json.dumps(sorted(data.send_times), ensure_ascii=False)
+    elif data.send_time is not None or data.morning_send_time is not None:
         if data.send_time and not time_re.match(data.send_time):
             raise HTTPException(status_code=400, detail="send_time 형식은 HH:MM이어야 합니다.")
         if data.morning_send_time and not time_re.match(data.morning_send_time):
             raise HTTPException(status_code=400, detail="morning_send_time 형식은 HH:MM이어야 합니다.")
-
-        # 기존 배열에서 아침/저녁 추출
         try:
             existing = _json.loads(db_user.send_time or '["21:00"]')
             existing = existing if isinstance(existing, list) and existing else ["21:00"]
@@ -565,18 +550,9 @@ async def update_my_profile(
             existing = ["21:00"]
         cur_morning = existing[0] if len(existing) > 1 else "08:00"
         cur_evening = existing[-1]
-
         new_morning = data.morning_send_time if data.morning_send_time is not None else cur_morning
         new_evening = data.send_time         if data.send_time         is not None else cur_evening
         db_user.send_time = _json.dumps(sorted(list({new_morning, new_evening})), ensure_ascii=False)
-=======
-    # send_times → 유효성 검사 후 JSON 배열로 저장
-    if data.send_times is not None:
-        for t in data.send_times:
-            if not time_re.match(t):
-                raise HTTPException(status_code=400, detail=f"send_times 형식은 HH:MM이어야 합니다: {t}")
-        db_user.send_time = _json.dumps(sorted(data.send_times), ensure_ascii=False)
->>>>>>> feature/onboarding-time-interest-flow-fe
 
     if data.interest_categories is not None:
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
