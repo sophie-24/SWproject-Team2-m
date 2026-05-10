@@ -1,3 +1,12 @@
+// ── 과거 YouTube 검색 기록 수집 및 분석 ─────────────────────────────────────────
+// TODO: chrome.history API로 과거 YouTube 검색 기록 수집 후 /profile/analyze-history로 전송
+//   흐름: chrome.history.search({ text: "youtube.com/results", maxResults: 500 })
+//         → URL 파싱으로 'search_query' 파라미터 추출 (키워드 목록 생성)
+//         → POST /profile/analyze-history { keywords: [...] }
+//         → 응답으로 받은 categories / intent_type을 온보딩 페이지에 전달
+//   호출 시점: onboarding.html Step2에서 chrome.runtime.sendMessage({ type: "GET_HISTORY" }) 로 요청
+//   권한: manifest.json에 "history" 이미 포함됨
+
 // ── 설치 시 사이드패널 동작 설정 ───────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(() => {
   // 툴바 아이콘 클릭 시 사이드패널이 자동으로 열리지 않도록 설정
