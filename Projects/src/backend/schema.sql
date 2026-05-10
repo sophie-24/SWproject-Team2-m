@@ -110,6 +110,15 @@ ALTER TABLE users
 ALTER TABLE newsletters
     DROP COLUMN IF EXISTS delivery_type;
 
+-- ============================================================
+-- Migration v4: 구독 채널 ID 캐시 컬럼 추가
+-- ============================================================
+
+-- v4-1) users.subscribed_channels — 유튜브 구독 채널 ID JSON 배열 캐시
+--        GET /subscriptions 호출 시 갱신, scheduler selector_ai 가산점에 활용
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS subscribed_channels TEXT NULL;
+
 -- 7) 인덱스
 CREATE INDEX IF NOT EXISTS idx_behavior_logs_status    ON behavior_logs      (user_id, status, logged_at);
 CREATE INDEX IF NOT EXISTS idx_behavior_logs_batch_id  ON behavior_logs      (batch_id);

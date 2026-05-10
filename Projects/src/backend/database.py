@@ -43,6 +43,9 @@ class User(Base):
     # 수신 동의 여부 — False이면 배치에서 완전히 제외
     is_subscribed        = Column(Boolean, nullable=False, default=True)
     unsubscribed_at      = Column(DateTime, nullable=True)
+    # 유튜브 구독 채널 ID 캐시 — JSON 배열 문자열 (예: '["UCxxx","UCyyy"]')
+    # GET /subscriptions 호출 시 갱신, scheduler에서 selector_ai 가산점에 사용
+    subscribed_channels  = Column(Text, nullable=True)
     created_at           = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

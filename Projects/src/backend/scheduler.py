@@ -280,12 +280,17 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                     )
                     await db.commit()
 
-                # 5. 파이프라인 실행
-                # TODO: YouTube API로 구독 채널 실시간 조회 후 가중치 부여
+                # 5. 파이프라인 실행 — 구독 채널 ID DB 캐시 로드 (selector_ai 가산점용)
+                try:
+                    sub_ch = json.loads(user.subscribed_channels or "[]")
+                    sub_ch = sub_ch if isinstance(sub_ch, list) else []
+                except Exception:
+                    sub_ch = []
+
                 newsletter = await run_pipeline(
                     user_id=str(user.google_id),
                     raw_keywords=triggered_topics,
-                    subscribed_channel_ids=[],
+                    subscribed_channel_ids=sub_ch,
                     initial_intent=user.initial_intent,
                     today_logs=today_logs,
                 )
