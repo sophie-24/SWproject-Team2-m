@@ -14,7 +14,7 @@ CREATE TABLE users (
     google_id VARCHAR(255) UNIQUE NOT NULL, -- 로그인 식별용
     email VARCHAR(255) UNIQUE NOT NULL,
     interest_categories JSONB DEFAULT '[]',
-    send_time TIME NOT NULL DEFAULT '08:00:00',
+    send_time TIME NOT NULL DEFAULT '["08:00", "20:00"]',
     is_subscribed BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- started_at에서 변경
 );
@@ -49,7 +49,7 @@ CREATE TABLE user_interests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     category TEXT NOT NULL, -- topic에서 category로 확정
-    count INTEGER DEFAULT 1, -- weight에서 count(정수)로 확정
+    weight INTEGER DEFAULT 1, -- count -> weight로 수정
     source interest_source DEFAULT 'behavior',
     last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -71,4 +71,4 @@ CREATE TABLE newsletters (
 
 -- 7. 인덱스 추가 (조회 성능 최적화)
 CREATE INDEX idx_behavior_logs_pending ON behavior_logs (user_id, status) WHERE status = 'pending';
-CREATE INDEX idx_user_interests_ranking ON user_interests (user_id, count DESC);
+CREATE INDEX idx_user_interests_ranking ON user_interests (user_id, weight DESC);
