@@ -491,16 +491,19 @@ async def my_profile(
         times = times if isinstance(times, list) and times else ["21:00"]
     except Exception:
         times = ["21:00"]
+    morning_time = times[0] if len(times) > 1 else "08:00"
+    evening_time = times[-1]
 
     return {
         "email":               db_user.email,
-        "send_times":          times,
+        "send_times":          times,           # 신형 (onboarding.html, home.js)
+        "send_time":           evening_time,    # 구형 호환 (mypage.html)
+        "morning_send_time":   morning_time,    # 구형 호환 (mypage.html)
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
         "is_subscribed":       db_user.is_subscribed,
         "created_at":          db_user.created_at.isoformat() if db_user.created_at else None,
     }
-
 
 class ProfileUpdateData(BaseModel):
     send_times:          Optional[list[str]] = None  # ["HH:MM", ...] — send_time 컬럼에 JSON 배열로 저장
@@ -784,6 +787,30 @@ async def resubscribe(
 
     logger.info(f"[resubscribe] {user['user_id']} 수신 재신청 완료")
     return {"success": True, "message": "수신 신청이 완료되었습니다."}
+
+
+@app.delete("/my/withdraw")
+async def withdraw(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    회원 탈퇴 — 사용자 계정 및 관련 데이터 삭제.
+    users, user_interests, behavior_logs, newsletters 모두 제거.
+    """
+    from database import User, UserInterest, BehaviorLog, Newsletter
+    from sqlalchemy import delete as sql_delete
+
+    user_id = user["user_id"]
+
+    await db.execute(sql_delete(Newsletter).where(Newsletter.user_id == user_id))
+    await db.execute(sql_delete(BehaviorLog).where(BehaviorLog.user_id == user_id))
+    await db.execute(sql_delete(UserInterest).where(UserInterest.user_id == user_id))
+    await db.execute(sql_delete(User).where(User.google_id == user_id))
+    await db.commit()
+
+    logger.info(f"[withdraw] {user_id} 회원 탈퇴 완료")
+    return {"success": True}
 
 
 # ── YouTube ───────────────────────────────────────────────────────────────────
