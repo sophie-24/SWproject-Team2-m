@@ -816,7 +816,13 @@ async def withdraw(
 # ── YouTube ───────────────────────────────────────────────────────────────────
 
 @app.get("/subscriptions")
-def subscriptions(user=Depends(get_current_user)):
+async def subscriptions(user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """유튜브 구독 목록 조회 (마이페이지용) + 채널 ID를 DB에 캐싱.
+    캐싱된 channel_id 목록은 scheduler에서 selector_ai 가산점에 활용됨.
+    """
+    import json as _json
+    from database import User
+
     # 가장 최근 OAuth credentials 탐색 (단일 워커 환경 한정)
     creds_data = next(iter(_oauth_credentials.values()), None) if _oauth_credentials else None
     if not creds_data:
@@ -831,6 +837,17 @@ def subscriptions(user=Depends(get_current_user)):
         scopes=creds_data["scopes"],
     )
     subs = get_subscriptions(creds)
+
+    # ── 구독 채널 ID DB 캐싱 — scheduler selector_ai 가산점용 ───────────────────
+    channel_ids = [s["channel_id"] for s in subs if s.get("channel_id")]
+    if channel_ids:
+        result = await db.execute(select(User).where(User.google_id == user["user_id"]))
+        db_user = result.scalar_one_or_none()
+        if db_user:
+            db_user.subscribed_channels = _json.dumps(channel_ids, ensure_ascii=False)
+            await db.commit()
+            logger.info(f"[subscriptions] {user['user_id']} 채널 {len(channel_ids)}개 캐싱")
+
     return JSONResponse({"count": len(subs), "subscriptions": subs})
 
 
