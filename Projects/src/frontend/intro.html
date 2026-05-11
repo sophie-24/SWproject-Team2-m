@@ -425,9 +425,9 @@
       <a href="/intro.html" class="nav-logo" id="nav-logo">Tubify</a>
       <div class="nav-links">
         <a href="/intro.html" class="nav-link active">홈</a>
-        <a href="/dashboard.html" class="nav-link" id="nav-mypage" style="display:none">마이페이지</a>
+        <a href="/mypage.html" class="nav-link" id="nav-mypage" style="display:none">마이페이지</a>
       </div>
-      <a href="/" class="nav-btn" id="nav-auth-btn">로그인</a>
+      <a href="/auth/login" class="nav-btn" id="nav-auth-btn">로그인</a>
     </div>
   </nav>
 
@@ -443,7 +443,7 @@
         정제해 드립니다. 실시간 요약부터 맞춤형 메일링까지,<br>
         스마트한 AI 큐레이터 Tubify를 만나보세요.
       </p>
-      <a href="/" class="hero-cta">지금 무료로 시작하기</a>
+      <a href="/auth/login" class="hero-cta">지금 무료로 시작하기</a>
     </div>
   </section>
 
@@ -515,7 +515,7 @@
       <h2 class="cta-title">
         지금 Tubify와 함께<br>스마트한 유튜브 생활을 시작하세요.
       </h2>
-      <a href="/" class="cta-btn">지금 무료로 시작하기</a>
+      <a href="/auth/login" class="cta-btn">지금 무료로 시작하기</a>
     </div>
   </div>
 
@@ -537,14 +537,15 @@
     if (token) {
       document.getElementById("nav-mypage").style.display = "block";
       const authBtn = document.getElementById("nav-auth-btn");
-      authBtn.textContent = "로그아웃";
-      authBtn.href = "#";
-      authBtn.onclick = function(e) {
-        e.preventDefault();
-        localStorage.removeItem("access_token");
-        sessionStorage.removeItem("loggedIn");
-        window.location.href = "/";
-      };
+      authBtn.textContent = "마이페이지 →";
+      authBtn.href = "/mypage.html";
+      authBtn.onclick = null;
+
+      // CTA 버튼들도 마이페이지로 연결
+      document.querySelectorAll(".hero-cta, .cta-btn").forEach(btn => {
+        btn.href = "/mypage.html";
+        btn.textContent = "마이페이지 바로가기 →";
+      });
     }
   </script>
 </body>

@@ -460,9 +460,9 @@
 
   <!-- 네비게이션 -->
   <nav class="nav">
-    <a href="/dashboard.html" class="nav-logo">Tubify</a>
+    <a href="/intro.html" class="nav-logo">Tubify</a>
     <div class="nav-links">
-      <a href="/dashboard.html" class="nav-link">홈</a>
+      <a href="/intro.html" class="nav-link">홈</a>
       <a href="/mypage.html" class="nav-link active">마이페이지</a>
     </div>
     <button class="nav-logout" onclick="logout()">로그아웃</button>
@@ -491,7 +491,7 @@
         <div class="interest-tags" id="interest-tags">
           <span class="interest-tags-empty">관심사를 불러오는 중...</span>
         </div>
-        <a href="/home.html?from=dashboard" class="btn-edit-interest">관심사 수정</a>
+        <a href="/home.html?from=mypage" class="btn-edit-interest">관심사 수정</a>
       </div>
 
       <!-- Delivery Schedule -->
@@ -584,6 +584,17 @@
 
   <script>
     const API = "";
+
+    // OAuth 콜백 후 URL에 token이 있으면 저장
+    (function() {
+      const p = new URLSearchParams(location.search);
+      const t = p.get("token");
+      if (t) {
+        localStorage.setItem("access_token", t);
+        sessionStorage.setItem("loggedIn", "1");
+        history.replaceState({}, "", location.pathname);
+      }
+    })();
 
     async function loadProfile() {
       const jwt = localStorage.getItem("access_token");

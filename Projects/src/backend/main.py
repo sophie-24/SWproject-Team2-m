@@ -33,6 +33,9 @@ FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "../frontend")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8000")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "admin1234")
 EXTENSION_ID = os.getenv("EXTENSION_ID", "")
+# JS 배열 문자열로 변환 (쉼표 구분 다중 ID 지원)
+_ext_ids = [x.strip() for x in EXTENSION_ID.split(",") if x.strip()]
+EXTENSION_IDS_JS = "[" + ",".join(f'"{i}"' for i in _ext_ids) + "]"
 
 
 @asynccontextmanager
@@ -308,7 +311,7 @@ def root():
     # login.html 에 EXTENSION_ID 주입
     with open(os.path.join(FRONTEND_DIR, "login.html"), "r", encoding="utf-8") as f:
         html = f.read()
-    html = html.replace("__EXTENSION_ID__", EXTENSION_ID)
+    html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
     return HTMLResponse(content=html)
 
 @app.get("/home.html", tags=["프론트엔드"], summary="홈 페이지 제공 ✅", response_class=FileResponse)
@@ -319,7 +322,7 @@ def home():
 def onboarding():
     with open(os.path.join(FRONTEND_DIR, "onboarding.html"), "r", encoding="utf-8") as f:
         html = f.read()
-    html = html.replace("__EXTENSION_ID__", EXTENSION_ID)
+    html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
     return HTMLResponse(content=html)
 
 @app.get("/dashboard.html", tags=["프론트엔드"], summary="대시보드 페이지 제공 ✅", response_class=FileResponse)
@@ -329,6 +332,17 @@ def dashboard():
 @app.get("/search_dashboard.html", tags=["프론트엔드"], summary="검색 대시보드 페이지 제공 ✅", response_class=FileResponse)
 def search_dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "search_dashboard.html"))
+
+@app.get("/mypage.html", tags=["프론트엔드"], summary="마이페이지 제공 ✅", response_class=FileResponse)
+def mypage():
+    return FileResponse(os.path.join(FRONTEND_DIR, "mypage.html"))
+
+@app.get("/loading.html", tags=["프론트엔드"], summary="로딩 페이지 제공 ✅", response_class=HTMLResponse)
+def loading():
+    with open(os.path.join(FRONTEND_DIR, "loading.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
+    return HTMLResponse(content=html)
 
 @app.get("/privacy.html", tags=["프론트엔드"], summary="개인정보 처리방침 페이지 제공 ✅", response_class=FileResponse)
 def privacy():
@@ -432,11 +446,11 @@ async def callback(
         email=user_info["email"],
     )
 
-    # 신규 유저 → 온보딩, 기존 유저 → 메인 페이지
+    # 신규 유저 → 로딩(히스토리 분석), 기존 유저 → 마이페이지
     if not user.initial_intent:
-        redirect_url = f"{FRONTEND_URL}/onboarding.html?token={jwt_token}"
+        redirect_url = f"{FRONTEND_URL}/loading.html?token={jwt_token}"
     else:
-        redirect_url = f"{FRONTEND_URL}/?token={jwt_token}"
+        redirect_url = f"{FRONTEND_URL}/mypage.html?token={jwt_token}"
 
     response = RedirectResponse(url=redirect_url)
     response.set_cookie(
@@ -1070,26 +1084,52 @@ async def analyze_history(
     user=Depends(get_current_user),
 ):
     """
-    온보딩 Step2 — 유튜브 검색 기록 키워드를 받아 관심 카테고리 + 의도 유형 추론.
-    cluster_ai로 토픽 그룹화 → 상위 카테고리명 반환.
-    intent_ai로 전체 키워드 의도 분류 → intent_type 반환.
+    온보딩 — 유튜브 검색 기록 키워드를 받아 미리 정의된 관심 카테고리로 매핑.
     """
-    from agents.cluster_ai import cluster_topics
+    import json as _json
     from agents.intent_ai import classify_intent
+    from gemini_client import call_gemini_async
+
+    PRESET_CATEGORIES = [
+        "여행", "테크놀로지", "경제", "디자인", "정치", "과학",
+        "라이프스타일", "뷰티", "철학", "예술", "역사", "기후",
+        "웰니스", "우주", "미식",
+    ]
 
     keywords = [kw.strip() for kw in body.keywords if kw.strip()]
     if not keywords:
         return {"categories": [], "intent_type": "지식형"}
 
-    # 키워드 수 제한 (Gemini 컨텍스트 과부하 방지)
     keywords = keywords[:100]
 
-    clusters, intent_result = await asyncio.gather(
-        cluster_topics(keywords, max_topics=8),
-        classify_intent(keywords[:10], []),
-    )
+    prompt = f"""다음은 사용자의 최근 1개월 유튜브 검색 기록입니다.
 
-    categories = [c["topic"] for c in clusters if c.get("topic")]
+검색 기록:
+{chr(10).join(f"- {kw}" for kw in keywords)}
+
+아래 카테고리 목록 중에서 이 검색 기록과 관련된 것만 골라주세요.
+
+카테고리 목록:
+{", ".join(PRESET_CATEGORIES)}
+
+규칙:
+1. 반드시 위 목록에 있는 카테고리만 선택하세요 (임의로 만들지 마세요)
+2. 관련성이 높은 순으로 최대 5개까지만 선택하세요
+3. 반드시 JSON 배열 형식으로만 응답하세요
+
+응답 예시: ["테크놀로지", "경제", "과학"]"""
+
+    try:
+        text = await call_gemini_async(prompt, temperature=0.1, json_mode=True)
+        import re as _re
+        match = _re.search(r"\[.*?\]", text, _re.DOTALL)
+        raw = _json.loads(match.group()) if match else []
+        categories = [c for c in raw if c in PRESET_CATEGORIES]
+    except Exception as e:
+        logger.error(f"[analyze-history] Gemini 오류: {e}")
+        categories = []
+
+    intent_result = await classify_intent(keywords[:10], [])
     intent_type = intent_result.get("intent_type", "지식형")
 
     logger.info(
@@ -1317,8 +1357,10 @@ async def send_now(
     # 1순위: 오늘 행동 로그 기반
     today_logs = await get_today_logs(db, user_id=user_id)
     topics = get_triggered_topics(today_logs)
+    skip_clustering = False
 
     if not topics:
+        skip_clustering = True
         # 2순위: user_interests 상위 토픽
         interest_result = await db.execute(
             select(UserInterest.category)
@@ -1348,6 +1390,7 @@ async def send_now(
     newsletter = await run_pipeline(
         user_id=user_id,
         raw_keywords=topics,
+        skip_clustering=skip_clustering,
     )
 
     record = NewsletterModel(
@@ -1358,8 +1401,26 @@ async def send_now(
     )
     db.add(record)
     await db.commit()
+    await db.refresh(record)
 
-    return JSONResponse(newsletter)
+    # 이메일 발송
+    from mailer import send_email as _send_email
+    user_result = await db.execute(select(User).where(User.google_id == user_id))
+    db_user = user_result.scalar_one_or_none()
+    email_result = _send_email(
+        user_email=db_user.email if db_user else "",
+        newsletter=newsletter,
+        newsletter_type="interest",
+    )
+
+    record.delivery_status = "sent" if email_result.get("success") else "failed"
+    await db.commit()
+
+    return JSONResponse({
+        **newsletter,
+        "email_sent": email_result.get("success", False),
+        "sent_to": db_user.email if db_user else "",
+    })
 
 
 # ── 즉석 검색 분석 ────────────────────────────────────────────────────────────

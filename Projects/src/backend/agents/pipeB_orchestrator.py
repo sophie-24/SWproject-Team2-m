@@ -53,6 +53,7 @@ async def run_pipeline(
     initial_intent: Optional[str] = None,
     pipeline_a_cache: Optional[Dict[str, Any]] = None,
     today_logs: Optional[List[Dict[str, Any]]] = None,
+    skip_clustering: bool = False,
 ) -> Dict[str, Any]:
     """
     오늘 수집된 키워드를 받아 전체 AI 파이프라인 실행 후 뉴스레터 데이터 반환.
@@ -101,12 +102,16 @@ async def run_pipeline(
     logger.info(f"[orchestrator] 의도={intent_type} / 길이={format_style['length']}")
 
     # ── Step 1: 주제 클러스터링 ────────────────────────────────────────────────
-    logger.info(f"[orchestrator] Step 1 — 주제 클러스터링 ({len(raw_keywords)}개 키워드)")
-    clusters = await cluster_topics(raw_keywords, today_logs=today_logs)
-    if not clusters:
-        raise ValueError("클러스터링 결과 없음 — 키워드 부족")
-
-    logger.info(f"[orchestrator] 클러스터 {len(clusters)}개 생성됨")
+    if skip_clustering:
+        # 관심사 카테고리 fallback: 이미 정제된 토픽이므로 클러스터링 건너뜀
+        clusters = [{"topic": kw, "keywords": [kw]} for kw in raw_keywords]
+        logger.info(f"[orchestrator] Step 1 — 클러스터링 스킵, {len(clusters)}개 토픽 직접 사용")
+    else:
+        logger.info(f"[orchestrator] Step 1 — 주제 클러스터링 ({len(raw_keywords)}개 키워드)")
+        clusters = await cluster_topics(raw_keywords, today_logs=today_logs)
+        if not clusters:
+            raise ValueError("클러스터링 결과 없음 — 키워드 부족")
+        logger.info(f"[orchestrator] 클러스터 {len(clusters)}개 생성됨")
 
     # ── Step 2, 3: 주제별 순차 처리 ──────────────────────────────────────────────
     # 각 클러스터 토픽에 대해 영상 선정 → 분석 수행

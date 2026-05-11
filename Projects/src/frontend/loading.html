@@ -201,7 +201,7 @@
           <div class="progress-fill" id="progress-fill"></div>
         </div>
         <div class="progress-labels">
-          <span class="progress-status">PROCESSING</span>
+          <span class="progress-status" id="progress-status">PROCESSING</span>
           <span class="progress-percent" id="progress-percent">0%</span>
         </div>
       </div>
@@ -209,35 +209,110 @@
   </div>
 
   <script>
-    let current = 0;
-
-    // URL 파라미터로 리디렉션 경로 지정 가능 (기본: dashboard.html)
+    const EXTENSION_IDS = __EXTENSION_ID__;
     const params = new URLSearchParams(location.search);
-    const redirectTo = params.get("redirect") || "dashboard.html";
 
-    function tick() {
-      if (current >= 100) {
-        document.getElementById("progress-fill").style.width = "100%";
-        document.getElementById("progress-percent").textContent = "100%";
-        setTimeout(() => { window.location.href = redirectTo; }, 500);
-        return;
+    // 토큰 저장
+    const urlToken = params.get("token");
+    if (urlToken) {
+      localStorage.setItem("access_token", urlToken);
+      sessionStorage.setItem("loggedIn", "1");
+      if (typeof chrome !== "undefined" && chrome.runtime) {
+        EXTENSION_IDS.forEach(id => {
+          try { chrome.runtime.sendMessage(id, { type: "SET_TOKEN", token: urlToken }, () => {}); } catch (_) {}
+        });
       }
-
-      // 초반엔 빠르게, 후반엔 천천히
-      const step = current < 70
-        ? Math.random() * 4 + 2
-        : Math.random() * 1.5 + 0.5;
-
-      current = Math.min(current + step, 100);
-
-      document.getElementById("progress-fill").style.width = current + "%";
-      document.getElementById("progress-percent").textContent = Math.floor(current) + "%";
-
-      const delay = current < 70 ? 150 : 300;
-      setTimeout(tick, delay);
+      history.replaceState({}, "", location.pathname);
     }
 
-    tick();
+    const jwt = localStorage.getItem("access_token");
+    if (!jwt) { window.location.href = "/"; }
+
+    let current = 0;
+
+    function setProgress(pct, statusText) {
+      current = pct;
+      document.getElementById("progress-fill").style.width = pct + "%";
+      document.getElementById("progress-percent").textContent = Math.floor(pct) + "%";
+      if (statusText) document.getElementById("progress-status").textContent = statusText;
+    }
+
+    function animateTo(targetPct, statusText, duration) {
+      return new Promise(resolve => {
+        const start = current;
+        const startTime = Date.now();
+        function step() {
+          const elapsed = Date.now() - startTime;
+          const t = Math.min(elapsed / duration, 1);
+          setProgress(start + (targetPct - start) * t, statusText);
+          if (t < 1) requestAnimationFrame(step);
+          else resolve();
+        }
+        requestAnimationFrame(step);
+      });
+    }
+
+    function goNext() {
+      setProgress(100, "COMPLETE");
+      setTimeout(() => { window.location.href = "/home.html"; }, 600);
+    }
+
+    async function run() {
+      await animateTo(15, "COLLECTING", 500);
+
+      const canUseExt = typeof chrome !== "undefined" && chrome.runtime && EXTENSION_IDS.length > 0;
+
+      let keywords = [];
+
+      if (canUseExt) {
+        // 설치된 익스텐션 ID 찾기 (여러 개 순서대로 시도)
+        const tryGetHistory = (id) => new Promise(resolve => {
+          const t = setTimeout(() => resolve(null), 3000);
+          try {
+            chrome.runtime.sendMessage(id, { type: "GET_HISTORY" }, res => {
+              clearTimeout(t);
+              resolve(chrome.runtime.lastError ? null : (res || null));
+            });
+          } catch (_) { clearTimeout(t); resolve(null); }
+        });
+
+        for (const id of EXTENSION_IDS) {
+          const result = await tryGetHistory(id);
+          if (result && result.keywords?.length > 0) {
+            keywords = result.keywords;
+            break;
+          }
+        }
+      }
+
+      await animateTo(45, "ANALYZING", 800);
+
+      if (keywords.length > 0) {
+        try {
+          const res = await fetch("/profile/analyze-history", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+            body: JSON.stringify({ keywords: keywords.slice(0, 100) }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            // 분석된 카테고리를 localStorage에 저장 → home.html에서 읽어서 pill 자동 선택
+            if (data.categories?.length > 0) {
+              localStorage.setItem("detectedCategories", JSON.stringify(data.categories));
+            }
+            if (data.intent_type) {
+              localStorage.setItem("detectedIntent", data.intent_type);
+            }
+            await animateTo(90, "ANALYZING", 1200);
+          }
+        } catch (_) {}
+      }
+
+      await animateTo(98, "DONE", 400);
+      goNext();
+    }
+
+    run();
   </script>
 </body>
 

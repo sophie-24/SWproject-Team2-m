@@ -289,10 +289,11 @@ async def _run_batch_for_send_time(send_time: str) -> None:
 
                 newsletter = await run_pipeline(
                     user_id=str(user.google_id),
-                    raw_keywords=triggered_topics,
+                    raw_keywords=merged_topics,
                     subscribed_channel_ids=sub_ch,
                     initial_intent=user.initial_intent,
                     today_logs=today_logs,
+                    skip_clustering=bool(fallback),
                 )
 
                 # 6. 뉴스레터 저장 (delivery_status='pending')

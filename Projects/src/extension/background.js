@@ -10,7 +10,7 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log("[Tubify] 익스텐션 설치/업데이트 완료");
 });
 
-// ── 웹사이트로부터 JWT 수신 → storage에 저장 ─────────────────────────────────
+// ── 웹사이트로부터 메시지 수신 (JWT 저장 / 검색 기록 요청) ──────────────────────
 chrome.runtime.onMessageExternal.addListener(
   (message, sender, sendResponse) => {
     if (message.type === "SET_TOKEN") {
@@ -25,6 +25,32 @@ chrome.runtime.onMessageExternal.addListener(
       chrome.storage.local.remove(["jwt", "loggedIn"], () => {
         sendResponse({ success: true });
       });
+      return true;
+    }
+
+    // loading.html(웹페이지)에서 검색 기록 요청 — onMessage는 내부 전용이라 여기서도 처리
+    if (message.type === "GET_HISTORY") {
+      const oneMonthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      chrome.history.search(
+        { text: "youtube.com/results", maxResults: 500, startTime: oneMonthAgo },
+        (historyItems) => {
+          const keywords = [];
+          const seen = new Set();
+          for (const item of historyItems || []) {
+            try {
+              const url = new URL(item.url);
+              if (url.hostname.includes("youtube.com") && url.pathname === "/results") {
+                const kw = url.searchParams.get("search_query") || "";
+                if (kw && !seen.has(kw.toLowerCase())) {
+                  seen.add(kw.toLowerCase());
+                  keywords.push(kw);
+                }
+              }
+            } catch (e) {}
+          }
+          sendResponse({ success: true, keywords });
+        }
+      );
       return true;
     }
   }

@@ -91,20 +91,45 @@ def _source_cards(sources: List[Dict[str, Any]]) -> str:
     return f'<table cellpadding="0" cellspacing="0" width="100%">{"".join(rows)}</table>'
 
 
-def _build_topic_section(topic_data: Dict[str, Any]) -> str:
+# intent_type별 섹션 라벨
+_LEFT_LABEL = {
+    "유희형": "&#9650; 화제 포인트",
+    "구매형": "&#9650; 장점",
+    "지식형": "&#9650; 핵심 인사이트",
+}
+_RIGHT_LABEL = {
+    "유희형": "&#8593; 논란 및 쟁점",
+    "구매형": "&#8593; 단점 및 주의사항",
+    "지식형": "&#8593; 주요 관점",
+}
+
+
+def _build_topic_section(topic_data: Dict[str, Any], intent_type: str = "지식형") -> str:
     """주제 1개 → Figma 디자인 기반 섹션 HTML"""
     topic         = topic_data.get("topic", "")
     summary       = topic_data.get("summary", [])
+    pros          = topic_data.get("pros", [])
     cons          = topic_data.get("cons", [])
+    common_facts  = topic_data.get("common_facts", [])
     controversies = topic_data.get("controversies", [])
     sources       = topic_data.get("sources", [])
 
-    # 왼쪽: 요약 (주요 스펙 및 혁신 포인트)
-    summary_text = " ".join(summary) if summary else "요약 정보가 없습니다."
+    left_label  = _LEFT_LABEL.get(intent_type, _LEFT_LABEL["지식형"])
+    right_label = _RIGHT_LABEL.get(intent_type, _RIGHT_LABEL["지식형"])
 
-    # 오른쪽: 우려/쟁점 (시장 기대 및 우려)
-    concern_items = [c for c in (cons + controversies) if c]
-    concern_text  = " ".join(concern_items) if concern_items else "관련 분석 정보가 없습니다."
+    # 왼쪽: 요약 + 공통사실 + 장점
+    left_items = [s for s in summary if s and "분석 가능한" not in s]
+    if not left_items:
+        left_items = [f for f in common_facts if f]
+    if not left_items:
+        left_items = [p for p in pros if p]
+    left_text = " ".join(left_items) if left_items else "관련 영상을 분석 중입니다."
+
+    # 오른쪽: 쟁점 + 단점
+    right_items = [c for c in controversies if c]
+    if not right_items:
+        right_items = [c for c in cons if c]
+    right_text = " ".join(right_items) if right_items else "추가 분석 정보를 수집 중입니다."
 
     source_html = _source_cards(sources)
 
@@ -134,27 +159,27 @@ def _build_topic_section(topic_data: Dict[str, Any]) -> str:
         <td style="padding-bottom:28px;">
           <table cellpadding="0" cellspacing="0" width="100%">
             <tr valign="top">
-              <!-- 왼쪽: 주요 스펙 -->
+              <!-- 왼쪽 -->
               <td width="48%" style="padding-right:16px;">
                 <div style="margin-bottom:10px;">
                   <span style="font-size:11px; font-weight:400; color:#ff0000;
                                letter-spacing:1.2px; text-transform:uppercase;">
-                    &#9650; 주요 스펙 및 혁신 포인트
+                    {left_label}
                   </span>
                 </div>
                 <div style="font-size:16px; font-weight:400; color:#191c1e;
-                            line-height:1.625;">{summary_text}</div>
+                            line-height:1.625;">{left_text}</div>
               </td>
-              <!-- 오른쪽: 시장 기대 및 우려 -->
+              <!-- 오른쪽 -->
               <td width="48%" style="padding-left:16px;">
                 <div style="margin-bottom:10px;">
                   <span style="font-size:11px; font-weight:400; color:#0059ba;
                                letter-spacing:1.2px; text-transform:uppercase;">
-                    &#8593; 시장 기대 및 우려
+                    {right_label}
                   </span>
                 </div>
                 <div style="font-size:16px; font-weight:400; color:#191c1e;
-                            line-height:1.625;">{concern_text}</div>
+                            line-height:1.625;">{right_text}</div>
               </td>
             </tr>
           </table>
@@ -177,15 +202,16 @@ def _format_html(newsletter: Dict[str, Any], user_email: str = "",
                  newsletter_type: str = "search") -> str:
     """뉴스레터 딕셔너리 → Figma 디자인 기반 HTML 이메일"""
     import datetime
-    subject  = newsletter.get("subject", "오늘의 유튜브 브리핑")
-    topics   = newsletter.get("topics", [])
-    now_str  = datetime.datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
+    subject     = newsletter.get("subject", "오늘의 유튜브 브리핑")
+    topics      = newsletter.get("topics", [])
+    intent_type = newsletter.get("intent_type", "지식형")
+    now_str     = datetime.datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
 
     header_title = _HEADER_TITLE.get(newsletter_type, _HEADER_TITLE["search"])
     header_badge = _HEADER_BADGE.get(newsletter_type, _HEADER_BADGE["search"])
 
-    pills   = _keyword_pills(topics)
-    sections = "".join(_build_topic_section(t) for t in topics)
+    pills    = _keyword_pills(topics)
+    sections = "".join(_build_topic_section(t, intent_type) for t in topics)
 
     return f'''<!DOCTYPE html>
 <html lang="ko">

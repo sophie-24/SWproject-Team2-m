@@ -1,6 +1,6 @@
 const API = "";
 /* chrome://extensions/ 에서 Tubify 익스텐션 ID를 복사해 여기에 붙여넣기 */
-const EXTENSION_ID = "caaoacncggbohojcejagaijcpoigcpga"; //TODO: 실제 익스텐션 ID로 교체 필요
+const EXTENSION_IDS = ["haagaoipcidfnhojkjdiajieiejocckk", "caaoacncggbohojcejagaijcpoigcpga"];
 
 window.onload = () => {
   const params = new URLSearchParams(location.search);
@@ -12,11 +12,9 @@ window.onload = () => {
     sessionStorage.setItem("loggedIn", "1");
     // 익스텐션에 토큰 전달
     if (typeof chrome !== "undefined" && chrome.runtime) {
-      chrome.runtime.sendMessage(
-        EXTENSION_ID,
-        { type: "SET_TOKEN", token },
-        () => { if (chrome.runtime.lastError) { } }
-      );
+      EXTENSION_IDS.forEach(id => {
+        try { chrome.runtime.sendMessage(id, { type: "SET_TOKEN", token }, () => {}); } catch (_) {}
+      });
     }
     // 익스텐션 팝업이 window.open()으로 열었을 경우 자동 닫기
     if (window.opener !== null) { setTimeout(() => window.close(), 400); return; }
@@ -28,9 +26,9 @@ window.onload = () => {
     sessionStorage.setItem("loggedIn", "1");
     history.replaceState({}, "", location.pathname);
   }
-  /* 이미 로그인된 유저 → home으로 바로 이동 */
+  /* 이미 로그인된 유저 → 마이페이지로 바로 이동 */
   if (sessionStorage.getItem("loggedIn") || localStorage.getItem("access_token")) {
-    window.location.href = "/intro.html";
+    window.location.href = "/mypage.html";
   }
 };
 

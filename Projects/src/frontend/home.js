@@ -68,6 +68,18 @@ async function loadExistingInterests() {
   const jwt = localStorage.getItem("access_token") || "";
   if (!jwt) return;
 
+  // loading.html에서 분석한 카테고리가 있으면 우선 사용 (신규 유저)
+  const detected = localStorage.getItem("detectedCategories");
+  if (detected) {
+    try {
+      const categories = JSON.parse(detected);
+      _applyInterests(categories);
+      localStorage.removeItem("detectedCategories");
+      localStorage.removeItem("detectedIntent");
+    } catch (_) {}
+    return;
+  }
+
   try {
     const res = await fetch(`${API}/my/profile`, {
       headers: { "Authorization": `Bearer ${jwt}` },
@@ -83,19 +95,25 @@ async function loadExistingInterests() {
       [...document.querySelectorAll(".interest-pill")].map(p => p.dataset.value)
     );
 
-    existing.forEach(cat => {
-      if (presetValues.has(cat)) {
-        /* preset pill → 선택 상태로 변경 */
-        const pill = document.querySelector(`[data-value="${CSS.escape(cat)}"]`);
-        if (pill) pill.classList.add("selected");
-      } else {
-        /* preset에 없는 기존 관심사 → 커스텀 pill로 추가 */
-        _addCustomPill(cat, true);
-      }
-    });
+    _applyInterests(existing);
   } catch (e) {
     console.warn("[home] 기존 관심사 로드 실패:", e);
   }
+}
+
+function _applyInterests(categories) {
+  document.querySelectorAll(".interest-pill").forEach(pill => pill.classList.remove("selected"));
+  const presetValues = new Set(
+    [...document.querySelectorAll(".interest-pill")].map(p => p.dataset.value)
+  );
+  categories.forEach(cat => {
+    if (presetValues.has(cat)) {
+      const pill = document.querySelector(`[data-value="${CSS.escape(cat)}"]`);
+      if (pill) pill.classList.add("selected");
+    } else {
+      _addCustomPill(cat, true);
+    }
+  });
 }
 
 // ── 저장 ────────────────────────────────────────────────────────────────────
@@ -123,8 +141,7 @@ async function saveSettings() {
     }
     if (!res.ok) throw new Error("저장 실패");
 
-    /* 온보딩 완료 or 마이페이지 편집 → 항상 대시보드로 */
-    window.location.href = "/dashboard.html";
+    window.location.href = "/mypage.html";
   } catch (e) {
     alert("저장 실패 — 다시 시도해주세요.");
   } finally {
