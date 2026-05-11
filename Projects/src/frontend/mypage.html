@@ -611,8 +611,9 @@
           : `<span class="interest-tags-empty">아직 설정된 관심사가 없어요.</span>`;
 
         // 발송 시간 로드
-        const morning = data.morning_send_time || "08:00";
-        const evening = data.send_time || "21:00";
+        const sendTimes = Array.isArray(data.send_time) ? data.send_time : [data.send_time || "21:00"];
+        const morning = sendTimes[0] || "08:00";
+        const evening = sendTimes[sendTimes.length - 1] || "21:00";
         document.getElementById("input-morning").value = morning;
         document.getElementById("input-evening").value = evening;
         updateScheduleDisplay(morning, evening);
@@ -659,7 +660,7 @@
             "Authorization": `Bearer ${jwt}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ morning_send_time: morning, send_time: evening })
+          body: JSON.stringify({ send_time: [morning, evening] })
         });
         if (res.ok) {
           updateScheduleDisplay(morning, evening);

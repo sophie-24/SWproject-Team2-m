@@ -220,3 +220,21 @@ document.getElementById("btn-logout").addEventListener("click", async () => {
   const isLoggedIn = !!(jwt && loggedIn);
 
   if (isLoggedIn) {
+    renderLoggedIn(jwt);
+  } else {
+    renderLoggedOut();
+  }
+
+  // 현재 탭 URL 기반 섹션 표시
+  const tab = await getCurrentTab();
+  const url = tab?.url || "";
+  const keyword = extractKeyword(url);
+
+  if (keyword) {
+    showSearchSection(keyword, jwt);
+  } else if (isYouTube(url)) {
+    sectionIdle.classList.remove("hidden");
+  } else {
+    sectionNotYT.classList.remove("hidden");
+  }
+})();

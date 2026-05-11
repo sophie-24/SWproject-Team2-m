@@ -6,11 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tubify — 시작하기</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: "Segoe UI", sans-serif;
@@ -24,10 +20,7 @@
       padding: 24px;
     }
 
-    .container {
-      width: 100%;
-      max-width: 480px;
-    }
+    .container { width: 100%; max-width: 520px; }
 
     .logo {
       font-size: 1.4rem;
@@ -53,13 +46,8 @@
       transition: background 0.2s;
     }
 
-    .step-dot.active {
-      background: #ff4444;
-    }
-
-    .step-dot.done {
-      background: #44cc44;
-    }
+    .step-dot.active { background: #ff4444; }
+    .step-dot.done   { background: #44cc44; }
 
     /* ── 카드 ── */
     .card {
@@ -70,22 +58,17 @@
       margin-bottom: 16px;
     }
 
-    .card h2 {
-      font-size: 1.1rem;
-      margin-bottom: 8px;
-    }
+    .card h2 { font-size: 1.1rem; margin-bottom: 8px; }
 
     .card p {
       font-size: 0.85rem;
       color: #888;
       line-height: 1.6;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     /* ── 입력 ── */
-    .input-group {
-      margin-bottom: 16px;
-    }
+    .input-group { margin-bottom: 16px; }
 
     .input-group label {
       display: block;
@@ -121,17 +104,130 @@
       font-size: 0.95rem;
       font-weight: 600;
       cursor: pointer;
+      font-family: inherit;
+      margin-top: 20px;
     }
 
-    .btn-primary:hover {
-      background: #cc2222;
-    }
+    .btn-primary:hover { background: #cc2222; }
 
     .btn-primary:disabled {
       background: #333;
       color: #666;
       cursor: not-allowed;
     }
+
+    /* ── 관심사 그리드 ── */
+    .interest-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+      min-height: 48px;
+    }
+
+    .interest-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 16px;
+      background: #111;
+      border: 2px solid #2a2a2a;
+      border-radius: 9999px;
+      color: #ccc;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .interest-pill:hover { border-color: #555; }
+
+    .interest-pill.selected {
+      border-color: #ff4444;
+      color: #fff;
+      background: rgba(255,68,68,0.1);
+    }
+
+    .interest-pill.clustered {
+      border-color: #3a7bd5;
+      color: #99bbff;
+    }
+
+    .interest-pill.clustered.selected {
+      border-color: #ff4444;
+      color: #fff;
+      background: rgba(255,68,68,0.1);
+    }
+
+    /* ── 검색 추가 ── */
+    .search-wrap {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 10px 14px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      color: #f1f1f1;
+      font-size: 0.85rem;
+      font-family: inherit;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: #ff4444;
+    }
+
+    .search-add-btn {
+      padding: 10px 16px;
+      background: #ff4444;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+
+    .search-add-btn:hover { background: #cc2222; }
+
+    /* ── 로딩 ── */
+    .loading-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .loading-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+    }
+
+    .loading-row.active { border-color: rgba(255,68,68,0.4); background: rgba(255,68,68,0.05); }
+    .loading-row.done   { border-color: rgba(68,204,68,0.4); background: rgba(68,204,68,0.05); }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #333;
+      border-top-color: #ff4444;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── 시간 프리셋 ── */
     .time-row {
@@ -150,25 +246,15 @@
       color: #ccc;
       cursor: pointer;
       font-size: 0.85rem;
+      font-family: inherit;
       transition: border-color 0.2s;
     }
 
-    .time-preset-btn:hover {
-      border-color: #555;
-    }
+    .time-preset-btn:hover { border-color: #555; }
 
     .time-preset-btn.selected {
       border-color: #ff4444;
       color: #fff;
-    }
-
-    .time-custom {
-      background: #111;
-      border: 1px solid #2a2a2a;
-      border-radius: 8px;
-      color: #f1f1f1;
-      padding: 6px 10px;
-      font-size: 0.85rem;
     }
 
     /* ── 익스텐션 설치 안내 ── */
@@ -179,13 +265,8 @@
       margin-bottom: 24px;
     }
 
-    .install-steps code {
-      color: #ff4444;
-    }
-
-    .install-steps strong {
-      color: #eee;
-    }
+    .install-steps code { color: #ff4444; }
+    .install-steps strong { color: #eee; }
 
     .install-steps .step-num {
       display: inline-block;
@@ -215,11 +296,9 @@
       margin-bottom: 20px;
     }
 
-    .dl-link:hover {
-      color: #99bbff;
-    }
+    .dl-link:hover { color: #99bbff; }
 
-    /* ── 에러 메시지 ── */
+    /* ── 에러 ── */
     .msg {
       font-size: 0.82rem;
       color: #cc4444;
@@ -228,13 +307,15 @@
       min-height: 18px;
     }
 
-    .hidden {
-      display: none !important;
+    .selected-count {
+      font-size: 0.82rem;
+      color: #888;
+      margin-bottom: 8px;
     }
 
-    .hidden {
-      display: none !important;
-    }
+    .selected-count span { color: #ff4444; font-weight: 700; }
+
+    .hidden { display: none !important; }
   </style>
 </head>
 
@@ -250,16 +331,53 @@
       <div class="step-dot" id="dot4"></div>
     </div>
 
-    <!-- Step 1: 이메일 주소 + 발송 시각 입력 -->
+    <!-- ── Step 1: 관심사 피드 맞춤 설정 ────────────────────── -->
     <div id="step1">
       <div class="card">
+        <h2>관심사 피드 맞춤 설정</h2>
+        <p>지난 한 달간의 유튜브 검색 기록을 바탕으로 관심사를 추출했어요.<br>원하는 주제를 선택하고, 추가적으로 더 넣을 수 있어요.</p>
+
+        <!-- 분석 로딩 표시 -->
+        <div id="history-loading" class="loading-wrap">
+          <div class="loading-row active" id="ld1">
+            <div class="spinner"></div>
+            <span style="font-size:0.85rem;color:#aaa;">검색 기록 수집 중...</span>
+          </div>
+          <div class="loading-row" id="ld2">
+            <span style="font-size:0.85rem;color:#555;">🤖 AI 관심사 분석 중...</span>
+          </div>
+        </div>
+
+        <!-- 관심사 버튼 목록 -->
+        <div id="interest-section" class="hidden">
+          <div class="selected-count" id="selected-count">선택된 관심사: <span>0</span>개</div>
+          <div id="interest-grid" class="interest-grid"></div>
+
+          <!-- 직접 추가 -->
+          <div class="search-wrap">
+            <input type="text" id="interest-search" class="search-input"
+              placeholder="관심사 직접 추가 (예: AI 기술, 재테크 ...)" />
+            <button class="search-add-btn" onclick="addCustomInterest()">+ 추가</button>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="btn-step1" onclick="goStep2()" disabled>
+          다음 — 이메일 설정
+        </button>
+        <div class="msg" id="msg1"></div>
+      </div>
+    </div>
+
+    <!-- ── Step 2: 이메일 주소 + 발송 시각 ──────────────────── -->
+    <div id="step2" class="hidden">
+      <div class="card">
         <h2>뉴스레터 설정</h2>
-        <p>매일 정해진 시간에 오늘의 유튜브 브리핑을 이메일로 보내드립니다.</p>
+        <p>매일 정해진 시간에 맞춤 유튜브 브리핑을 이메일로 보내드립니다.</p>
 
         <div class="input-group">
           <label>이메일 주소</label>
           <input type="email" id="input-email" placeholder="your@email.com"
-            oninput="document.getElementById('btn-step1').disabled = !this.value.trim()">
+            oninput="document.getElementById('btn-step2').disabled = !this.value.trim()">
         </div>
 
         <div class="input-group" style="margin-top:16px;">
@@ -280,15 +398,15 @@
           </div>
         </div>
 
-        <button class="btn-primary" id="btn-step1" onclick="goStep2()" disabled>
+        <button class="btn-primary" id="btn-step2" onclick="goStep3()" disabled>
           다음
         </button>
-        <div id="msg1"></div>
+        <div class="msg" id="msg2"></div>
       </div>
     </div>
 
-    <!-- ── Step 2: 익스텐션 다운로드 ──────────────────────── -->
-    <div id="step2" class="hidden">
+    <!-- ── Step 3: 익스텐션 다운로드 ──────────────────────────── -->
+    <div id="step3" class="hidden">
       <div class="card">
         <h2>크롬 익스텐션 설치 <span style="font-size:0.8rem;color:#888">1/2</span></h2>
         <p>유튜브 시청 기록을 수집하려면 크롬 익스텐션이 필요합니다.</p>
@@ -298,85 +416,58 @@
         </a>
 
         <div class="install-steps">
-          <div>
-            <span class="step-num">1</span>
-            위 버튼으로 익스텐션 파일을 <strong>다운로드</strong>하세요.
-          </div>
-          <div>
-            <span class="step-num">2</span>
-            크롬 주소창에 <code>chrome://extensions/</code>를 입력하세요.
-          </div>
-          <div>
-            <span class="step-num">3</span>
-            우측 상단 <strong>개발자 모드</strong>를 켜세요.
-          </div>
+          <div><span class="step-num">1</span>위 버튼으로 익스텐션 파일을 <strong>다운로드</strong>하세요.</div>
+          <div><span class="step-num">2</span>크롬 주소창에 <code>chrome://extensions/</code>를 입력하세요.</div>
+          <div><span class="step-num">3</span>우측 상단 <strong>개발자 모드</strong>를 켜세요.</div>
         </div>
 
-        <button class="btn-primary" onclick="goStep3()">다음 — 설치 계속하기</button>
+        <button class="btn-primary" onclick="goStep4()">다음 — 설치 계속하기</button>
       </div>
     </div>
 
-    <!-- ── Step 3: 익스텐션 활성화 ────────────────────────── -->
-    <div id="step3" class="hidden">
+    <!-- ── Step 4: 익스텐션 활성화 + 발송 시간 상세 설정 ─────── -->
+    <div id="step4" class="hidden">
       <div class="card">
         <h2>크롬 익스텐션 설치 <span style="font-size:0.8rem;color:#888">2/2</span></h2>
         <p>다운로드한 파일을 크롬에 로드해주세요.</p>
 
         <div class="install-steps">
-          <div>
-            <span class="step-num">4</span>
-            <strong>압축해제된 확장 프로그램을 로드합니다</strong> 클릭
-          </div>
-          <div>
-            <span class="step-num">5</span>
-            다운로드한 폴더를 선택하면 설치가 완료됩니다.
-          </div>
+          <div><span class="step-num">4</span><strong>압축해제된 확장 프로그램을 로드합니다</strong> 클릭</div>
+          <div><span class="step-num">5</span>다운로드한 폴더를 선택하면 설치가 완료됩니다.</div>
         </div>
 
-        <button class="btn-primary" onclick="goStep4()">설치 완료 — 다음</button>
-      </div>
-    </div>
+        <!-- 발송 시간 상세 설정 (하루 두 번) -->
+        <h2 style="margin-top:24px;">발송 시간 상세 설정</h2>
+        <p style="margin-top:8px;">아침·저녁 두 타임을 직접 고를 수 있어요.</p>
 
-    <!-- ── Step 4: 발송 시간 설정 (아침 + 저녁) ────────────── -->
-    <div id="step4" class="hidden">
-      <div class="card">
-        <h2>뉴스레터 발송 시간 설정</h2>
-        <p>하루 두 번, 원하는 시간에 뉴스레터를 보내드립니다.</p>
-
-        <!-- 아침 발송 시간 -->
-        <div class="input-group">
+        <div class="input-group" style="margin-top:16px;">
           <label>🌅 아침 발송 시간</label>
           <div class="time-row">
-            <button class="time-preset-btn selected" id="m-btn-7" onclick="selectTime('morning','07:00',this)">오전
-              7시</button>
+            <button class="time-preset-btn selected" id="m-btn-7" onclick="selectTime('morning','07:00',this)">오전 7시</button>
             <button class="time-preset-btn" id="m-btn-8" onclick="selectTime('morning','08:00',this)">오전 8시</button>
             <button class="time-preset-btn" id="m-btn-9" onclick="selectTime('morning','09:00',this)">오전 9시</button>
             <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
               <span style="font-size:0.78rem;color:#666;">직접 입력</span>
-              <input type="time" class="time-custom" id="morning-custom"
-                oninput="selectTime('morning', this.value, null)">
+              <input type="time" style="background:#111;border:1px solid #2a2a2a;border-radius:8px;color:#f1f1f1;padding:6px 10px;font-size:0.85rem;" id="morning-custom" oninput="selectTime('morning', this.value, null)">
             </div>
           </div>
         </div>
 
-        <!-- 저녁 발송 시간 -->
         <div class="input-group" style="margin-top:20px;">
           <label>🌙 저녁 발송 시간</label>
           <div class="time-row">
             <button class="time-preset-btn" id="e-btn-20" onclick="selectTime('evening','20:00',this)">오후 8시</button>
-            <button class="time-preset-btn selected" id="e-btn-21" onclick="selectTime('evening','21:00',this)">오후
-              9시</button>
+            <button class="time-preset-btn selected" id="e-btn-21" onclick="selectTime('evening','21:00',this)">오후 9시</button>
             <button class="time-preset-btn" id="e-btn-22" onclick="selectTime('evening','22:00',this)">오후 10시</button>
             <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
               <span style="font-size:0.78rem;color:#666;">직접 입력</span>
-              <input type="time" class="time-custom" id="evening-custom"
-                oninput="selectTime('evening', this.value, null)">
+              <input type="time" style="background:#111;border:1px solid #2a2a2a;border-radius:8px;color:#f1f1f1;padding:6px 10px;font-size:0.85rem;" id="evening-custom" oninput="selectTime('evening', this.value, null)">
             </div>
           </div>
         </div>
 
-        <button class="btn-primary" style="margin-top:24px;" onclick="finishTimeSetup()">
-          설정 완료 — 관심사 설정하기
+        <button class="btn-primary" style="margin-top:24px;" onclick="finishOnboarding()">
+          설정 완료 — 시작하기
         </button>
         <div class="msg" id="msg4"></div>
       </div>
@@ -386,22 +477,13 @@
   <script>
     const EXTENSION_ID = "__EXTENSION_ID__";
 
-    let selectedIntent = "지식형";
-    let activeCategories = new Set();
-    let selectedSendTime = "08:00"; /* 기본값: 오전 8시 */
-
-    function selectSendTime(time, btn) {
-      selectedSendTime = time;
-      document.querySelectorAll(".time-preset-btn").forEach(b => b.classList.remove("selected"));
-      if (btn) btn.classList.add("selected");
-    }
-
-    // ── URL에서 JWT 추출 → 저장 → 익스텐션으로 전달 ──
+    // ── JWT 초기화 ─────────────────────────────────────────────────────────────
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
     if (token) {
       localStorage.setItem("access_token", token);
-      if (typeof chrome !== "undefined" && chrome.runtime) {
+      // 익스텐션이 설치된 경우 토큰 전달
+      if (typeof chrome !== "undefined" && chrome.runtime && EXTENSION_ID) {
         chrome.runtime.sendMessage(
           EXTENSION_ID,
           { type: "SET_TOKEN", token },
@@ -414,11 +496,7 @@
       return token || localStorage.getItem("access_token") || "";
     }
 
-    /* 발송 시간 상태 */
-    let morningTime = "07:00";
-    let eveningTime = "21:00";
-
-    // ── Step 이동 헬퍼 ────────────────────────────────────────────────────────
+    // ── Step 상태 관리 ─────────────────────────────────────────────────────────
     function _moveTo(from, to) {
       document.getElementById(`step${from}`).classList.add("hidden");
       document.getElementById(`step${to}`).classList.remove("hidden");
@@ -427,9 +505,225 @@
       document.getElementById(`dot${to}`).classList.add("active");
     }
 
-    // ── Step 1 → Step 2: 이메일 저장 ─────────────────────────────────────────
+    // ── Step 1: 관심사 설정 ────────────────────────────────────────────────────
+
+    let detectedIntentType = "지식형";
+    const selectedInterests = new Set();
+
+    // 로딩 스텝 UI 업데이트
+    function setLoadStep(n, state) {
+      const row = document.getElementById(`ld${n}`);
+      if (!row) return;
+      row.className = `loading-row${state === "active" ? " active" : state === "done" ? " done" : ""}`;
+      if (state === "active") {
+        row.innerHTML = `<div class="spinner"></div><span style="font-size:0.85rem;color:#aaa;">${row.querySelector('span')?.textContent || ""}</span>`;
+      } else if (state === "done") {
+        row.innerHTML = `<span style="font-size:0.85rem;color:#44cc44;">✓ ${row.querySelector('span')?.textContent || ""}</span>`;
+      }
+    }
+
+    // 관심사 pill 추가
+    function addPill(label, isCluster = false, preSelect = false) {
+      const grid = document.getElementById("interest-grid");
+      // 중복 방지
+      if (grid.querySelector(`[data-value="${CSS.escape(label)}"]`)) {
+        if (preSelect) {
+          const existing = grid.querySelector(`[data-value="${CSS.escape(label)}"]`);
+          existing.classList.add("selected");
+          selectedInterests.add(label);
+        }
+        return;
+      }
+      const pill = document.createElement("button");
+      pill.className = "interest-pill" + (isCluster ? " clustered" : "") + (preSelect ? " selected" : "");
+      pill.dataset.value = label;
+      pill.textContent = label;
+      if (preSelect) selectedInterests.add(label);
+      pill.addEventListener("click", () => {
+        pill.classList.toggle("selected");
+        if (pill.classList.contains("selected")) {
+          selectedInterests.add(label);
+        } else {
+          selectedInterests.delete(label);
+        }
+        updateSelectedCount();
+      });
+      grid.appendChild(pill);
+    }
+
+    function updateSelectedCount() {
+      const countEl = document.querySelector("#selected-count span");
+      if (countEl) countEl.textContent = selectedInterests.size;
+      document.getElementById("btn-step1").disabled = selectedInterests.size === 0;
+    }
+
+    // 직접 추가
+    function addCustomInterest() {
+      const input = document.getElementById("interest-search");
+      const val = input.value.trim();
+      if (!val) return;
+      addPill(val, false, true);
+      input.value = "";
+      updateSelectedCount();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const searchInput = document.getElementById("interest-search");
+      if (searchInput) {
+        searchInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") addCustomInterest();
+        });
+      }
+    });
+
+    // 기본 관심사 목록 (익스텐션 없을 때 fallback)
+    const DEFAULT_CATEGORIES = [
+      "테크놀로지", "경제·재테크", "과학", "디자인", "여행",
+      "정치·사회", "라이프스타일", "뷰티·패션", "철학", "예술",
+      "역사", "기후·환경", "웰니스", "우주", "미식"
+    ];
+
+    function showDefaultCategories() {
+      document.getElementById("history-loading").classList.add("hidden");
+      DEFAULT_CATEGORIES.forEach(cat => addPill(cat, false, false));
+      document.getElementById("interest-section").classList.remove("hidden");
+      updateSelectedCount();
+    }
+
+    // 익스텐션 GET_HISTORY → /profile/analyze-history 호출
+    async function loadHistoryAndAnalyze() {
+      const jwt = getJwt();
+
+      // 익스텐션 미설치 or EXTENSION_ID 없는 경우 바로 기본 카테고리
+      const canUseExtension = (
+        typeof chrome !== "undefined" &&
+        chrome.runtime &&
+        EXTENSION_ID &&
+        EXTENSION_ID !== "__EXTENSION_ID__"
+      );
+
+      if (!canUseExtension) {
+        showDefaultCategories();
+        return;
+      }
+
+      // Step 1 로딩 표시
+      setLoadStep(1, "active");
+
+      let keywords = [];
+      try {
+        const historyResult = await new Promise((resolve) => {
+          const timeout = setTimeout(() => resolve({ success: false, keywords: [] }), 5000);
+          chrome.runtime.sendMessage(
+            EXTENSION_ID,
+            { type: "GET_HISTORY" },
+            (res) => { clearTimeout(timeout); resolve(res || { success: false, keywords: [] }); }
+          );
+        });
+        keywords = historyResult.keywords || [];
+      } catch (e) {
+        console.warn("[onboarding] GET_HISTORY 실패:", e);
+      }
+
+      if (!keywords.length) {
+        // 기록 없음 → 기본 카테고리 표시
+        document.getElementById("ld1").innerHTML = `<span style="font-size:0.85rem;color:#888;">📭 검색 기록 없음 — 기본 카테고리를 선택해주세요</span>`;
+        showDefaultCategories();
+        return;
+      }
+
+      // ld1 완료, ld2 활성화
+      document.getElementById("ld1").className = "loading-row done";
+      document.getElementById("ld1").innerHTML = `<span style="font-size:0.85rem;color:#44cc44;">✓ 검색 기록 ${keywords.length}개 수집 완료</span>`;
+      document.getElementById("ld2").className = "loading-row active";
+      document.getElementById("ld2").innerHTML = `<div class="spinner"></div><span style="font-size:0.85rem;color:#aaa;">🤖 AI 관심사 분석 중...</span>`;
+
+      // /profile/analyze-history 호출
+      try {
+        const res = await fetch("/profile/analyze-history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+          body: JSON.stringify({ keywords: keywords.slice(0, 100) }),
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        detectedIntentType = data.intent_type || "지식형";
+        const categories = data.categories || [];
+
+        document.getElementById("ld2").className = "loading-row done";
+        document.getElementById("ld2").innerHTML = `<span style="font-size:0.85rem;color:#44cc44;">✓ 관심사 ${categories.length}개 추출 완료</span>`;
+
+        document.getElementById("history-loading").classList.add("hidden");
+
+        // 클러스터링된 카테고리 pill 추가 (자동 선택)
+        categories.forEach(cat => addPill(cat, true, true));
+
+        // 나머지 기본 카테고리도 추가 (미선택)
+        DEFAULT_CATEGORIES
+          .filter(cat => !categories.map(c => c.toLowerCase()).includes(cat.toLowerCase()))
+          .forEach(cat => addPill(cat, false, false));
+
+        document.getElementById("interest-section").classList.remove("hidden");
+        updateSelectedCount();
+
+      } catch (e) {
+        console.warn("[onboarding] analyze-history 실패:", e);
+        showDefaultCategories();
+      }
+    }
+
+    // Step 1 → Step 2: 관심사 저장
     async function goStep2() {
       const msgEl = document.getElementById("msg1");
+      const jwt = getJwt();
+      const selected = [...selectedInterests];
+
+      if (!selected.length) { msgEl.textContent = "관심사를 하나 이상 선택해주세요."; return; }
+
+      const btn = document.getElementById("btn-step1");
+      btn.disabled = true;
+      btn.textContent = "저장 중...";
+
+      try {
+        const res = await fetch("/profile/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+          body: JSON.stringify({
+            initial_intent:      detectedIntentType,
+            interest_categories: selected,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          msgEl.textContent = err.detail || "저장 실패, 다시 시도해주세요.";
+          btn.disabled = false;
+          btn.textContent = "다음 — 이메일 설정";
+          return;
+        }
+      } catch (e) {
+        msgEl.textContent = "네트워크 오류가 발생했습니다.";
+        btn.disabled = false;
+        btn.textContent = "다음 — 이메일 설정";
+        return;
+      }
+
+      _moveTo(1, 2);
+    }
+
+    // ── Step 2: 이메일 + 발송 시각 ────────────────────────────────────────────
+
+    let selectedSendTime = "08:00";
+
+    function selectSendTime(time, btn) {
+      selectedSendTime = time;
+      document.querySelectorAll("#step2 .time-preset-btn").forEach(b => b.classList.remove("selected"));
+      if (btn) btn.classList.add("selected");
+    }
+
+    async function goStep3() {
+      const msgEl = document.getElementById("msg2");
       const email = document.getElementById("input-email").value.trim();
       const jwt = getJwt();
 
@@ -451,16 +745,18 @@
         return;
       }
 
-      _moveTo(1, 2);
+      _moveTo(2, 3);
     }
 
-    // ── Step 2 → Step 3: 익스텐션 다운로드 확인 ──────────────────────────────
-    function goStep3() { _moveTo(2, 3); }
+    // ── Step 3 → Step 4 ───────────────────────────────────────────────────────
 
-    // ── Step 3 → Step 4: 익스텐션 활성화 확인 ────────────────────────────────
     function goStep4() { _moveTo(3, 4); }
 
-    // ── 시간 선택 (아침/저녁) ─────────────────────────────────────────────────
+    // ── Step 4: 발송 시간 상세 설정 + 완료 ────────────────────────────────────
+
+    let morningTime = "07:00";
+    let eveningTime = "21:00";
+
     function selectTime(type, value, btn) {
       if (type === "morning") {
         morningTime = value;
@@ -472,21 +768,15 @@
       if (btn) btn.classList.add("selected");
     }
 
-    // ── Step 4 완료: 두 시간 저장 → 관심사 페이지로 ──────────────────────────
-    async function finishTimeSetup() {
+    async function finishOnboarding() {
       const msgEl = document.getElementById("msg4");
       const jwt = getJwt();
 
       try {
-        /* 아침·저녁 두 시간을 각각 send_time / morning_send_time으로 전달
-           → 백엔드 PUT /my/profile에서 JSON 배열로 합산해 저장 */
         const res = await fetch("/my/profile", {
           method: "PUT",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
-          body: JSON.stringify({
-            send_time: eveningTime,
-            morning_send_time: morningTime,
-          }),
+          body: JSON.stringify({ send_times: [morningTime, eveningTime] }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -494,15 +784,16 @@
           return;
         }
       } catch (e) {
-        /* 저장 실패해도 관심사 설정으로 진행 (non-critical) */
         console.warn("[onboarding] 시간 저장 실패:", e);
+        // non-critical: 실패해도 대시보드로 이동
       }
 
-      /* 관심사 설정 페이지로 이동 */
-      window.location.href = "/home.html?from=onboarding";
+      window.location.href = "/dashboard.html";
     }
+
+    // ── 자동 시작 ──────────────────────────────────────────────────────────────
+    loadHistoryAndAnalyze();
   </script>
 </body>
-<<<<<<< HEAD=======>>>>>>> feature/onboarding-time-interest-flow-fe
 
 </html>

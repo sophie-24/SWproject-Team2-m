@@ -214,17 +214,6 @@
           <button onclick="toggleSubscription()" id="sub-toggle-btn"
             style="padding:6px 14px;border:1px solid #333;background:transparent;color:#cc6666;border-radius:6px;cursor:pointer;font-size:0.8rem">구독
             해지</button>
-<<<<<<< HEAD
-          <a href="/home.html?from=dashboard"
-=======
-<<<<<<< HEAD
-          <a href="/home.html?from=dashboard"
-=======
-          <a href="/home.html"
->>>>>>> main
->>>>>>> feature/onboarding-time-interest-flow-fe
-            style="padding:6px 14px;border:1px solid #333;border-radius:6px;font-size:0.8rem;color:#888;text-decoration:none;text-align:center">관심사
-            편집</a>
         </div>
       </div>
       <!-- 편집 패널 -->
@@ -329,8 +318,11 @@
     function renderProfile(p) {
       document.getElementById("profile-email").textContent = p.email || "—";
       document.getElementById("profile-intent").textContent = p.initial_intent || "미설정";
-      document.getElementById("profile-send-time").textContent = p.send_time || "21:00";
-      document.getElementById("profile-morning-time").textContent = p.morning_send_time || "08:00";
+      const sendTimes = Array.isArray(p.send_time) ? p.send_time : [p.send_time || "21:00"];
+      const morningTime = sendTimes[0] || "08:00";
+      const eveningTime = sendTimes[sendTimes.length - 1] || "21:00";
+      document.getElementById("profile-send-time").textContent = eveningTime;
+      document.getElementById("profile-morning-time").textContent = morningTime;
 
       const subBadge = document.getElementById("profile-sub-badge");
       subBadge.innerHTML = p.is_subscribed
@@ -344,9 +336,9 @@
       ).join("");
 
       if (document.getElementById("edit-send-time"))
-        document.getElementById("edit-send-time").value = p.send_time || "21:00";
+        document.getElementById("edit-send-time").value = eveningTime;
       if (document.getElementById("edit-morning-time"))
-        document.getElementById("edit-morning-time").value = p.morning_send_time || "08:00";
+        document.getElementById("edit-morning-time").value = morningTime;
 
       const subBtn = document.getElementById("sub-toggle-btn");
       if (subBtn) {
@@ -367,7 +359,7 @@
         const res = await fetch(`${API}/my/profile`, {
           method: "PUT",
           headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ send_time: sendTime, morning_send_time: morningTime }),
+          body: JSON.stringify({ send_time: [morningTime, sendTime] }),
         });
         if (res.ok) { await loadProfile(); toggleEdit(); }
         else alert("저장 실패");
