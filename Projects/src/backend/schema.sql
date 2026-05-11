@@ -58,7 +58,6 @@ ON CONFLICT (user_id, category) DO NOTHING;
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS is_subscribed      BOOLEAN     NOT NULL DEFAULT TRUE,
     ADD COLUMN IF NOT EXISTS unsubscribed_at    TIMESTAMP   NULL,
-    ADD COLUMN IF NOT EXISTS morning_send_time  VARCHAR(5)  NOT NULL DEFAULT '08:00',
     ADD COLUMN IF NOT EXISTS initial_intent     VARCHAR(20) NULL,
     ADD COLUMN IF NOT EXISTS interest_categories TEXT       NULL;
 
@@ -88,7 +87,7 @@ ALTER TABLE report_batches
     ADD COLUMN IF NOT EXISTS period_end   TIMESTAMP   NULL;
 
 -- ============================================================
--- Migration v3: send_time JSON 배열 통합, morning_send_time 제거
+-- Migration v3: send_time JSON 배열 통합
 -- ============================================================
 
 -- v3-1) send_time 컬럼 타입 먼저 TEXT로 변경 (VARCHAR(5) → TEXT)
@@ -102,11 +101,7 @@ SET send_time = '["' || send_time || '"]'
 WHERE send_time IS NOT NULL
   AND send_time NOT LIKE '[%';
 
--- v3-3) morning_send_time 컬럼 제거
-ALTER TABLE users
-    DROP COLUMN IF EXISTS morning_send_time;
-
--- v3-4) newsletters.delivery_type 컬럼 제거
+-- v3-3) newsletters.delivery_type 컬럼 제거
 ALTER TABLE newsletters
     DROP COLUMN IF EXISTS delivery_type;
 
@@ -118,6 +113,15 @@ ALTER TABLE newsletters
 --        GET /subscriptions 호출 시 갱신, scheduler selector_ai 가산점에 활용
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS subscribed_channels TEXT NULL;
+
+-- ============================================================
+-- Migration v5: OAuth credentials DB 저장
+-- ============================================================
+
+-- v5-1) users.oauth_credentials — Google OAuth credentials JSON 저장
+--        로그인 시 저장, 서버 재시작 후 /subscriptions 호출에 활용
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS oauth_credentials TEXT NULL;
 
 -- 7) 인덱스
 CREATE INDEX IF NOT EXISTS idx_behavior_logs_status    ON behavior_logs      (user_id, status, logged_at);
