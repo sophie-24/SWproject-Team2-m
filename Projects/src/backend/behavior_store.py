@@ -35,8 +35,9 @@ async def save_behavior(
 
     # 오늘 같은 키워드 횟수 카운트
     today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
+        hour=0, minute=0, second=0, microsecond=0, tzinfo=None
     )
+
     result = await db.execute(
         select(func.count())
         .where(BehaviorLog.user_id == user_id)
@@ -44,7 +45,6 @@ async def save_behavior(
         .where(BehaviorLog.logged_at >= today_start)
     )
     count = result.scalar()
-
     return {"saved": True, "count": count}
 
 
@@ -54,7 +54,7 @@ async def get_today_logs(db: AsyncSession, user_id: str) -> list[dict]:
     → trigger.py에서 사용
     """
     today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
+        hour=0, minute=0, second=0, microsecond=0, tzinfo=None
     )
     result = await db.execute(
         select(BehaviorLog)
