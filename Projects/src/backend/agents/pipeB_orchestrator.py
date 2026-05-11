@@ -108,4 +108,62 @@ async def run_pipeline(
 
     logger.info(f"[orchestrator] 클러스터 {len(clusters)}개 생성됨")
 
-    # ── Step 2, 3: 주제별 순차 처리 ──────
+    # ── Step 2, 3: 주제별 순차 처리 ──────────────────────────────────────────────
+    # 각 클러스터 토픽에 대해 영상 선정 → 분석 수행
+    # Pipeline A 캐시 히트 시 Gemini 호출 없이 재활용
+    analyses: List[Dict[str, Any]] = []
+
+    for cluster in clusters:
+        topic = cluster.get("topic", "")
+        if not topic:
+            continue
+
+        # Pipeline A 캐시 확인 — 같은 키워드가 이미 분석된 경우 재활용
+        cache_hit = pipeline_a_cache.get(topic) or pipeline_a_cache.get(f"{user_id}:{topic}")
+        if cache_hit:
+            logger.info(f"[orchestrator] '{topic}' → Pipeline A 캐시 재활용")
+            analyses.append(_dashboard_to_analysis(topic, cache_hit))
+            continue
+
+        # 영상 선정 (Step 2)
+        logger.info(f"[orchestrator] Step 2 — '{topic}' 영상 선정")
+        try:
+            videos = await asyncio.to_thread(
+                select_top_videos,
+                topic,
+                subscribed_channel_ids,
+            )
+        except Exception as e:
+            logger.warning(f"[orchestrator] '{topic}' 영상 선정 실패: {e}")
+            videos = []
+
+        if not videos:
+            logger.warning(f"[orchestrator] '{topic}' 영상 없음 — 스킵")
+            continue
+
+        # 영상 분석 (Step 3)
+        logger.info(f"[orchestrator] Step 3 — '{topic}' 영상 {len(videos)}개 분석")
+        try:
+            analysis = await analyze_videos(
+                keyword=topic,
+                videos=videos,
+                format_style=format_style,
+                intent_type=intent_type,
+            )
+            analyses.append(analysis)
+        except Exception as e:
+            logger.warning(f"[orchestrator] '{topic}' 분석 실패: {e}")
+
+    if not analyses:
+        raise ValueError("분석 가능한 주제 없음 — 영상 선정 실패")
+
+    # ── Step 4: 뉴스레터 조립 ──────────────────────────────────────────────────
+    logger.info(f"[orchestrator] Step 4 — 뉴스레터 조립 ({len(analyses)}개 주제)")
+    newsletter = await generate_newsletter(
+        user_id=user_id,
+        analyses=analyses,
+        format_style=format_style,
+        intent_type=intent_type,
+    )
+    logger.info(f"[orchestrator] 완료 — subject='{newsletter.get('subject', '')}'")
+    return newsletter
