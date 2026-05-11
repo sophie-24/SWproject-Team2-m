@@ -1,450 +1,743 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TechVisibility 검색 분석</title>
+  <title>Tubify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
-      font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
-      background: #0f0f0f;
-      color: #f1f1f1;
+      font-family: "Noto Sans KR", "Segoe UI", sans-serif;
+      background: #f7f9fb;
+      color: #191c1e;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
       font-size: 13px;
     }
 
     /* ── 헤더 ── */
     .header {
-      background: #1a1a1a;
-      border-bottom: 1px solid #2a2a2a;
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
       position: sticky;
       top: 0;
       z-index: 10;
-    }
-    .logo { font-weight: 800; color: #ff4444; font-size: 0.95rem; }
-    .keyword-badge {
-      background: #2a2a2a;
-      border: 1px solid #3a3a3a;
-      border-radius: 6px;
-      padding: 4px 8px;
-      font-size: 0.75rem;
-      color: #ccc;
-      max-width: 180px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid #f2f4f6;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px 0 16px;
+      flex-shrink: 0;
     }
 
-    /* ── 로딩 ── */
-    .loading {
-      padding: 32px 16px;
-      text-align: center;
-    }
-    .loading-steps { display: flex; flex-direction: column; gap: 14px; }
-    .step-row {
+    .header-brand {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 14px;
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
+    }
+
+    .header-logo-box {
+      width: 32px;
+      height: 32px;
+      background: red;
       border-radius: 8px;
-      transition: all 0.3s;
-    }
-    .step-row.active  { border-color: #ff4444; background: #1f1010; }
-    .step-row.done    { border-color: #44cc66; background: #0f1f14; }
-    .step-icon { font-size: 1rem; width: 20px; text-align: center; }
-    .step-label { font-size: 0.82rem; color: #aaa; }
-    .step-row.active .step-label { color: #ff4444; }
-    .step-row.done  .step-label { color: #44cc66; }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner {
-      display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid #333;
-      border-top-color: #ff4444;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
     }
 
-    /* ── 에러 ── */
-    .error-box {
-      margin: 24px 16px;
-      background: #1f1010;
-      border: 1px solid #cc3333;
-      border-radius: 10px;
-      padding: 16px;
-      text-align: center;
+    .header-logo-box svg {
+      width: 14px;
+      height: 14px;
+      fill: #fff;
     }
-    .error-box .err-icon { font-size: 1.8rem; margin-bottom: 8px; }
-    .error-box .err-msg  { color: #ff6666; font-size: 0.85rem; line-height: 1.6; }
-    .error-box .err-sub  { color: #666; font-size: 0.75rem; margin-top: 6px; }
-    .btn-retry {
-      margin-top: 12px;
-      padding: 8px 20px;
-      background: #ff4444;
-      color: #fff;
+
+    .header-brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #191c1e;
+      line-height: 1;
+      letter-spacing: -0.3px;
+    }
+
+    .header-subtitle {
+      font-size: 9px;
+      font-weight: 500;
+      color: #515f74;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .icon-btn {
+      background: none;
       border: none;
-      border-radius: 6px;
       cursor: pointer;
-      font-size: 0.82rem;
+      padding: 8px;
+      border-radius: 9999px;
+      color: #515f74;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+      line-height: 1;
     }
-    .btn-retry:hover { background: #cc2222; }
 
-    /* ── 결과 영역 ── */
-    #results { display: none; padding: 12px; }
+    .icon-btn:hover {
+      background: #f2f4f6;
+      color: #191c1e;
+    }
 
-    /* 영상 카드 */
-    .video-card {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 10px;
-      margin-bottom: 10px;
+    .icon-btn svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    /* ── 바디 레이아웃 ── */
+    .body-wrap {
+      display: flex;
+      flex: 1;
       overflow: hidden;
     }
-    .video-card-header {
+
+    /* ── 사이드 탭 네비 ── */
+    .tab-nav {
+      width: 56px;
+      background: #f8fafc;
+      border-right: 1px solid rgba(226, 232, 240, 0.6);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 0;
+      flex-shrink: 0;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 4px;
+      background: none;
+      border: none;
+      border-right: 3px solid transparent;
+      border-radius: 2px 0 0 2px;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .tab-btn:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .tab-btn.active {
+      border-right-color: red;
+      background: rgba(255, 0, 0, 0.06);
+    }
+
+    .tab-icon {
+      font-size: 16px;
+      color: #94a3b8;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .tab-btn.active .tab-icon {
+      color: red;
+    }
+
+    .tab-label {
+      font-size: 7px;
+      font-weight: 800;
+      color: #94a3b8;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .tab-btn.active .tab-label {
+      color: red;
+    }
+
+    .tab-nav-spacer {
+      flex: 1;
+    }
+
+    .tab-btn-settings {
+      margin-top: auto;
+    }
+
+    /* ── 콘텐츠 영역 ── */
+    .content-wrap {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: #fff;
+    }
+
+    .content-wrap::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .content-wrap::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .content-wrap::-webkit-scrollbar-thumb {
+      background: #e6e8ea;
+      border-radius: 2px;
+    }
+
+    .tab-panel {
+      display: none;
+      padding: 20px 16px;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* ── 키워드 타이틀 ── */
+    .keyword-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #191c1e;
+      letter-spacing: -0.9px;
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+
+    .keyword-underline {
+      width: 40px;
+      height: 4px;
+      background: red;
+      border-radius: 9999px;
+      margin-bottom: 20px;
+    }
+
+    /* ── 섹션 카드 ── */
+    .section-block {
+      background: #f2f4f6;
+      border-radius: 12px;
+      padding: 16px 16px 16px 20px;
+      margin-bottom: 12px;
+      border-left: 4px solid transparent;
+    }
+
+    .section-block.border-red {
+      border-left-color: red;
+    }
+
+    .section-block.border-gray {
+      border-left-color: #515f74;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .section-icon-box {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    .icon-red   { color: red; }
+    .icon-blue  { color: #515f74; }
+    .icon-gray  { color: #515f74; }
+    .icon-yellow { color: #f59e0b; }
+
+    .section-title-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: #191c1e;
+      line-height: 1.4;
+    }
+
+    /* ── 불릿 리스트 ── */
+    .bullet-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bullet-item {
       display: flex;
       gap: 10px;
-      padding: 10px 12px;
+      align-items: flex-start;
+      font-size: 13px;
+      color: #603e39;
+      line-height: 1.65;
+    }
+
+    .bullet-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+
+    .dot-red    { background: red; }
+    .dot-blue   { background: #515f74; }
+    .dot-yellow { background: #f59e0b; }
+
+    /* ── 결론 박스 ── */
+    .conclusion-box {
+      background: #f2f4f6;
+      border-left: 4px solid red;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #515f74;
+      line-height: 1.65;
+    }
+
+    /* ── 소스 섹션 헤더 ── */
+    .source-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+    }
+
+    .source-title-text {
+      font-size: 14px;
+      font-weight: 700;
+      color: #191c1e;
+      border-bottom: 2px solid red;
+      padding-bottom: 4px;
+    }
+
+    .view-all-btn {
+      font-size: 10px;
+      font-weight: 600;
+      color: #515f74;
+      background: none;
+      border: none;
+      cursor: pointer;
+      letter-spacing: -0.5px;
+      text-transform: uppercase;
+    }
+
+    .view-all-btn:hover {
+      color: #191c1e;
+    }
+
+    /* ── 비디오 카드 ── */
+    .video-card {
+      margin-bottom: 16px;
+    }
+
+    .video-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .video-card-inner {
+      display: flex;
+      gap: 12px;
       align-items: flex-start;
     }
-    .video-thumb {
-      width: 72px;
-      height: 46px;
-      object-fit: cover;
-      border-radius: 4px;
+
+    .video-thumb-wrap {
+      position: relative;
+      width: 96px;
       flex-shrink: 0;
-      background: #222;
     }
-    .video-meta { flex: 1; min-width: 0; }
-    .video-title {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #eee;
-      line-height: 1.4;
+
+    .video-thumb {
+      width: 96px;
+      aspect-ratio: 16/9;
+      object-fit: cover;
+      border-radius: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+      display: block;
+    }
+
+    .video-thumb-placeholder {
+      width: 96px;
+      aspect-ratio: 16/9;
+      border-radius: 6px;
+      background: #e6e8ea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .video-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .video-title-text {
+      font-size: 12px;
+      font-weight: 500;
+      color: #191c1e;
+      line-height: 1.5;
       display: -webkit-box;
-      -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
       overflow: hidden;
-      margin-bottom: 5px;
+      text-overflow: ellipsis;
+      word-break: break-word;
+      margin-bottom: 4px;
+      text-decoration: none;
     }
-    .video-title a { color: inherit; text-decoration: none; }
-    .video-title a:hover { color: #ff4444; }
-    .video-badges { display: flex; gap: 5px; flex-wrap: wrap; }
+
+    .video-title-text:hover {
+      color: red;
+    }
+
+    .video-subtitle {
+      font-size: 11px;
+      color: #515f74;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 6px;
+    }
+
+    .video-meta-row {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .channel-badge {
+      font-size: 9px;
+      font-weight: 500;
+      color: #515f74;
+      text-transform: uppercase;
+      letter-spacing: -0.25px;
+    }
+
     .badge {
-      font-size: 0.68rem;
+      font-size: 10px;
       padding: 2px 6px;
       border-radius: 4px;
       font-weight: 600;
     }
-    .badge.ad       { background: #2a1010; color: #ff5555; border: 1px solid #441111; }
-    .badge.no-ad    { background: #0f1f14; color: #44cc66; border: 1px solid #1a3a22; }
-    .badge.cred     { background: #111827; color: #6699ff; border: 1px solid #1e2d4a; }
 
-    .video-summary {
-      font-size: 0.75rem;
-      color: #888;
-      padding: 0 12px 10px;
-      line-height: 1.6;
+    .badge-ad   { background: #fee2e2; color: #dc2626; }
+    .badge-noad { background: #dcfce7; color: #16a34a; }
+    .badge-cred { background: #eff6ff; color: #2563eb; }
+
+    /* ── 로딩 ── */
+    .loading-wrap {
+      padding: 20px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
-    /* 섹션 블록 */
-    .section-block {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
+    .step-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: #f2f4f6;
+      border: 1px solid #e6e8ea;
       border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 10px;
+      transition: all 0.3s;
     }
-    .section-title {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
-    .fact-item, .controversy-item {
-      font-size: 0.78rem;
-      color: #ccc;
-      padding: 5px 0;
-      border-bottom: 1px solid #222;
-      line-height: 1.5;
-    }
-    .fact-item:last-child, .controversy-item:last-child { border-bottom: none; }
-    .fact-item::before       { content: "✓ "; color: #44cc66; }
-    .controversy-item::before { content: "⚡ "; color: #ffaa44; }
 
-    /* 로그인 필요 */
-    .login-needed {
-      margin: 32px 16px;
-      text-align: center;
+    .step-row.active {
+      background: #fff5f5;
+      border-color: rgba(255, 0, 0, 0.2);
     }
-    .login-needed p { color: #888; font-size: 0.85rem; line-height: 1.8; }
-    .btn-login {
-      margin-top: 14px;
+
+    .step-row.done {
+      background: #f0fdf4;
+      border-color: rgba(22, 163, 74, 0.2);
+    }
+
+    .step-icon-wrap {
+      width: 20px;
+      text-align: center;
+      color: #94a3b8;
+    }
+
+    .step-row.active .step-icon-wrap { color: red; }
+    .step-row.done  .step-icon-wrap  { color: #16a34a; }
+
+    .step-label-text {
+      font-size: 13px;
+      color: #515f74;
+      font-weight: 500;
+    }
+
+    .step-row.active .step-label-text { color: red; }
+    .step-row.done  .step-label-text  { color: #16a34a; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #e6e8ea;
+      border-top-color: red;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    /* ── 상태 화면 ── */
+    .state-screen {
+      padding: 48px 20px;
+      text-align: center;
+      color: #515f74;
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .state-screen .icon {
+      font-size: 2rem;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    .btn-primary {
+      margin-top: 16px;
       padding: 10px 24px;
-      background: #ff4444;
+      background: red;
       color: #fff;
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 0.88rem;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-primary:hover { background: #cc0000; }
+
+    .btn-retry {
+      margin-top: 12px;
+      padding: 8px 20px;
+      background: #fff;
+      color: red;
+      border: 1px solid rgba(255, 0, 0, 0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-retry:hover { background: #fff5f5; }
+
+    .error-msg {
+      color: #dc2626;
+      font-size: 13px;
+      line-height: 1.6;
       font-weight: 600;
     }
-    .btn-login:hover { background: #cc2222; }
 
-    /* 키워드 없음 */
-    .no-keyword {
-      margin: 32px 16px;
-      text-align: center;
-      color: #555;
-      font-size: 0.85rem;
-      line-height: 1.8;
+    .error-sub {
+      color: #515f74;
+      font-size: 12px;
+      margin-top: 4px;
     }
-    .no-keyword span { font-size: 2rem; display: block; margin-bottom: 10px; }
 
     .hidden { display: none !important; }
+
+    /* ── 캐시 안내 ── */
+    .cache-notice {
+      margin-bottom: 12px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: #f2f4f6;
+      border: 1px solid #e6e8ea;
+      font-size: 11px;
+      color: #515f74;
+    }
+
+    /* ── 카테고리 뱃지 ── */
+    .category-badge {
+      display: inline-block;
+      margin-bottom: 14px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 9999px;
+    }
   </style>
 </head>
+
 <body>
 
   <!-- 헤더 -->
   <div class="header">
-    <div class="logo">✦ TechVisibility</div>
-    <div class="keyword-badge" id="keyword-badge">분석 중...</div>
+    <div class="header-brand">
+      <div class="header-logo-box">
+        <!-- 신문/요약 아이콘 -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="3" width="18" height="3" rx="1"/>
+          <rect x="3" y="9" width="11" height="2" rx="1"/>
+          <rect x="3" y="13" width="11" height="2" rx="1"/>
+          <rect x="3" y="17" width="7" height="2" rx="1"/>
+        </svg>
+      </div>
+      <div class="header-brand-text">
+        <span class="header-title">Tubify</span>
+        <span class="header-subtitle">THE INTELLIGENT CURATOR</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <!-- 새로고침 -->
+      <button class="icon-btn" id="btn-refresh" title="새로고침">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
+    </div>
   </div>
 
   <!-- 로그인 필요 -->
-  <div id="login-needed" class="login-needed hidden">
-    <p>🔒<br>AI 분석을 보려면<br>로그인이 필요합니다.</p>
-    <button class="btn-login" id="btn-login">Google 로그인</button>
+  <div id="screen-login" class="state-screen hidden">
+    <span class="icon">🔒</span>
+    AI 분석을 보려면<br>로그인이 필요합니다.
+    <br><button class="btn-primary" id="btn-login">Google 로그인</button>
   </div>
 
-  <!-- 키워드 없음 -->
-  <div id="no-keyword" class="no-keyword hidden">
-    <span>🔍</span>
-    유튜브에서 검색하면<br>
-    AI 분석이 시작됩니다.
+  <!-- 유튜브에서 검색 유도 -->
+  <div id="screen-empty" class="state-screen hidden">
+    <span class="icon">🔍</span>
+    유튜브에서 검색하면<br>AI 분석이 시작됩니다.
   </div>
 
   <!-- 로딩 -->
-  <div id="loading" class="loading">
-    <div class="loading-steps">
-      <div class="step-row" id="s1">
-        <span class="step-icon">🔍</span>
-        <span class="step-label">영상 검색 중...</span>
-      </div>
-      <div class="step-row" id="s2">
-        <span class="step-icon">📝</span>
-        <span class="step-label">자막 분석 중...</span>
-      </div>
-      <div class="step-row" id="s3">
-        <span class="step-icon">🤖</span>
-        <span class="step-label">AI 교차 분석 중...</span>
+  <div id="screen-loading" class="hidden">
+    <div style="padding: 20px 16px;">
+      <div class="loading-wrap">
+        <div class="step-row" id="s1">
+          <div class="step-icon-wrap" id="s1-icon">🔍</div>
+          <span class="step-label-text">영상 검색 중...</span>
+        </div>
+        <div class="step-row" id="s2">
+          <div class="step-icon-wrap" id="s2-icon">📝</div>
+          <span class="step-label-text">자막 분석 중...</span>
+        </div>
+        <div class="step-row" id="s3">
+          <div class="step-icon-wrap" id="s3-icon">🤖</div>
+          <span class="step-label-text">AI 교차 분석 중...</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- 에러 -->
-  <div id="error-box" class="error-box hidden">
-    <div class="err-icon">⚠️</div>
-    <div class="err-msg" id="err-msg">분석 중 오류가 발생했습니다.</div>
-    <div class="err-sub" id="err-sub"></div>
+  <!-- 오류 -->
+  <div id="screen-error" class="state-screen hidden">
+    <span class="icon">⚠️</span>
+    <div class="error-msg" id="err-msg">분석 중 오류가 발생했습니다.</div>
+    <div class="error-sub" id="err-sub"></div>
     <button class="btn-retry" id="btn-retry">다시 시도</button>
   </div>
 
   <!-- 결과 -->
-  <div id="results">
-    <div id="videos-section"></div>
-    <div id="common-section"></div>
-    <div id="controversy-section"></div>
+  <div id="screen-results" class="body-wrap hidden">
+
+    <!-- 사이드 탭 네비 -->
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="summary" title="인사이트">
+        <span class="tab-icon">📋</span>
+        <span class="tab-label">INSIGHTS</span>
+      </button>
+      <button class="tab-btn" data-tab="insights" title="AI 결론">
+        <span class="tab-icon">💡</span>
+        <span class="tab-label">AI</span>
+      </button>
+      <button class="tab-btn" data-tab="sources" title="소스">
+        <span class="tab-icon">🔗</span>
+        <span class="tab-label">SOURCES</span>
+      </button>
+      <div class="tab-nav-spacer"></div>
+      <button class="tab-btn tab-btn-settings" title="설정" onclick="window.open('https://tubify.app/settings')">
+        <span class="tab-icon">⚙️</span>
+        <span class="tab-label">SETTINGS</span>
+      </button>
+    </div>
+
+    <!-- 콘텐츠 -->
+    <div class="content-wrap">
+
+      <!-- 요약 탭 -->
+      <div id="tab-summary" class="tab-panel active">
+        <div class="keyword-title" id="kw-title-s">-</div>
+        <div class="keyword-underline"></div>
+        <div id="summary-sections"></div>
+      </div>
+
+      <!-- 인사이트 탭 -->
+      <div id="tab-insights" class="tab-panel">
+        <div class="keyword-title" id="kw-title-i">-</div>
+        <div class="keyword-underline"></div>
+        <div id="insights-sections"></div>
+      </div>
+
+      <!-- 소스 탭 -->
+      <div id="tab-sources" class="tab-panel">
+        <div class="source-header">
+          <span class="source-title-text">주요 소스</span>
+          <button class="view-all-btn">VIEW ALL</button>
+        </div>
+        <div id="sources-list"></div>
+      </div>
+
+    </div>
   </div>
 
-  <script>
-    const API = "http://localhost:8000";
-
-    // ── 상태 변수 ──────────────────────────────────────────────
-    let currentKeyword = "";
-    let currentJwt     = "";
-
-    // ── 유틸 ──────────────────────────────────────────────────
-    function esc(s) {
-      return String(s ?? "")
-        .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-        .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    }
-
-    function setStep(n, state) {
-      const el = document.getElementById(`s${n}`);
-      if (!el) return;
-      el.classList.remove("active","done");
-      if (state) el.classList.add(state);
-      const icon = el.querySelector(".step-icon");
-      if (state === "active") icon.innerHTML = `<span class="spinner"></span>`;
-      if (state === "done")   icon.textContent = "✅";
-      if (!state)             icon.textContent = ["","🔍","📝","🤖"][n];
-    }
-
-    function showError(msg, sub = "") {
-      document.getElementById("loading").classList.add("hidden");
-      document.getElementById("results").style.display = "none";
-      const box = document.getElementById("error-box");
-      box.classList.remove("hidden");
-      document.getElementById("err-msg").textContent = msg;
-      document.getElementById("err-sub").textContent = sub;
-    }
-
-    // ── 메인 분석 ─────────────────────────────────────────────
-    async function analyze(keyword, jwt) {
-      currentKeyword = keyword;
-      currentJwt     = jwt;
-
-      document.getElementById("keyword-badge").textContent = `"${keyword}"`;
-      document.getElementById("loading").classList.remove("hidden");
-      document.getElementById("error-box").classList.add("hidden");
-      document.getElementById("results").style.display = "none";
-      setStep(1,"active"); setStep(2,""); setStep(3,"");
-
-      let data;
-      try {
-        // Step 1 → 2 애니메이션
-        await new Promise(r => setTimeout(r, 600));
-        setStep(1,"done"); setStep(2,"active");
-        await new Promise(r => setTimeout(r, 600));
-        setStep(2,"done"); setStep(3,"active");
-
-        const res = await fetch(
-          `${API}/analyze_search?keyword=${encodeURIComponent(keyword)}`,
-          { headers: { "Authorization": `Bearer ${jwt}` } }
-        );
-
-        if (res.status === 401) {
-          showError("세션이 만료됐습니다.", "팝업에서 다시 로그인해주세요.");
-          return;
-        }
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          showError(err.detail || `서버 오류 (${res.status})`, "잠시 후 다시 시도해주세요.");
-          return;
-        }
-        data = await res.json();
-      } catch (e) {
-        showError("백엔드에 연결할 수 없습니다.", "백엔드 서버가 실행 중인지 확인하세요.");
-        return;
-      }
-
-      setStep(3,"done");
-      await new Promise(r => setTimeout(r, 300));
-      document.getElementById("loading").classList.add("hidden");
-      renderResults(data);
-    }
-
-    // ── 결과 렌더링 ──────────────────────────────────────────
-    function renderResults(data) {
-      const videos       = data.videos || [];
-      const commonFacts  = data.common_facts || [];
-      const controversies= data.controversies || [];
-
-      // ── 영상 카드 ──
-      const videosHTML = videos.map(v => {
-        const adBadge = v.ad_detected
-          ? `<span class="badge ad">광고 포함</span>`
-          : `<span class="badge no-ad">광고 없음</span>`;
-        const credBadge = v.credibility_score != null
-          ? `<span class="badge cred">신뢰도 ${Math.round(v.credibility_score * 100)}%</span>`
-          : "";
-        const thumb = v.thumbnail_url
-          ? `<img class="video-thumb" src="${esc(v.thumbnail_url)}" alt="">`
-          : `<div class="video-thumb" style="display:flex;align-items:center;justify-content:center;color:#444;">▶</div>`;
-
-        return `
-        <div class="video-card">
-          <div class="video-card-header">
-            ${thumb}
-            <div class="video-meta">
-              <div class="video-title">
-                <a href="https://youtube.com/watch?v=${esc(v.video_id)}" target="_blank">${esc(v.title)}</a>
-              </div>
-              <div class="video-badges">${adBadge}${credBadge}</div>
-            </div>
-          </div>
-          ${v.summary ? `<div class="video-summary">${esc(v.summary)}</div>` : ""}
-        </div>`;
-      }).join("");
-
-      document.getElementById("videos-section").innerHTML = videosHTML;
-
-      // ── 공통 사실 ──
-      if (commonFacts.length) {
-        document.getElementById("common-section").innerHTML = `
-        <div class="section-block">
-          <div class="section-title">📋 공통 사실</div>
-          ${commonFacts.map(f => `<div class="fact-item">${esc(f)}</div>`).join("")}
-        </div>`;
-      }
-
-      // ── 쟁점 ──
-      if (controversies.length) {
-        document.getElementById("controversy-section").innerHTML = `
-        <div class="section-block">
-          <div class="section-title">⚡ 쟁점</div>
-          ${controversies.map(c => `<div class="controversy-item">${esc(c)}</div>`).join("")}
-        </div>`;
-      }
-
-      document.getElementById("results").style.display = "block";
-    }
-
-    // ── 초기화 ──────────────────────────────────────────────
-    document.getElementById("btn-retry").addEventListener("click", () => {
-      if (currentKeyword && currentJwt) analyze(currentKeyword, currentJwt);
-    });
-
-    document.getElementById("btn-login").addEventListener("click", () => {
-      chrome.tabs.create({ url: `${API}/auth/login` });
-    });
-
-    (async function init() {
-      // JWT 확인
-      const { jwt, loggedIn } = await new Promise(r =>
-        chrome.storage.local.get(["jwt","loggedIn"], r)
-      );
-
-      if (!jwt || !loggedIn) {
-        document.getElementById("loading").classList.add("hidden");
-        document.getElementById("login-needed").classList.remove("hidden");
-        return;
-      }
-
-      // 현재 탭 URL에서 키워드 추출
-      const tabs = await new Promise(r =>
-        chrome.tabs.query({ active: true, currentWindow: true }, r)
-      );
-      const tab = tabs[0];
-      let keyword = "";
-      try {
-        const u = new URL(tab?.url || "");
-        if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
-          keyword = u.searchParams.get("search_query") || "";
-        }
-      } catch {}
-
-      if (!keyword) {
-        document.getElementById("loading").classList.add("hidden");
-        document.getElementById("no-keyword").classList.remove("hidden");
-        return;
-      }
-
-      analyze(keyword, jwt);
-    })();
-  </script>
+  <script src="config.js"></script>
+  <script src="side_panel.js"></script>
 </body>
+
 </html>

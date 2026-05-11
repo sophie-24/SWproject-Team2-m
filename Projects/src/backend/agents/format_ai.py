@@ -1,7 +1,13 @@
+"""
+format_ai -- newsletter format rules (utility module, not an agent)
+
+Gemini를 호출하지 않는 순수 데이터 모듈입니다.
+intent_ai.classify_intent()가 이 맵을 내부에서 직접 참조합니다.
+orchestrator에서 별도로 호출하지 않습니다.
+"""
 from typing import Dict
 
-# Gemini 호출 없이 규칙 기반임. 프롬프트 수정 필요
-_FORMAT_MAP: Dict[str, Dict[str, str]] = {
+FORMAT_MAP: Dict[str, Dict[str, str]] = {
     "유희형": {
         "tone": (
             "친근하고 가벼운 말투로 작성하세요. "
@@ -38,24 +44,4 @@ _FORMAT_MAP: Dict[str, Dict[str, str]] = {
     },
 }
 
-_DEFAULT_FORMAT = _FORMAT_MAP["지식형"]
-
-
-def decide_format(intent_type: str) -> Dict[str, str]:
-    """
-    의도 타입에 맞는 뉴스레터 포맷 스타일 반환.
-    Gemini 호출 없이 규칙 기반으로 결정해 API 호출 횟수를 아낍니다.
-
-    Args:
-        intent_type: "유희형" | "지식형" | "구매형"
-
-    Returns:
-        {
-            "tone":      뉴스레터 문체 지시문,
-            "structure": 콘텐츠 구성 방향 지시문,
-            "length":    "short" | "long",
-        }
-    """
-    fmt = _FORMAT_MAP.get(intent_type, _DEFAULT_FORMAT)
-    print(f"[format_ai] 포맷 결정 완료: intent={intent_type} / length={fmt['length']}")
-    return dict(fmt)
+DEFAULT_FORMAT = FORMAT_MAP["지식형"]

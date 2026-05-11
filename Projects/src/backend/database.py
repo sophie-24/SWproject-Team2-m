@@ -43,7 +43,12 @@ class User(Base):
     # 수신 동의 여부 — False이면 배치에서 완전히 제외
     is_subscribed        = Column(Boolean, nullable=False, default=True)
     unsubscribed_at      = Column(DateTime, nullable=True)
-    created_at           = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # 유튜브 구독 채널 ID 캐시 — JSON 배열 문자열 (예: '["UCxxx","UCyyy"]')
+    # GET /subscriptions 호출 시 갱신, scheduler에서 selector_ai 가산점에 사용
+    subscribed_channels  = Column(Text, nullable=True)
+    # Google OAuth credentials JSON — 서버 재시작 후에도 /subscriptions 호출 가능하도록 DB에 저장
+    oauth_credentials    = Column(Text, nullable=True)
+    created_at           = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class BehaviorLog(Base):
@@ -54,7 +59,7 @@ class BehaviorLog(Base):
     event_type   = Column(String(10), nullable=False)    # 'search' | 'watch'
     keyword      = Column(String(500), nullable=False)
     video_id     = Column(String(50), nullable=True)
-    logged_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    logged_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     # 배치 처리 상태 추적
     status       = Column(String(20), nullable=False, default="pending")  # 'pending'|'processed'|'archived'
     processed_at = Column(DateTime, nullable=True)                         # processed 상태로 바뀐 시점
@@ -75,7 +80,7 @@ class Newsletter(Base):
     user_id          = Column(String(255), nullable=False)
     subject          = Column(String(500), nullable=True)
     content_json     = Column(Text, nullable=False)       # newsletter_ai 출력값 JSON 문자열
-    delivered_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    delivered_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     # 발송 결과 추적
     delivery_status  = Column(String(20), nullable=False, default="generated")  # 'generated'|'sent'|'failed'
     error_message    = Column(Text, nullable=True)        # 실패 시 오류 메시지
@@ -95,7 +100,7 @@ class ReportBatch(Base):
 
     id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id      = Column(String(255), nullable=False)   # google_id 기준
-    started_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    started_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     finished_at  = Column(DateTime, nullable=True)
     status       = Column(String(20), nullable=False, default="created")  # 'created'|'processing'|'completed'|'failed'
     topic_count  = Column(Integer, nullable=True)    # Pipeline B가 추출한 최종 토픽 수
@@ -124,9 +129,9 @@ class UserInterest(Base):
     weight       = Column(Integer, nullable=False, default=1)
     source       = Column(String(20), nullable=False, default="behavior")  # 'behavior'|'onboarding'|'manual'
     last_seen_at = Column(DateTime, nullable=True)        # 해당 토픽이 마지막으로 관찰된 시점
-    created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc),
-                          onupdate=lambda: datetime.now(timezone.utc))
+    created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+                          onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     __table_args__ = (
         UniqueConstraint("user_id", "category", name="uq_user_interest_category"),

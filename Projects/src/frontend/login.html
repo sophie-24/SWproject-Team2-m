@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tubify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div id="login-screen">
+    <nav class="login-nav">
+      <a href="/intro.html" class="login-nav-logo" style="text-decoration:none">Tubify</a>
+      <a href="#" class="login-nav-link">로그인</a>
+    </nav>
+
+    <main class="login-content">
+      <div class="login-card">
+        <div class="login-card-brand">
+          <h1 class="login-card-title">Tubify</h1>
+          <p class="login-card-subtitle">보고 싶은 것만, 핵심만.</p>
+        </div>
+        <button class="google-btn" onclick="login()">
+          <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          Continue with Google
+        </button>
+        <p class="login-card-terms">
+          계속 진행하시면 Tubify의 이용약관 및<br />
+          개인정보처리방침에 동의하시게 됩니다.
+        </p>
+      </div>
+    </main>
+
+    <footer class="login-footer">
+      <span class="login-footer-logo">Tubify</span>
+      <div class="login-footer-links">
+        <a href="/privacy.html">개인정보처리방침</a>
+        <a href="/terms.html">이용약관</a>
+        <a href="#">고객센터</a>
+      </div>
+      <span class="login-footer-copy">© 2026 Tubify. 보고 싶은 것만. 핵심만.</span>
+    </footer>
+  </div>
+
+  <div id="main-screen">
+    <header>
+      <h1>Tubify</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        <a href="/dashboard.html" style="color:#888;font-size:0.82rem;text-decoration:none;">대시보드</a>
+        <button class="logout-btn" onclick="logout()">로그아웃</button>
+      </div>
+    </header>
+
+    <div class="search-bar">
+      <input id="search-input" type="text" placeholder="키워드 입력 (예: 파이썬, AI, 클라우드)" />
+      <button onclick="doSearch()">검색</button>
+      <button onclick="doAnalyze()" id="analyze-btn"
+        style="background:#1a3a5c;color:#6ab4f5;border:1px solid #2a5a8c;border-radius:8px;padding:12px 18px;font-size:1rem;cursor:pointer;font-weight:600;white-space:nowrap">
+        AI 분석
+      </button>
+    </div>
+
+    <div id="analyze-result" style="display:none;margin:0 0 20px;background:#111;border:1px solid #2a2a2a;border-radius:10px;padding:16px"></div>
+    <div id="results"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>

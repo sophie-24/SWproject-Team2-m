@@ -1,13 +1,13 @@
 import os
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Query, Depends, BackgroundTasks, Cookie
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Optional
 from google.oauth2.credentials import Credentials
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +19,7 @@ from youtube_search import search_videos, get_subscriptions
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
 from shared_cache import search_analysis_cache as _search_analysis_cache_shared
-from database import init_db, get_db, Newsletter, UserInterest, UserSubscription
+from database import init_db, get_db, Newsletter, UserInterest
 from behavior_store import save_behavior, get_today_logs
 from trigger import get_triggered_topics
 from agents.pipeB_orchestrator import run_pipeline
@@ -44,15 +44,64 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title="Tubify Backend", lifespan=lifespan)
+app = FastAPI(
+    title="Tubify API",
+    version="1.0.0",
+    description="""
+유튜브 시청 행동 기반 맞춤 뉴스레터 서비스 백엔드입니다.
+
+## 인증
+모든 `/my/*`, `/collect/*`, `/analyze_search`, `/newsletter/*` 엔드포인트는
+`Authorization: Bearer <JWT>` 헤더가 필요합니다.
+
+JWT는 `/auth/callback` 로그인 완료 후 리다이렉트 URL의 `?token=` 파라미터와
+HttpOnly `access_token` 쿠키로 전달됩니다.
+
+## 테스트 상태
+- ✅ 테스트 완료
+- 🚧 미테스트 / 개발 중
+""",
+    lifespan=lifespan,
+    openapi_tags=[
+        {"name": "인증",        "description": "Google OAuth 로그인 및 JWT 발급"},
+        {"name": "행동 수집",   "description": "익스텐션에서 검색·시청 이벤트 수집"},
+        {"name": "프로필",      "description": "사용자 프로필 조회 및 수정"},
+        {"name": "온보딩",      "description": "온보딩 플로우 — 의도 설정 및 관심사 초기화"},
+        {"name": "구독 설정",   "description": "뉴스레터 수신 동의 및 발송 시간 설정"},
+        {"name": "YouTube",     "description": "YouTube 구독 목록 및 영상 검색"},
+        {"name": "뉴스레터",    "description": "뉴스레터 히스토리 조회 및 즉시 발송"},
+        {"name": "AI 분석",     "description": "Pipeline A — 실시간 검색 분석 (사이드패널)"},
+        {"name": "자막",        "description": "YouTube 영상 자막 조회 및 가용 언어 확인"},
+        {"name": "전처리",      "description": "자막 기반 분석 청크 생성"},
+        {"name": "관심사",      "description": "누적 관심사 조회 및 타임라인"},
+        {"name": "프론트엔드",  "description": "정적 HTML, CSS, JavaScript 파일 제공"},
+        {"name": "상태 확인",   "description": "서버 상태 및 헬스체크"},
+        {"name": "관리자",      "description": "관리자 전용 — Admin-Secret 헤더 필요"},
+    ],
+)
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "https://www.youtube.com",  # content.js가 유튜브 페이지 컨텍스트에서 /collect 호출
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── 전역 예외 핸들러 — 500 plain text → JSON 변환 (디버깅용) ───────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.exception(f"[500] {request.method} {request.url.path} — {type(exc).__name__}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__},
+    )
 
 # 정적 파일 서빙 (frontend/ 폴더)
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
@@ -71,16 +120,190 @@ _search_analysis_lock = asyncio.Lock()   # 동일 키워드 동시 요청 시 �
 
 # ── JWT 인증 의존성 ────────────────────────────────────────────────────────────
 
-def get_current_user(token=Depends(security)):
-    user = verify_jwt(token.credentials)
+def get_current_user(
+    token=Depends(optional_security),
+    access_token: Optional[str] = Cookie(None),
+):
+    token_value = token.credentials if token else access_token
+    if token_value and token_value.startswith("Bearer "):
+        token_value = token_value.removeprefix("Bearer ").strip()
+
+    user = verify_jwt(token_value) if token_value else None
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return user
 
 
+class GenericObjectResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+
+class HealthResponse(BaseModel):
+    status: str
+
+
+class AuthMeResponse(BaseModel):
+    user_id: str
+    email: str
+
+
+class SuccessResponse(BaseModel):
+    success: bool
+
+
+class OkResponse(BaseModel):
+    ok: bool
+
+
+class MessageResponse(SuccessResponse):
+    message: str
+
+
+class BehaviorLogItem(BaseModel):
+    event_type: str
+    keyword: str
+    video_id: Optional[str] = None
+    logged_at: str
+
+
+class CollectResponse(BaseModel):
+    saved: bool
+    count: int
+
+
+class TodayLogsResponse(BaseModel):
+    total_logs: int
+    logs: list[BehaviorLogItem]
+    triggered_topics: list[str]
+
+
+class MyLogsResponse(BaseModel):
+    total: int
+    logs: list[BehaviorLogItem]
+    triggered_topics: list[str]
+    profile_categories: list[str]
+    merged_topics: list[str]
+
+
+class SendTimeResponse(SuccessResponse):
+    send_time: list[str]
+
+
+class SettingsResponse(BaseModel):
+    send_time: list[str]
+    is_subscribed: bool
+    delivery_type: Optional[str] = None
+    email: Optional[str] = None
+
+
+class ProfileResponse(BaseModel):
+    email: Optional[str] = None
+    send_time: list[str]
+    initial_intent: Optional[str] = None
+    interest_categories: list[str]
+    is_subscribed: bool
+    created_at: Optional[str] = None
+
+
+class StatsResponse(BaseModel):
+    today_log_count: int
+    triggered_topics: list[str]
+    total_newsletters: int
+    last_sent_at: Optional[str] = None
+
+
+class InterestItem(BaseModel):
+    category: str
+    weight: float
+    updated_at: Optional[str] = None
+
+
+class InterestsResponse(BaseModel):
+    interests: list[InterestItem]
+
+
+class HistoryAnalyzeResponse(BaseModel):
+    categories: list[str]
+    intent_type: str
+
+
+class SubscriptionsResponse(BaseModel):
+    count: int
+    subscriptions: list[dict[str, Any]]
+
+
+class SearchResponse(BaseModel):
+    count: int
+    videos: list[dict[str, Any]]
+
+
+class NewsletterItem(BaseModel):
+    id: str
+    subject: str
+    content_json: Optional[str] = None
+    delivered_at: str
+    delivery_type: Optional[str] = None
+
+
+class NewsletterHistoryResponse(BaseModel):
+    newsletters: list[NewsletterItem]
+
+
+class AnalyzeSearchResponse(GenericObjectResponse):
+    keyword: Optional[str] = None
+
+
+class VideoAnalyzeResponse(BaseModel):
+    video_id: str
+    ad_score: float
+    summary: str
+    key_claims: list[Any]
+    credibility_score: float
+    ad_detected: bool
+
+
+class TranscriptAvailableResponse(BaseModel):
+    video_id: str
+    available: list[Any]
+
+
+class TranscriptResponse(BaseModel):
+    video_id: str
+    count: int
+    transcript: list[Any]
+
+
+class PreprocessResponse(BaseModel):
+    video_id: str
+    total_chunks: int
+    chunks: list[Any]
+
+
+class AdminUserItem(BaseModel):
+    id: str
+    google_id: str
+    email: Optional[str] = None
+    delivery_type: Optional[str] = None
+    created_at: str
+
+
+class AdminUsersResponse(BaseModel):
+    total: int
+    users: list[AdminUserItem]
+
+
+class AdminBehaviorLogItem(BehaviorLogItem):
+    user_id: str
+
+
+class AdminLogsResponse(BaseModel):
+    total: int
+    logs: list[AdminBehaviorLogItem]
+
+
 # ── 정적 파일 ─────────────────────────────────────────────────────────────────
 
-@app.get("/")
+@app.get("/", tags=["프론트엔드"], summary="로그인 페이지 제공 ✅", response_class=HTMLResponse)
 def root():
     # login.html 에 EXTENSION_ID 주입
     with open(os.path.join(FRONTEND_DIR, "login.html"), "r", encoding="utf-8") as f:
@@ -88,65 +311,65 @@ def root():
     html = html.replace("__EXTENSION_ID__", EXTENSION_ID)
     return HTMLResponse(content=html)
 
-@app.get("/home.html")
+@app.get("/home.html", tags=["프론트엔드"], summary="홈 페이지 제공 ✅", response_class=FileResponse)
 def home():
     return FileResponse(os.path.join(FRONTEND_DIR, "home.html"))
 
-@app.get("/onboarding.html")
+@app.get("/onboarding.html", tags=["프론트엔드"], summary="온보딩 페이지 제공 ✅", response_class=HTMLResponse)
 def onboarding():
     with open(os.path.join(FRONTEND_DIR, "onboarding.html"), "r", encoding="utf-8") as f:
         html = f.read()
     html = html.replace("__EXTENSION_ID__", EXTENSION_ID)
     return HTMLResponse(content=html)
 
-@app.get("/dashboard.html")
+@app.get("/dashboard.html", tags=["프론트엔드"], summary="대시보드 페이지 제공 ✅", response_class=FileResponse)
 def dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "dashboard.html"))
 
-@app.get("/search_dashboard.html")
+@app.get("/search_dashboard.html", tags=["프론트엔드"], summary="검색 대시보드 페이지 제공 ✅", response_class=FileResponse)
 def search_dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "search_dashboard.html"))
 
-@app.get("/privacy.html")
+@app.get("/privacy.html", tags=["프론트엔드"], summary="개인정보 처리방침 페이지 제공 ✅", response_class=FileResponse)
 def privacy():
     return FileResponse(os.path.join(FRONTEND_DIR, "privacy.html"))
 
-@app.get("/terms.html")
+@app.get("/terms.html", tags=["프론트엔드"], summary="약관 페이지 제공 ✅", response_class=FileResponse)
 def terms():
     return FileResponse(os.path.join(FRONTEND_DIR, "terms.html"))
 
-@app.get("/intro.html")
+@app.get("/intro.html", tags=["프론트엔드"], summary="서비스 소개 페이지 제공 ✅", response_class=FileResponse)
 def intro():
     return FileResponse(os.path.join(FRONTEND_DIR, "intro.html"))
 
 # login.html / home.html 이 참조하는 정적 에셋 (/static/ 마운트와 별개로 루트 경로 노출)
-@app.get("/app.js")
+@app.get("/app.js", tags=["프론트엔드"], summary="공통 앱 스크립트 제공 ✅", response_class=FileResponse)
 def serve_app_js():
     return FileResponse(os.path.join(FRONTEND_DIR, "app.js"), media_type="application/javascript")
 
-@app.get("/style.css")
+@app.get("/style.css", tags=["프론트엔드"], summary="공통 스타일시트 제공 ✅", response_class=FileResponse)
 def serve_style_css():
     return FileResponse(os.path.join(FRONTEND_DIR, "style.css"), media_type="text/css")
 
-@app.get("/home.js")
+@app.get("/home.js", tags=["프론트엔드"], summary="홈 스크립트 제공 ✅", response_class=FileResponse)
 def serve_home_js():
     return FileResponse(os.path.join(FRONTEND_DIR, "home.js"), media_type="application/javascript")
 
-@app.get("/home.css")
+@app.get("/home.css", tags=["프론트엔드"], summary="홈 스타일시트 제공 ✅", response_class=FileResponse)
 def serve_home_css():
     return FileResponse(os.path.join(FRONTEND_DIR, "home.css"), media_type="text/css")
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse, tags=["상태 확인"], summary="서버 상태 확인 ✅")
 def health():
     return {"status": "ok"}
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
-@app.get("/auth/login")
+@app.get("/auth/login", tags=["인증"], summary="Google OAuth 로그인 시작 ✅", response_class=RedirectResponse)
 def login():
     auth_url, state, code_verifier = create_auth_url()
     _oauth_sessions[state] = code_verifier  # state별로 분리 저장
@@ -154,7 +377,7 @@ def login():
     return RedirectResponse(auth_url)
 
 
-@app.get("/auth/callback")
+@app.get("/auth/callback", tags=["인증"], summary="Google OAuth 콜백 처리 ✅", response_class=RedirectResponse)
 async def callback(
     code: str,
     state: str,
@@ -175,7 +398,10 @@ async def callback(
         logger.error(f"[callback] 토큰 교환 실패: {e}")
         raise HTTPException(status_code=502, detail=f"Google 인증 실패: {e}")
 
-    _oauth_credentials[state] = user_info.get("credentials")
+    import json as _json
+    creds_data = user_info.get("credentials")
+    _oauth_credentials[state] = creds_data  # 메모리 캐시 유지 (기존 호환)
+
     from database import User
     from sqlalchemy import select
 
@@ -196,6 +422,11 @@ async def callback(
     else:
         logger.info(f"[callback] 기존 유저 로그인: {user_info['email']}")
 
+    # OAuth credentials DB 저장 — 서버 재시작 후에도 /subscriptions 동작하도록
+    if creds_data:
+        user.oauth_credentials = _json.dumps(creds_data, ensure_ascii=False)
+        await db.commit()
+
     jwt_token = create_jwt(
         user_id=user_info["google_id"],
         email=user_info["email"],
@@ -207,10 +438,18 @@ async def callback(
     else:
         redirect_url = f"{FRONTEND_URL}/?token={jwt_token}"
 
-    return RedirectResponse(url=redirect_url)
+    response = RedirectResponse(url=redirect_url)
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {jwt_token}",
+        httponly=True,
+        samesite="lax",
+        secure=False,
+    )
+    return response
 
 
-@app.get("/auth/me")
+@app.get("/auth/me", response_model=AuthMeResponse, tags=["인증"], summary="현재 로그인 사용자 조회 ✅")
 def me(user=Depends(get_current_user)):
     return {"user_id": user["user_id"], "email": user["email"]}
 
@@ -218,17 +457,37 @@ def me(user=Depends(get_current_user)):
 # ── 행동 데이터 수집 ───────────────────────────────────────────────────────────
 
 class CollectData(BaseModel):
-    event_type: str        # "search" | "watch"
-    keyword: str
-    video_id: Optional[str] = None
+    event_type: str = Field("search", description="'search' 또는 'watch'")
+    keyword: str = Field("FastAPI Swagger 테스트", description="검색어 또는 영상 제목")
+    video_id: Optional[str] = Field(None, description="시청 이벤트일 때 YouTube video_id")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "event_type": "search",
+                "keyword": "FastAPI Swagger 테스트",
+                "video_id": None,
+            }
+        }
+    )
 
 
-@app.post("/collect")
+@app.post(
+    "/collect",
+    response_model=CollectResponse,
+    tags=["행동 수집"],
+    summary="검색/시청 로그 저장 ✅",
+)
 async def collect(
     data: CollectData,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    익스텐션에서 유저의 검색·시청 이벤트를 수집합니다.
+    - event_type: 'search' | 'watch'
+    - keyword: 검색어 또는 영상 제목
+    """
     result = await save_behavior(
         db=db,
         user_id=user["user_id"],
@@ -238,7 +497,12 @@ async def collect(
     )
     return result
 
-@app.get("/collect/today")
+@app.get(
+    "/collect/today",
+    response_model=TodayLogsResponse,
+    tags=["행동 수집"],
+    summary="오늘 수집된 행동 로그 조회 ✅",
+)
 async def today_logs(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -253,7 +517,12 @@ async def today_logs(
     }
 
 
-@app.get("/my/logs")
+@app.get(
+    "/my/logs",
+    response_model=MyLogsResponse,
+    tags=["행동 수집"],
+    summary="내 행동 로그 및 트리거 주제 조회 ✅",
+)
 async def my_logs(
     limit: int = Query(50, ge=1, le=200),
     user=Depends(get_current_user),
@@ -326,6 +595,7 @@ async def my_logs(
 # ── 발송 시간 유효성 검사 유틸 ────────────────────────────────────────────────
 
 _DEFAULT_SEND_TIME = "21:00"
+_DEFAULT_SEND_TIMES = ["08:00", "21:00"]
 
 
 def _validate_send_time(send_time: str) -> str:
@@ -346,15 +616,86 @@ def _validate_send_time(send_time: str) -> str:
         )
     return send_time
 
+
+def _parse_send_times(raw: Optional[str]) -> list[str]:
+    import json as _json
+
+    if not raw:
+        return _DEFAULT_SEND_TIMES.copy()
+    try:
+        parsed = _json.loads(raw)
+        if isinstance(parsed, list):
+            times = [str(t) for t in parsed if isinstance(t, str) and t.strip()]
+        elif isinstance(parsed, str):
+            times = [parsed]
+        else:
+            times = []
+    except Exception:
+        times = [raw]
+
+    valid_times = []
+    for value in times:
+        try:
+            valid_times.append(_validate_send_time(value))
+        except HTTPException:
+            continue
+    return sorted(set(valid_times)) or _DEFAULT_SEND_TIMES.copy()
+
+
+def _serialize_send_times(send_time: list[str]) -> str:
+    import json as _json
+
+    if not isinstance(send_time, list) or not send_time:
+        raise HTTPException(status_code=400, detail="send_time은 ['08:00', '21:00'] 형식이어야 합니다.")
+    validated = [_validate_send_time(value) for value in send_time]
+    return _json.dumps(sorted(set(validated)), ensure_ascii=False)
+
+
+async def _get_or_create_user(db: AsyncSession, current_user: dict):
+    from database import User
+
+    result = await db.execute(select(User).where(User.google_id == current_user["user_id"]))
+    db_user = result.scalar_one_or_none()
+    if db_user:
+        return db_user
+
+    db_user = User(
+        google_id=current_user["user_id"],
+        email=current_user["email"],
+    )
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+    logger.info(f"[user] JWT 기반 사용자 자동 생성: {current_user['email']}")
+    return db_user
+
 # ── 구독 설정 ─────────────────────────────────────────────────────────────────
 
 class SubscribeData(BaseModel):
-    delivery_type: str = "email"
-    email: Optional[str] = None
-    send_time: Optional[str] = None   # "HH:MM" 단일 시간 — 온보딩 Step1에서는 미사용
+    delivery_type: str = Field("email", description="현재는 email만 사용")
+    email: Optional[str] = Field("test@example.com", description="뉴스레터 수신 이메일")
+    send_time: Optional[list[str]] = Field(
+        default_factory=lambda: ["08:00", "21:00"],
+        description="오전/오후 발송 시간 목록",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "delivery_type": "email",
+                "email": "test@example.com",
+                "send_time": ["08:00", "21:00"],
+            }
+        }
+    )
 
 
-@app.post("/subscribe")
+@app.post(
+    "/subscribe",
+    response_model=SuccessResponse,
+    tags=["구독 설정"],
+    summary="뉴스레터 수신 정보 저장 ✅",
+)
 async def subscribe(
     data: SubscribeData,
     user=Depends(get_current_user),
@@ -363,12 +704,7 @@ async def subscribe(
     """onboarding.html에서 수신 방법 저장 — users 테이블 업데이트"""
     from database import User
 
-    result = await db.execute(
-        select(User).where(User.google_id == user["user_id"])
-    )
-    db_user = result.scalar_one_or_none()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    db_user = await _get_or_create_user(db, user)
 
     db_user.delivery_type = "email"
     if data.email:
@@ -386,10 +722,7 @@ async def subscribe(
             )
         db_user.email = data.email
     if data.send_time:
-        import re as _re
-        if not _re.match(r"^\d{2}:\d{2}$", data.send_time):
-            raise HTTPException(status_code=400, detail="send_time은 HH:MM 형식이어야 합니다")
-        db_user.send_time = data.send_time
+        db_user.send_time = _serialize_send_times(data.send_time)
 
     await db.commit()
     print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
@@ -398,11 +731,28 @@ async def subscribe(
 # ── 마이페이지: 발송 시간 변경 ────────────────────────────────────────────────
 
 class SendTimeData(BaseModel):
-    send_time: str   # "08:00" | "21:00"
+    send_time: list[str] = Field(
+        default_factory=lambda: ["08:00", "21:00"],
+        description="오전/오후 발송 시간 목록",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"send_time": ["08:00", "21:00"]}}
+    )
 
 
-@app.patch("/settings/send_time")
-@app.patch("/my/send-time")
+@app.patch(
+    "/settings/send_time",
+    response_model=SendTimeResponse,
+    tags=["구독 설정"],
+    summary="뉴스레터 발송 시간 변경 ✅",
+)
+@app.patch(
+    "/my/send-time",
+    response_model=SendTimeResponse,
+    tags=["구독 설정"],
+    summary="내 뉴스레터 발송 시간 변경 ✅ (별칭 — /settings/send_time과 동일 핸들러)",
+)
 async def update_send_time(
     data: SendTimeData,
     user=Depends(get_current_user),
@@ -417,26 +767,25 @@ async def update_send_time(
     허용값: "08:00" (아침 8시 KST) | "21:00" (저녁 9시 KST, 기본값)
     변경 즉시 다음 배치부터 반영됩니다.
     """
-    from database import User
+    serialized_times = _serialize_send_times(data.send_time)
+    validated_times = _parse_send_times(serialized_times)
 
-    validated_time = _validate_send_time(data.send_time)
-
-    result = await db.execute(
-        select(User).where(User.google_id == user["user_id"])
-    )
-    db_user = result.scalar_one_or_none()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    db_user = await _get_or_create_user(db, user)
 
     prev_time = db_user.send_time
-    db_user.send_time = validated_time
+    db_user.send_time = serialized_times
     await db.commit()
 
-    logger.info(f"[send-time] {user['user_id']} {prev_time} → {validated_time}")
-    return {"success": True, "send_time": validated_time}
+    logger.info(f"[send-time] {user['user_id']} {prev_time} → {serialized_times}")
+    return {"success": True, "send_time": validated_times}
 
 
-@app.get("/my/settings")
+@app.get(
+    "/my/settings",
+    response_model=SettingsResponse,
+    tags=["구독 설정"],
+    summary="내 구독 설정 조회 ✅",
+)
 async def get_my_settings(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -445,17 +794,10 @@ async def get_my_settings(
     마이페이지 설정 조회.
     발송 시간, 수신 동의 여부, 배송 방법 반환.
     """
-    from database import User
-
-    result = await db.execute(
-        select(User).where(User.google_id == user["user_id"])
-    )
-    db_user = result.scalar_one_or_none()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    db_user = await _get_or_create_user(db, user)
 
     return {
-        "send_time":      db_user.send_time or _DEFAULT_SEND_TIME,
+        "send_time":      _parse_send_times(db_user.send_time),
         "is_subscribed":  db_user.is_subscribed,
         "delivery_type":  db_user.delivery_type,
         "email":          db_user.email,
@@ -464,19 +806,20 @@ async def get_my_settings(
 
 # ── 프로필 조회 / 수정 / 통계 ─────────────────────────────────────────────────
 
-@app.get("/my/profile")
+@app.get(
+    "/my/profile",
+    response_model=ProfileResponse,
+    tags=["프로필"],
+    summary="내 프로필 조회 ✅",
+)
 async def my_profile(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """프로필 전체 조회 — 이메일, 발송 시간, 의도 유형, 관심사 카테고리"""
     import json as _json
-    from database import User
 
-    result = await db.execute(select(User).where(User.google_id == user["user_id"]))
-    db_user = result.scalar_one_or_none()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="유저 없음")
+    db_user = await _get_or_create_user(db, user)
 
     categories = []
     if db_user.interest_categories:
@@ -485,34 +828,43 @@ async def my_profile(
         except Exception:
             pass
 
-    # send_time JSON 배열에서 아침(첫 번째)·저녁(마지막) 분리해서 반환
-    import json as _json_p
-    try:
-        times = _json_p.loads(db_user.send_time or '["21:00"]')
-        times = times if isinstance(times, list) and times else ["21:00"]
-    except Exception:
-        times = ["21:00"]
-    morning_time = times[0] if len(times) > 1 else "08:00"
-    evening_time = times[-1]
+    times = _parse_send_times(db_user.send_time)
 
     return {
         "email":               db_user.email,
-        "send_time":           evening_time,
-        "morning_send_time":   morning_time,
+        "send_time":           times,
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
         "is_subscribed":       db_user.is_subscribed,
         "created_at":          db_user.created_at.isoformat() if db_user.created_at else None,
     }
 
-
 class ProfileUpdateData(BaseModel):
-    send_time:           Optional[str]       = None  # "HH:MM" 저녁 발송 시간
-    morning_send_time:   Optional[str]       = None  # "HH:MM" 아침 발송 시간 — 내부적으로 send_time JSON 배열에 합산
-    interest_categories: Optional[list[str]] = None  # 관심사 카테고리 목록
+    send_time: Optional[list[str]] = Field(
+        None,
+        description="오전/오후 발송 시간 목록",
+    )
+    interest_categories: Optional[list[str]] = Field(
+        None,
+        description="관심사 카테고리 목록",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "send_time": ["08:00", "21:00"],
+                "interest_categories": ["AI", "경제", "테크"],
+            }
+        }
+    )
 
 
-@app.put("/my/profile")
+@app.put(
+    "/my/profile",
+    response_model=OkResponse,
+    tags=["프로필"],
+    summary="내 프로필 수정 ✅",
+)
 async def update_my_profile(
     data: ProfileUpdateData,
     user=Depends(get_current_user),
@@ -520,37 +872,15 @@ async def update_my_profile(
 ):
     """발송 시간 / 관심사 수정.
     관심사 변경 시 user_interests에 신규 카테고리만 추가 (기존 weight 유지).
+    send_time 배열을 수용합니다.
     """
-    import re, json as _json
-    from database import User
+    import json as _json
     from datetime import datetime, timezone
 
-    result = await db.execute(select(User).where(User.google_id == user["user_id"]))
-    db_user = result.scalar_one_or_none()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="유저 없음")
+    db_user = await _get_or_create_user(db, user)
 
-    time_re = re.compile(r'^\d{2}:\d{2}$')
-
-    # send_time / morning_send_time → JSON 배열로 합산해 저장
-    if data.send_time is not None or data.morning_send_time is not None:
-        if data.send_time and not time_re.match(data.send_time):
-            raise HTTPException(status_code=400, detail="send_time 형식은 HH:MM이어야 합니다.")
-        if data.morning_send_time and not time_re.match(data.morning_send_time):
-            raise HTTPException(status_code=400, detail="morning_send_time 형식은 HH:MM이어야 합니다.")
-
-        # 기존 배열에서 아침/저녁 추출
-        try:
-            existing = _json.loads(db_user.send_time or '["21:00"]')
-            existing = existing if isinstance(existing, list) and existing else ["21:00"]
-        except Exception:
-            existing = ["21:00"]
-        cur_morning = existing[0] if len(existing) > 1 else "08:00"
-        cur_evening = existing[-1]
-
-        new_morning = data.morning_send_time if data.morning_send_time is not None else cur_morning
-        new_evening = data.send_time         if data.send_time         is not None else cur_evening
-        db_user.send_time = _json.dumps(sorted(list({new_morning, new_evening})), ensure_ascii=False)
+    if data.send_time is not None:
+        db_user.send_time = _serialize_send_times(data.send_time)
 
     if data.interest_categories is not None:
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
@@ -561,7 +891,7 @@ async def update_my_profile(
                     user_id=user["user_id"],
                     category=category,
                     weight=1,
-                    updated_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
                 .on_conflict_do_nothing(constraint="uq_user_interest_category")
             )
@@ -572,7 +902,12 @@ async def update_my_profile(
     return {"ok": True}
 
 
-@app.get("/my/stats")
+@app.get(
+    "/my/stats",
+    response_model=StatsResponse,
+    tags=["프로필"],
+    summary="내 활동 통계 조회 ✅",
+)
 async def my_stats(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -582,7 +917,7 @@ async def my_stats(
     from datetime import datetime, timezone
 
     today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
+        hour=0, minute=0, second=0, microsecond=0, tzinfo=None
     )
 
     log_count_r = await db.execute(
@@ -619,7 +954,12 @@ async def my_stats(
     }
 
 
-@app.get("/my/interests")
+@app.get(
+    "/my/interests",
+    response_model=InterestsResponse,
+    tags=["관심사"],
+    summary="내 관심사 랭킹 조회 ✅",
+)
 async def my_interests(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -645,11 +985,28 @@ async def my_interests(
 
 
 class ProfileInitData(BaseModel):
-    initial_intent:      str            # '유희형'|'지식형'|'구매형'
-    interest_categories: list[str] = [] # 온보딩에서 선택한 관심사 목록
+    initial_intent: str = Field("지식형", description="'유희형' | '지식형' | '구매형'")
+    interest_categories: list[str] = Field(
+        default_factory=lambda: ["AI", "경제", "테크"],
+        description="온보딩에서 선택한 관심사 목록",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "initial_intent": "지식형",
+                "interest_categories": ["AI", "경제", "테크"],
+            }
+        }
+    )
 
 
-@app.post("/profile/init")
+@app.post(
+    "/profile/init",
+    response_model=OkResponse,
+    tags=["온보딩"],
+    summary="초기 관심사 프로필 저장 ✅",
+)
 async def profile_init(
     data: ProfileInitData,
     user=Depends(get_current_user),
@@ -660,16 +1017,12 @@ async def profile_init(
     user_interests 테이블에 weight=1 초기화 (신규 카테고리만).
     """
     import json as _json
-    from database import User
     from datetime import datetime, timezone
 
     if data.initial_intent not in {"유희형", "지식형", "구매형"}:
         raise HTTPException(status_code=400, detail="initial_intent는 유희형|지식형|구매형 중 하나여야 합니다.")
 
-    result = await db.execute(select(User).where(User.google_id == user["user_id"]))
-    db_user = result.scalar_one_or_none()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="유저 없음")
+    db_user = await _get_or_create_user(db, user)
 
     db_user.initial_intent      = data.initial_intent
     db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
@@ -681,7 +1034,7 @@ async def profile_init(
                 user_id=user["user_id"],
                 category=category,
                 weight=1,
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
             .on_conflict_do_nothing(constraint="uq_user_interest_category")
         )
@@ -693,9 +1046,25 @@ async def profile_init(
 
 
 class HistoryAnalyzeRequest(BaseModel):
-    keywords: list[str]
+    keywords: list[str] = Field(
+        default_factory=lambda: ["생성형 AI", "경제 뉴스", "테크 리뷰"],
+        description="분석할 검색/시청 키워드 목록",
+    )
 
-@app.post("/profile/analyze-history")
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "keywords": ["생성형 AI", "경제 뉴스", "테크 리뷰"]
+            }
+        }
+    )
+
+@app.post(
+    "/profile/analyze-history",
+    response_model=HistoryAnalyzeResponse,
+    tags=["온보딩"],
+    summary="검색 기록 기반 관심사 분석 ✅",
+)
 async def analyze_history(
     body: HistoryAnalyzeRequest,
     user=Depends(get_current_user),
@@ -730,7 +1099,12 @@ async def analyze_history(
     return {"categories": categories, "intent_type": intent_type}
 
 
-@app.delete("/my/subscription")
+@app.delete(
+    "/my/subscription",
+    response_model=MessageResponse,
+    tags=["구독 설정"],
+    summary="뉴스레터 수신 해지 ✅",
+)
 async def unsubscribe(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -751,14 +1125,19 @@ async def unsubscribe(
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
 
     db_user.is_subscribed   = False
-    db_user.unsubscribed_at = datetime.now(timezone.utc)
+    db_user.unsubscribed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     await db.commit()
 
     logger.info(f"[unsubscribe] {user['user_id']} 수신 해지 완료")
     return {"success": True, "message": "수신이 해지되었습니다. 언제든 다시 구독할 수 있습니다."}
 
 
-@app.post("/my/subscription")
+@app.post(
+    "/my/subscription",
+    response_model=MessageResponse,
+    tags=["구독 설정"],
+    summary="뉴스레터 수신 재신청 ✅",
+)
 async def resubscribe(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -784,28 +1163,96 @@ async def resubscribe(
     return {"success": True, "message": "수신 신청이 완료되었습니다."}
 
 
+@app.delete(
+    "/my/withdraw",
+    response_model=SuccessResponse,
+    tags=["프로필"],
+    summary="회원 탈퇴 ✅",
+)
+async def withdraw(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    회원 탈퇴 — 사용자 계정 및 관련 데이터 삭제.
+    users, user_interests, behavior_logs, newsletters 모두 제거.
+    """
+    from database import User, UserInterest, BehaviorLog, Newsletter
+    from sqlalchemy import delete as sql_delete
+
+    user_id = user["user_id"]
+
+    await db.execute(sql_delete(Newsletter).where(Newsletter.user_id == user_id))
+    await db.execute(sql_delete(BehaviorLog).where(BehaviorLog.user_id == user_id))
+    await db.execute(sql_delete(UserInterest).where(UserInterest.user_id == user_id))
+    await db.execute(sql_delete(User).where(User.google_id == user_id))
+    await db.commit()
+
+    logger.info(f"[withdraw] {user_id} 회원 탈퇴 완료")
+    return {"success": True}
+
+
 # ── YouTube ───────────────────────────────────────────────────────────────────
 
-@app.get("/subscriptions")
-def subscriptions(user=Depends(get_current_user)):
-    # 가장 최근 OAuth credentials 탐색 (단일 워커 환경 한정)
+@app.get(
+    "/subscriptions",
+    response_model=SubscriptionsResponse,
+    tags=["YouTube"],
+    summary="YouTube 구독 목록 조회 ✅",
+)
+async def subscriptions(user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """유튜브 구독 목록 조회 (마이페이지용) + 채널 ID를 DB에 캐싱.
+    캐싱된 channel_id 목록은 scheduler에서 selector_ai 가산점에 활용됨.
+    OAuth credentials은 로그인 시 DB에 저장되어 서버 재시작 후에도 동작.
+    """
+    import json as _json
+    from database import User
+
+    result = await db.execute(select(User).where(User.google_id == user["user_id"]))
+    db_user = result.scalar_one_or_none()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+
+    # ── OAuth credentials 로드: 메모리 캐시 → DB 순으로 탐색 ──────────────────
     creds_data = next(iter(_oauth_credentials.values()), None) if _oauth_credentials else None
+    if not creds_data and db_user.oauth_credentials:
+        try:
+            creds_data = _json.loads(db_user.oauth_credentials)
+        except Exception:
+            creds_data = None
+
     if not creds_data:
-        raise HTTPException(status_code=401, detail="OAuth 재로그인 필요 (구독 목록 조회용)")
+        raise HTTPException(
+            status_code=401,
+            detail="구글 재로그인이 필요합니다 (OAuth credentials 없음)",
+        )
 
     creds = Credentials(
         token=creds_data["token"],
-        refresh_token=creds_data["refresh_token"],
+        refresh_token=creds_data.get("refresh_token"),
         token_uri=creds_data["token_uri"],
         client_id=creds_data["client_id"],
         client_secret=creds_data["client_secret"],
         scopes=creds_data["scopes"],
     )
     subs = get_subscriptions(creds)
+
+    # ── 구독 채널 ID DB 캐싱 — scheduler selector_ai 가산점용 ───────────────────
+    channel_ids = [s["channel_id"] for s in subs if s.get("channel_id")]
+    if channel_ids:
+        db_user.subscribed_channels = _json.dumps(channel_ids, ensure_ascii=False)
+        await db.commit()
+        logger.info(f"[subscriptions] {user['user_id']} 채널 {len(channel_ids)}개 캐싱")
+
     return JSONResponse({"count": len(subs), "subscriptions": subs})
 
 
-@app.get("/search")
+@app.get(
+    "/search",
+    response_model=SearchResponse,
+    tags=["YouTube"],
+    summary="YouTube 영상 검색 ✅",
+)
 def search(
     keyword: str = Query(...),
     max_results: int = Query(10, ge=1, le=50),
@@ -816,7 +1263,12 @@ def search(
 
 # ── 뉴스레터 ──────────────────────────────────────────────────────────────────
 
-@app.get("/newsletter/history")
+@app.get(
+    "/newsletter/history",
+    response_model=NewsletterHistoryResponse,
+    tags=["뉴스레터"],
+    summary="뉴스레터 히스토리 조회 ✅",
+)
 async def newsletter_history(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -833,44 +1285,76 @@ async def newsletter_history(
     return JSONResponse({
         "newsletters": [
             {
-                "id":            str(n.id),
-                "subject":       n.subject,
-                "content_json":  n.content_json,
-                "delivered_at":  n.delivered_at.isoformat(),
-                "delivery_type": n.delivery_type,
+                "id":           str(n.id),
+                "subject":      n.subject,
+                "content_json": n.content_json,
+                "delivered_at": n.delivered_at.isoformat(),
             }
             for n in newsletters
         ]
     })
 
 
-@app.post("/newsletter/send-now")
+@app.post(
+    "/newsletter/send-now",
+    tags=["뉴스레터"],
+    summary="즉시 발송 테스트 ✅ (행동 로그 없으면 관심사 기반 fallback 자동 적용)",
+)
 async def send_now(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """즉시 발송 테스트용"""
-    import asyncio
-    from database import User, Newsletter
-    import json
+    """즉시 발송 테스트용 — 스케줄러와 동일한 fallback 순위 적용.
+    1순위: 오늘 행동 로그 기반 triggered_topics
+    2순위: user_interests 상위 토픽
+    3순위: users.interest_categories (온보딩 관심사)
+    """
+    import json as _json
+    from database import Newsletter as NewsletterModel, User, UserInterest
 
-    today_logs = await get_today_logs(db, user_id=user["user_id"])
-    triggered  = get_triggered_topics(today_logs)
+    user_id = user["user_id"]
 
-    if not triggered:
-        raise HTTPException(status_code=404, detail="트리거된 주제 없음 — 유튜브에서 검색해보세요")
+    # 1순위: 오늘 행동 로그 기반
+    today_logs = await get_today_logs(db, user_id=user_id)
+    topics = get_triggered_topics(today_logs)
+
+    if not topics:
+        # 2순위: user_interests 상위 토픽
+        interest_result = await db.execute(
+            select(UserInterest.category)
+            .where(UserInterest.user_id == user_id)
+            .order_by(UserInterest.weight.desc())
+            .limit(10)
+        )
+        topics = [row[0] for row in interest_result.all()]
+
+    if not topics:
+        # 3순위: 온보딩 관심사 (interest_categories)
+        user_result = await db.execute(select(User).where(User.google_id == user_id))
+        db_user = user_result.scalar_one_or_none()
+        if db_user and db_user.interest_categories:
+            try:
+                cats = _json.loads(db_user.interest_categories)
+                topics = cats if isinstance(cats, list) else []
+            except Exception:
+                topics = []
+
+    if not topics:
+        raise HTTPException(
+            status_code=400,
+            detail="사용 가능한 토픽 없음 — 유튜브 검색 후 다시 시도하거나 온보딩에서 관심사를 설정하세요",
+        )
 
     newsletter = await run_pipeline(
-        user_id=user["user_id"],
-        raw_keywords=triggered,
+        user_id=user_id,
+        raw_keywords=topics,
     )
 
-    # DB 저장
-    record = Newsletter(
-        user_id=user["user_id"],
+    record = NewsletterModel(
+        user_id=user_id,
         subject=newsletter.get("subject", ""),
-        content_json=json.dumps(newsletter, ensure_ascii=False),
-        delivery_type="email",
+        content_json=_json.dumps(newsletter, ensure_ascii=False),
+        delivery_status="generated",
     )
     db.add(record)
     await db.commit()
@@ -880,18 +1364,18 @@ async def send_now(
 
 # ── 즉석 검색 분석 ────────────────────────────────────────────────────────────
 
-@app.get("/analyze_search")
+@app.get(
+    "/analyze_search",
+    response_model=AnalyzeSearchResponse,
+    tags=["AI 분석"],
+    summary="검색어 즉석 분석 (Pipeline A) ✅",
+)
 async def analyze_search(
     keyword: str = Query(..., min_length=1),
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    검색어 기반 즉석 분석 — popup/search_dashboard에서 호출.
-    pipeA_orchestrator: selector_ai + intent_ai + analyzer_ai 병렬 실행.
-    사용자별 구독 채널/관심사/시청 이력을 개인화 파라미터로 전달.
-    (user_id + keyword) 기준 인메모리 캐시로 Gemini 중복 호출 방지.
-    """
+    """검색어 기반 즉석 분석 — popup/search_dashboard에서 호출."""
     from pipeA_orchestrator import run_pipeline_a
 
     user_id = user.get("sub", "")
@@ -904,31 +1388,15 @@ async def analyze_search(
         if cache_key in _search_analysis_cache:
             return JSONResponse(_search_analysis_cache[cache_key])
 
-        # 개인화 파라미터 조회 (병렬)
-        sub_result, interest_result, click_result = await asyncio.gather(
-            db.execute(
-                select(UserSubscription.channel_id).where(UserSubscription.user_id == user_id)
-            ),
-            db.execute(
-                select(UserInterest.category)
-                .where(UserInterest.user_id == user_id)
-                .order_by(UserInterest.weight.desc())
-                .limit(10)
-            ),
-            db.execute(
-                select(UserSubscription.channel_id)  # clicked = 구독 채널 중 로그 있는 채널 (근사값)
-                .where(UserSubscription.user_id == user_id)
-            ),
+        interest_result = await db.execute(
+            select(UserInterest.category)
+            .where(UserInterest.user_id == user_id)
+            .order_by(UserInterest.weight.desc())
+            .limit(10)
         )
-        subscribed_channel_ids = [row[0] for row in sub_result.all()]
-        user_categories         = [row[0] for row in interest_result.all()]
-        # 클릭 이력: BehaviorLog에서 채널 ID 추출
-        click_log_result = await db.execute(
-            select(UserSubscription.channel_id)
-            .where(UserSubscription.user_id == user_id)
-        )
-        # BehaviorLog에서 video_url로 채널 구분이 어려우므로 구독 채널을 근사값으로 사용
-        clicked_channel_ids = subscribed_channel_ids  # 향후 BehaviorLog.channel_id 컬럼 추가 시 교체
+        subscribed_channel_ids = []
+        user_categories        = [row[0] for row in interest_result.all()]
+        clicked_channel_ids    = []
 
         try:
             result = await run_pipeline_a(
@@ -947,16 +1415,18 @@ async def analyze_search(
 
 # ── 단일 영상 AI 분석 ─────────────────────────────────────────────────────────
 
-@app.get("/ai_analyze/{video_id}")
+@app.get(
+    "/ai_analyze/{video_id}",
+    response_model=VideoAnalyzeResponse,
+    tags=["AI 분석"],
+    summary="단일 영상 AI 분석 ✅",
+)
 async def ai_analyze_video(
     video_id: str,
     query: str = Query("", description="검색 키워드 (컨텍스트용)"),
     user=Depends(get_current_user),
 ):
-    """
-    단일 영상 AI 분석 — index.html의 'AI 쟁점 분석' 버튼에서 호출.
-    analyzer_ai의 배치 분석을 단일 영상으로 호출.
-    """
+    """단일 영상 AI 분석 — index.html의 AI 쟁점 분석 버튼에서 호출."""
     from agents.analyzer_ai import analyze_videos
 
     cache_key = f"ai_analyze:{video_id}"
@@ -968,16 +1438,15 @@ async def ai_analyze_video(
         video_info = {"video_id": video_id, "title": keyword, "channel_title": "", "duration": 0}
         result = await analyze_videos(keyword=keyword, videos=[video_info])
 
-        # index.html에서 쓰는 필드만 추출해서 반환
         video_results = result.get("videos", [])
         first = video_results[0] if video_results else {}
         response = {
-            "video_id": video_id,
-            "ad_score": first.get("ad_score", 0),
-            "summary": first.get("summary", ""),
-            "key_claims": first.get("key_claims", []),
+            "video_id":          video_id,
+            "ad_score":          first.get("ad_score", 0),
+            "summary":           first.get("summary", ""),
+            "key_claims":        first.get("key_claims", []),
             "credibility_score": first.get("credibility_score", 0.5),
-            "ad_detected": first.get("ad_detected", False),
+            "ad_detected":       first.get("ad_detected", False),
         }
         _search_analysis_cache[cache_key] = response
         return JSONResponse(response)
@@ -987,13 +1456,23 @@ async def ai_analyze_video(
 
 # ── 자막 ──────────────────────────────────────────────────────────────────────
 
-@app.get("/transcript/available/{video_id}")
+@app.get(
+    "/transcript/available/{video_id}",
+    response_model=TranscriptAvailableResponse,
+    tags=["자막"],
+    summary="자막 가용 언어 목록 조회 ✅",
+)
 def transcript_available(video_id: str):
     langs = list_available_transcripts(video_id)
     return JSONResponse({"video_id": video_id, "available": langs})
 
 
-@app.get("/transcript/{video_id}")
+@app.get(
+    "/transcript/{video_id}",
+    response_model=TranscriptResponse,
+    tags=["자막"],
+    summary="영상 자막 조회 ✅ (video_id는 실제 YouTube video_id 입력)",
+)
 def transcript(video_id: str):
     if video_id in _transcript_cache:
         return JSONResponse(_transcript_cache[video_id])
@@ -1010,7 +1489,12 @@ def transcript(video_id: str):
 
 # ── 전처리 ────────────────────────────────────────────────────────────────────
 
-@app.get("/preprocess/{video_id}")
+@app.get(
+    "/preprocess/{video_id}",
+    response_model=PreprocessResponse,
+    tags=["전처리"],
+    summary="자막 청크 분할 ✅ (video_id는 실제 YouTube video_id 입력)",
+)
 def preprocess(
     video_id: str,
     channel_id: str = Query("unknown"),
@@ -1024,16 +1508,16 @@ def preprocess(
             raise HTTPException(status_code=404, detail="자막을 찾을 수 없습니다")
         formatted = format_transcript_with_timestamps(raw)
         _transcript_cache[video_id] = {
-            "video_id": video_id,
-            "count": len(formatted),
+            "video_id":   video_id,
+            "count":      len(formatted),
             "transcript": formatted,
         }
 
     chunks = chunk_transcript(formatted, video_id, channel_id, chunk_size)
     return JSONResponse({
-        "video_id": video_id,
+        "video_id":     video_id,
         "total_chunks": len(chunks),
-        "chunks": chunks,
+        "chunks":       chunks,
     })
 
 
@@ -1046,12 +1530,17 @@ def get_admin(token=Depends(security)):
     return True
 
 
-@app.get("/admin.html")
+@app.get("/admin.html", tags=["관리자"], include_in_schema=False)
 def admin_page():
     return FileResponse(os.path.join(FRONTEND_DIR, "admin.html"))
 
 
-@app.get("/admin/users")
+@app.get(
+    "/admin/users",
+    response_model=AdminUsersResponse,
+    tags=["관리자"],
+    summary="전체 유저 목록 🔒 (Authorize에 admin1234 입력)",
+)
 async def admin_users(
     admin=Depends(get_admin),
     db: AsyncSession = Depends(get_db),
@@ -1075,7 +1564,12 @@ async def admin_users(
     }
 
 
-@app.get("/admin/logs")
+@app.get(
+    "/admin/logs",
+    response_model=AdminLogsResponse,
+    tags=["관리자"],
+    summary="오늘 전체 행동 로그 🔒 (Authorize에 admin1234 입력)",
+)
 async def admin_logs(
     admin=Depends(get_admin),
     db: AsyncSession = Depends(get_db),
@@ -1083,7 +1577,7 @@ async def admin_logs(
     """오늘 전체 행동 로그"""
     from database import BehaviorLog
     from datetime import datetime, timezone
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
     result = await db.execute(
         select(BehaviorLog)
         .where(BehaviorLog.logged_at >= today)
@@ -1105,15 +1599,19 @@ async def admin_logs(
     }
 
 
-@app.post("/admin/pipeline/run")
+@app.post(
+    "/admin/pipeline/run",
+    tags=["관리자"],
+    summary="특정 유저 파이프라인 즉시 실행 🔒 (Authorize에 admin1234 입력)",
+)
 async def admin_run_pipeline(
     user_id: str,
     admin=Depends(get_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """특정 유저 파이프라인 즉시 실행 (google_id 기준)"""
-    import asyncio, json
-    from database import User, Newsletter
+    import json
+    from database import Newsletter
 
     logs      = await get_today_logs(db, user_id=user_id)
     triggered = get_triggered_topics(logs)
@@ -1130,7 +1628,6 @@ async def admin_run_pipeline(
         user_id=user_id,
         subject=newsletter.get("subject", ""),
         content_json=json.dumps(newsletter, ensure_ascii=False),
-        delivery_type="email",
     )
     db.add(record)
     await db.commit()

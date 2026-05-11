@@ -73,10 +73,12 @@ async def _save_newsletter(
     return record
 
 
-async def _deliver_newsletter(user: User, newsletter: Dict[str, Any]) -> Dict[str, Any]:
+async def _deliver_newsletter(
+    user: User, newsletter: Dict[str, Any], newsletter_type: str = "interest"
+) -> Dict[str, Any]:
     """이메일 발송 후 결과 딕셔너리 반환. {"success": bool, "error": str(optional)}"""
     try:
-        result = send_email(user_email=user.email, newsletter=newsletter)
+        result = send_email(user_email=user.email, newsletter=newsletter, newsletter_type=newsletter_type)
         if result is None:
             return {"success": True}
         return result
@@ -91,7 +93,7 @@ async def _update_user_interests(db, user_id: str, topics: List[str]) -> None:
     Gemini 추가 호출 없음 -- merged_topics 재활용.
     2차 설계: source='behavior', last_seen_at 기록 추가.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     for topic in topics:
         stmt = (
             pg_insert(UserInterest)
@@ -161,7 +163,7 @@ async def _get_fallback_topics(db, user: "User", today_logs: List[Dict]) -> List
 async def _already_sent_in_window(db, user_id: str, hours: int = 10) -> bool:
     """최근 N시간 이내에 발송된 뉴스레터가 있으면 True (오전/오후 슬롯 중복 방지)"""
     from datetime import timedelta
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
     result = await db.execute(
         select(Newsletter).where(
             Newsletter.user_id == user_id,
@@ -210,7 +212,7 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                     logger.warning(f"  [skip] {user.email} already sent today")
                     continue
 
-                now = datetime.now(timezone.utc)
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
 
                 # 1. ReportBatch 생성 (status='created') — window_type / period_start / period_end 기록
                 today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -260,7 +262,7 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                 if not merged_topics:
                     logger.warning(f"  [skip] {user.email} no topics")
                     batch.status = "failed"
-                    batch.finished_at = datetime.now(timezone.utc)
+                    batch.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     await db.commit()
                     continue
 
@@ -273,17 +275,22 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                         .values(
                             status="processed",
                             batch_id=batch.id,
-                            processed_at=datetime.now(timezone.utc),
+                            processed_at=datetime.now(timezone.utc).replace(tzinfo=None),
                         )
                     )
                     await db.commit()
 
-                # 5. 파이프라인 실행
-                # TODO: YouTube API로 구독 채널 실시간 조회 후 가중치 부여
+                # 5. 파이프라인 실행 — 구독 채널 ID DB 캐시 로드 (selector_ai 가산점용)
+                try:
+                    sub_ch = json.loads(user.subscribed_channels or "[]")
+                    sub_ch = sub_ch if isinstance(sub_ch, list) else []
+                except Exception:
+                    sub_ch = []
+
                 newsletter = await run_pipeline(
                     user_id=str(user.google_id),
                     raw_keywords=triggered_topics,
-                    subscribed_channel_ids=[],
+                    subscribed_channel_ids=sub_ch,
                     initial_intent=user.initial_intent,
                     today_logs=today_logs,
                 )
@@ -304,7 +311,7 @@ async def _run_batch_for_send_time(send_time: str) -> None:
 
                 # 8. ReportBatch 완료 마킹
                 batch.status = "completed"
-                batch.finished_at = datetime.now(timezone.utc)
+                batch.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
                 batch.topic_count = len(merged_topics)
                 await db.commit()
 
@@ -316,7 +323,7 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                 if batch is not None:
                     try:
                         batch.status = "failed"
-                        batch.finished_at = datetime.now(timezone.utc)
+                        batch.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
                         await db.commit()
                     except Exception:
                         pass

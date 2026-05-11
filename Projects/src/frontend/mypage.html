@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tubify — 마이페이지</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans KR", "Segoe UI", sans-serif;
+      background: #f7f9fb;
+      color: #191c1e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── 네비게이션 ── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      background: rgba(247, 249, 251, 0.8);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    }
+
+    .nav-logo {
+      font-size: 24px;
+      font-weight: 800;
+      color: red;
+      letter-spacing: -0.02em;
+      text-decoration: none;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .nav-link {
+      font-size: 18px;
+      font-weight: 500;
+      color: #191c1e;
+      text-decoration: none;
+      letter-spacing: -0.025em;
+      transition: color 0.15s;
+    }
+
+    .nav-link:hover { color: #bc0100; }
+
+    .nav-link.active {
+      font-weight: 600;
+      color: #bc0100;
+      border-bottom: 2px solid #bc0100;
+      padding-bottom: 2px;
+    }
+
+    .nav-logout {
+      background: #e6e8ea;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .nav-logout:hover { background: #d1d5db; }
+
+    /* ── 메인 ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 80px 24px 0;
+    }
+
+    .page-container {
+      width: 100%;
+      max-width: 848px;
+      display: flex;
+      flex-direction: column;
+      gap: 64px;
+      padding-bottom: 80px;
+    }
+
+    .page-title {
+      font-size: 36px;
+      font-weight: 800;
+      color: #191c1e;
+      text-align: center;
+      letter-spacing: -0.025em;
+      line-height: 1.1;
+    }
+
+    /* ── 프로필 카드 ── */
+    .profile-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(25, 28, 30, 0.04);
+      padding: 32px;
+    }
+
+    .profile-name {
+      font-size: 24px;
+      font-weight: 700;
+      color: #191c1e;
+      line-height: 1.33;
+    }
+
+    .profile-email {
+      font-size: 16px;
+      font-weight: 400;
+      color: #515f74;
+      line-height: 1.5;
+      margin-top: 4px;
+    }
+
+    /* ── 관심사 섹션 ── */
+    .section-card {
+      background: #f2f4f6;
+      border-radius: 12px;
+      box-shadow: 0 20px 20px rgba(25, 28, 30, 0.04);
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .section-icon {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #191c1e;
+      line-height: 1.4;
+    }
+
+    .interest-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .interest-tag {
+      background: #fff;
+      border: 1px solid #e0e3e5;
+      border-radius: 9999px;
+      padding: 13px 25px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #57657a;
+      line-height: 1.5;
+      white-space: nowrap;
+    }
+
+    .interest-tags-empty {
+      font-size: 14px;
+      color: #515f74;
+      margin-bottom: 32px;
+    }
+
+    .btn-edit-interest {
+      display: inline-flex;
+      align-items: center;
+      background: #bc0100;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 48px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 0 10px rgba(188, 1, 0, 0.1);
+      transition: background 0.15s;
+      text-decoration: none;
+      align-self: flex-start;
+    }
+
+    .btn-edit-interest:hover { background: #9a0000; }
+
+    /* ── Delivery Schedule ── */
+    .schedule-desc {
+      font-size: 14px;
+      color: #515f74;
+      margin-bottom: 32px;
+    }
+
+    .schedule-btns {
+      display: flex;
+      gap: 16px;
+    }
+
+    .btn-schedule {
+      flex: 1;
+      background: #fff;
+      border: 2px solid red;
+      border-radius: 12px;
+      padding: 18px 26px;
+      font-size: 16px;
+      font-weight: 700;
+      color: red;
+      text-align: center;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-schedule:hover { background: #fff5f5; }
+
+    /* ── 액션 행 ── */
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid #e0e3e5;
+      padding: 34px 0 33px;
+    }
+
+    .action-info { display: flex; flex-direction: column; gap: 2px; }
+
+    .action-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #191c1e;
+    }
+
+    .action-desc {
+      font-size: 14px;
+      color: #515f74;
+    }
+
+    .btn-action {
+      background: #e6e8ea;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #191c1e;
+      cursor: pointer;
+      font-family: inherit;
+      flex-shrink: 0;
+      transition: background 0.15s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .btn-action:hover { background: #d1d5db; }
+
+    .btn-action.danger { color: #dc2626; }
+    .btn-action.danger:hover { background: #fee2e2; }
+
+    /* ── 모달 ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(25, 28, 30, 0.4);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(25, 28, 30, 0.06);
+      width: 100%;
+      max-width: 520px;
+      overflow: hidden;
+      transform: translateY(12px);
+      transition: transform 0.2s;
+    }
+
+    .modal-overlay.open .modal { transform: translateY(0); }
+
+    .modal-header {
+      padding: 40px 32px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #191c1e;
+      letter-spacing: -0.025em;
+      text-align: center;
+    }
+
+    .modal-subtitle {
+      font-size: 14px;
+      color: #515f74;
+      text-align: center;
+    }
+
+    .modal-body {
+      padding: 0 32px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    .time-picker-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .time-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #515f74;
+      letter-spacing: 0.02em;
+    }
+
+    .time-input-wrap {
+      position: relative;
+    }
+
+    .time-input-wrap .time-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      pointer-events: none;
+    }
+
+    .time-input {
+      width: 100%;
+      background: #f2f4f6;
+      border: none;
+      border-radius: 12px;
+      padding: 16px 16px 16px 48px;
+      font-size: 16px;
+      font-weight: 500;
+      color: #191c1e;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .time-input:focus {
+      outline: 2px solid red;
+      outline-offset: -2px;
+    }
+
+    .modal-footer {
+      background: rgba(242, 244, 246, 0.5);
+      padding: 24px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-modal-cancel {
+      width: 145px;
+      flex-shrink: 0;
+      background: transparent;
+      border: 1px solid #a6a6a6;
+      border-radius: 12px;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #515f74;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .btn-modal-cancel:hover { background: #f2f4f6; }
+
+    .btn-modal-save {
+      flex: 1;
+      background: linear-gradient(135deg, #bc0100 0%, #eb0000 100%);
+      border: none;
+      border-radius: 12px;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 20px 20px rgba(25, 28, 30, 0.06);
+      transition: opacity 0.15s;
+    }
+
+    .btn-modal-save:hover { opacity: 0.9; }
+
+    /* ── 푸터 ── */
+    .footer {
+      border-top: 1px solid rgba(244, 244, 245, 0.1);
+      padding: 48px 24px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .footer-logo { font-size: 18px; font-weight: 700; color: red; }
+
+    .footer-links { display: flex; gap: 32px; }
+
+    .footer-links a {
+      font-size: 14px;
+      color: #71717a;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-links a:hover { color: #191c1e; }
+
+    .footer-copy { margin-left: auto; font-size: 14px; color: #71717a; }
+  </style>
+</head>
+
+<body>
+
+  <!-- 네비게이션 -->
+  <nav class="nav">
+    <a href="/dashboard.html" class="nav-logo">Tubify</a>
+    <div class="nav-links">
+      <a href="/dashboard.html" class="nav-link">홈</a>
+      <a href="/mypage.html" class="nav-link active">마이페이지</a>
+    </div>
+    <button class="nav-logout" onclick="logout()">로그아웃</button>
+  </nav>
+
+  <!-- 메인 -->
+  <main class="main">
+    <div class="page-container">
+
+      <h1 class="page-title">마이페이지</h1>
+
+      <!-- 프로필 카드 -->
+      <div class="profile-card">
+        <div class="profile-name" id="profile-name">-</div>
+        <div class="profile-email" id="profile-email">-</div>
+      </div>
+
+      <!-- 관심사 섹션 -->
+      <div class="section-card">
+        <div class="section-header">
+          <svg class="section-icon" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11 2L12.5 9L19 11L12.5 13L11 20L9.5 13L3 11L9.5 9L11 2Z" fill="red"/>
+          </svg>
+          <span class="section-title" id="interest-title">관심사</span>
+        </div>
+        <div class="interest-tags" id="interest-tags">
+          <span class="interest-tags-empty">관심사를 불러오는 중...</span>
+        </div>
+        <a href="/home.html?from=dashboard" class="btn-edit-interest">관심사 수정</a>
+      </div>
+
+      <!-- Delivery Schedule -->
+      <div class="section-card">
+        <div class="section-header">
+          <svg class="section-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="8.5" stroke="#191c1e" stroke-width="1.5"/>
+            <path d="M10 6V10.5L13 12.5" stroke="#191c1e" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span class="section-title">Delivery Schedule</span>
+        </div>
+        <p class="schedule-desc">하루 두 번, 요약 레포트 수신 시간을 설정하세요.</p>
+        <div class="schedule-btns">
+          <button class="btn-schedule" id="btn-morning" onclick="openModal('morning')">
+            1차: <span id="morning-display">오전 08:00</span>
+          </button>
+          <button class="btn-schedule" id="btn-evening" onclick="openModal('evening')">
+            2차: <span id="evening-display">오후 09:00</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 이용 가이드 -->
+      <div class="action-row">
+        <div class="action-info">
+          <span class="action-title">이용 가이드</span>
+          <span class="action-desc">탈퇴 시 회원정보는 개인정보 처리방침에 의해 처리됩니다.</span>
+        </div>
+        <a href="/intro.html" class="btn-action">보러 가기</a>
+      </div>
+
+      <!-- 회원 탈퇴 -->
+      <div class="action-row">
+        <div class="action-info">
+          <span class="action-title">회원 탈퇴</span>
+          <span class="action-desc">탈퇴 시 회원정보는 개인정보 처리방침에 의해 처리됩니다.</span>
+        </div>
+        <button class="btn-action danger" onclick="confirmWithdraw()">회원 탈퇴</button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- 푸터 -->
+  <footer class="footer">
+    <span class="footer-logo">Tubify</span>
+    <div class="footer-links">
+      <a href="/privacy.html">개인정보처리방침</a>
+      <a href="/terms.html">이용약관</a>
+    </div>
+    <span class="footer-copy">© 2026 Tubify. 보고 싶은 것만. 핵심만.</span>
+  </footer>
+
+  <!-- 수신 시간 설정 모달 -->
+  <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">수신 시간 설정</h2>
+        <p class="modal-subtitle">인사이트를 받아보실 최적의 시간을 선택해주세요.</p>
+      </div>
+      <div class="modal-body">
+        <div class="time-picker-group">
+          <label class="time-label" for="input-morning">1차 수신 시간</label>
+          <div class="time-input-wrap">
+            <svg class="time-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="8.5" stroke="#515f74" stroke-width="1.5"/>
+              <path d="M10 6V10.5L13 12.5" stroke="#515f74" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input class="time-input" type="time" id="input-morning" value="08:00" />
+          </div>
+        </div>
+        <div class="time-picker-group">
+          <label class="time-label" for="input-evening">2차 수신 시간</label>
+          <div class="time-input-wrap">
+            <svg class="time-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="8.5" stroke="#515f74" stroke-width="1.5"/>
+              <path d="M10 6V10.5L13 12.5" stroke="#515f74" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M7 3.5L10 2L13 3.5" stroke="#515f74" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            <input class="time-input" type="time" id="input-evening" value="21:00" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" onclick="closeModal()">취소</button>
+        <button class="btn-modal-save" onclick="saveSchedule()">저장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = "";
+
+    async function loadProfile() {
+      const jwt = localStorage.getItem("access_token");
+      if (!jwt) { window.location.href = "/"; return; }
+
+      try {
+        const res = await fetch(`${API}/my/profile`, {
+          headers: { "Authorization": `Bearer ${jwt}` }
+        });
+        if (res.status === 401) { window.location.href = "/"; return; }
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const name = data.name || data.display_name || data.email?.split("@")[0] || "사용자";
+        const email = data.email || "";
+        const interests = Array.isArray(data.interest_categories) ? data.interest_categories : [];
+
+        document.getElementById("profile-name").textContent = name;
+        document.getElementById("profile-email").textContent = email;
+        document.getElementById("interest-title").textContent = `${name} 님의 관심사`;
+
+        const tagsEl = document.getElementById("interest-tags");
+        tagsEl.innerHTML = interests.length > 0
+          ? interests.map(t => `<span class="interest-tag">${escHtml(t)}</span>`).join("")
+          : `<span class="interest-tags-empty">아직 설정된 관심사가 없어요.</span>`;
+
+        // 발송 시간 로드
+        const sendTimes = Array.isArray(data.send_time) ? data.send_time : [data.send_time || "21:00"];
+        const morning = sendTimes[0] || "08:00";
+        const evening = sendTimes[sendTimes.length - 1] || "21:00";
+        document.getElementById("input-morning").value = morning;
+        document.getElementById("input-evening").value = evening;
+        updateScheduleDisplay(morning, evening);
+      } catch (e) {
+        console.warn("[mypage] 프로필 로드 실패:", e);
+      }
+    }
+
+    function updateScheduleDisplay(morning, evening) {
+      document.getElementById("morning-display").textContent = formatTime(morning);
+      document.getElementById("evening-display").textContent = formatTime(evening);
+    }
+
+    function formatTime(hhmm) {
+      const [h, m] = hhmm.split(":").map(Number);
+      const ampm = h < 12 ? "오전" : "오후";
+      const hour = h % 12 || 12;
+      return `${ampm} ${String(hour).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+
+    function openModal(target) {
+      document.getElementById("modal-overlay").classList.add("open");
+      const focusEl = target === "morning" ? "input-morning" : "input-evening";
+      setTimeout(() => document.getElementById(focusEl).focus(), 100);
+    }
+
+    function closeModal() {
+      document.getElementById("modal-overlay").classList.remove("open");
+    }
+
+    function handleOverlayClick(e) {
+      if (e.target === document.getElementById("modal-overlay")) closeModal();
+    }
+
+    async function saveSchedule() {
+      const jwt = localStorage.getItem("access_token");
+      const morning = document.getElementById("input-morning").value;
+      const evening = document.getElementById("input-evening").value;
+
+      try {
+        const res = await fetch(`${API}/my/profile`, {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${jwt}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ send_time: [morning, evening] })
+        });
+        if (res.ok) {
+          updateScheduleDisplay(morning, evening);
+          closeModal();
+        } else {
+          alert("저장에 실패했습니다. 다시 시도해주세요.");
+        }
+      } catch (e) {
+        alert("서버에 연결할 수 없습니다.");
+      }
+    }
+
+    async function confirmWithdraw() {
+      if (!confirm("정말 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.")) return;
+
+      const jwt = localStorage.getItem("access_token");
+      try {
+        const res = await fetch(`${API}/my/withdraw`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${jwt}` }
+        });
+        if (res.ok) {
+          alert("탈퇴가 완료되었습니다.");
+          logout();
+        } else {
+          alert("탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+        }
+      } catch (e) {
+        alert("서버에 연결할 수 없습니다. 다시 시도해주세요.");
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem("access_token");
+      sessionStorage.removeItem("loggedIn");
+      window.location.href = "/";
+    }
+
+    function escHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") closeModal();
+    });
+
+    loadProfile();
+  </script>
+</body>
+
+</html>

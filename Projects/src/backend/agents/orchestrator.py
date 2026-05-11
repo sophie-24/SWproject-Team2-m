@@ -1,8 +1,6 @@
-import concurrent.futures
 from typing import List, Dict, Any, Optional
 
 from agents.intent_ai import classify_intent
-from agents.format_ai import decide_format
 from agents.cluster_ai import cluster_topics
 from agents.selector_ai import select_top_videos
 from agents.analyzer_ai import analyze_videos
@@ -41,20 +39,14 @@ def run_pipeline(
     if clicked_video_titles is None:
         clicked_video_titles = []
 
-    # ── Step 0: 의도 분류 + 포맷 결정 (병렬) ──────────────────────────────────
-    print(f"[orchestrator] Step 0 — 의도 분류 + 포맷 결정 (병렬)")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        future_intent = executor.submit(
-            classify_intent,
-            raw_keywords,
-            clicked_video_titles,
-        )
-        # intent 결과를 기다렸다가 format 결정 (format은 intent 타입이 필요)
-        # → intent가 매우 빠르므로 순차 처리와 차이 없음. 안전하게 순차로.
-        intent_result = future_intent.result()
+    # ── Step 0: 의도 분류 (format_style 포함) ─────────────────────────────────
+    # classify_intent()가 FORMAT_MAP 딕셔너리 조회까지 내부에서 처리하므로
+    # decide_format() 별도 호출 불필요. ThreadPoolExecutor도 제거.
+    print("[orchestrator] Step 0 — 의도 분류")
+    intent_result = classify_intent(raw_keywords, clicked_video_titles)
 
     intent_type = intent_result.get("intent_type") or initial_intent or "지식형"
-    format_style = decide_format(intent_type)
+    format_style = intent_result["format_style"]
     print(f"[orchestrator] 의도={intent_type} / 길이={format_style['length']}")
 
     # ── Step 1: 주제 클러스터링 ────────────────────────────────────────────────

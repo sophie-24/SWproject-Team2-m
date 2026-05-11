@@ -1,4 +1,4 @@
-const API = "http://localhost:8000";
+// API 주소는 config.js의 API_BASE를 사용합니다 (popup.html에서 config.js 선행 로드됨)
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 
@@ -36,11 +36,11 @@ function get(keys) {
 
 async function checkServer() {
   try {
-    const res = await fetch(`${API}/health`, { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000) });
     const ok = res.ok;
     serverDot.className = `dot ${ok ? "on" : "off"}`;
     serverStatus.textContent = ok
-      ? "서버 연결됨 (localhost:8000)"
+      ? `서버 연결됨 (${API_BASE})`
       : "서버 오프라인 — 백엔드를 먼저 실행하세요";
     return ok;
   } catch {
@@ -79,7 +79,7 @@ function isYouTube(url) {
 async function loadVideoPreview(keyword) {
   videoPreview.innerHTML = `<div style="font-size:0.78rem;color:#444;padding:4px 0;"><span class="spinner"></span>영상 목록 로딩 중...</div>`;
   try {
-    const res = await fetch(`${API}/search?keyword=${encodeURIComponent(keyword)}&max_results=5`);
+    const res = await fetch(`${API_BASE}/search?keyword=${encodeURIComponent(keyword)}&max_results=5`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const videos = data.videos || [];
@@ -120,7 +120,7 @@ async function loadSubscriptions(jwt) {
   const channelCount = document.getElementById("channel-count");
   channelList.innerHTML = `<span style="color:#555;font-size:0.78rem;"><span class="spinner"></span>불러오는 중...</span>`;
   try {
-    const res = await fetch(`${API}/subscriptions`, {
+    const res = await fetch(`${API_BASE}/subscriptions`, {
       headers: { "Authorization": `Bearer ${jwt}` },
     });
     if (res.status === 401) {
@@ -158,19 +158,45 @@ function renderLoggedOut() {
 
 // ── 이벤트 ───────────────────────────────────────────────────────────────────
 
-document.getElementById("btn-login").addEventListener("click", () => {
-  chrome.tabs.create({ url: `${API}/auth/login` });
-  // 로그인 완료 후 JWT 저장 확인 polling
+document.getElementById("btn-login").addEventListener("click", async () => {
+  // 새 탭 대신 작은 팝업창에서 OAuth 진행
+  // → 로그인 완료 시 창이 자동으로 닫히고 JWT가 chrome.storage에 저장됨
+  const authWin = window.open(
+    `${API_BASE}/auth/login`,
+    "tubify_auth",
+    "width=520,height=660,left=300,top=80,toolbar=no,menubar=no,scrollbars=yes"
+  );
+
+  if (!authWin) {
+    // 팝업 차단된 경우 fallback: 새 탭으로 열기
+    chrome.tabs.create({ url: `${API_BASE}/auth/login` });
+  }
+
+  // JWT가 storage에 저장될 때까지 1초마다 확인
   const poll = setInterval(async () => {
     const { jwt } = await get(["jwt"]);
-    if (jwt) {
-      clearInterval(poll);
-      chrome.storage.local.set({ loggedIn: true });
-      renderLoggedIn(jwt);
-      showMsg("로그인 완료!");
+    if (!jwt) return;
+
+    clearInterval(poll);
+    try { authWin?.close(); } catch (_) {}
+
+    chrome.storage.local.set({ loggedIn: true });
+    renderLoggedIn(jwt);
+    showMsg("로그인 완료! 분석 시작...");
+
+    // 현재 탭이 유튜브 검색 중이면 → 사이드패널 즉시 오픈 후 팝업 닫기
+    const tab = await getCurrentTab();
+    const kw = extractKeyword(tab?.url || "");
+    if (kw && tab?.id) {
+      chrome.runtime.sendMessage(
+        { type: "OPEN_SIDE_PANEL", tabId: tab.id, keyword: kw },
+        () => { window.close(); }
+      );
     }
-  }, 2000);
-  setTimeout(() => clearInterval(poll), 30000);
+  }, 1000);
+
+  // 60초 후 polling 자동 종료
+  setTimeout(() => clearInterval(poll), 60000);
 });
 
 document.getElementById("btn-refresh").addEventListener("click", async () => {
@@ -199,23 +225,14 @@ document.getElementById("btn-logout").addEventListener("click", async () => {
     renderLoggedOut();
   }
 
-  if (!serverOk) return;
-
-  // 현재 탭 분석
+  // 현재 탭 URL 기반 섹션 표시
   const tab = await getCurrentTab();
-  const tabUrl = tab?.url || "";
-  const keyword = extractKeyword(tabUrl);
+  const url = tab?.url || "";
+  const keyword = extractKeyword(url);
 
-  if (keyword && isLoggedIn) {
+  if (keyword) {
     showSearchSection(keyword, jwt);
-  } else if (keyword && !isLoggedIn) {
-    // 검색어는 있지만 미로그인 → 로그인 유도 메시지
-    sectionSearch.classList.remove("hidden");
-    keywordText.textContent = keyword;
-    videoPreview.innerHTML = `<div style="font-size:0.78rem;color:#555;padding:4px 0;">로그인하면 요약을 볼 수 있습니다.</div>`;
-    document.getElementById("btn-dashboard").disabled = true;
-    document.getElementById("btn-dashboard").textContent = "로그인 후 이용 가능";
-  } else if (isYouTube(tabUrl)) {
+  } else if (isYouTube(url)) {
     sectionIdle.classList.remove("hidden");
   } else {
     sectionNotYT.classList.remove("hidden");

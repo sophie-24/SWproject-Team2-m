@@ -7,7 +7,7 @@ from database import BehaviorLog
 async def save_behavior(
     db: AsyncSession,
     user_id: str,
-    event_type: str,       # "search" | "watch"
+    event_type: str,
     keyword: str,
     video_id: str = None,
 ) -> dict:
