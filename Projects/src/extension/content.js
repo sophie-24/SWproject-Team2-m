@@ -14,8 +14,9 @@ let _searchDebounceTimer  = null;  // 디바운스 타이머 — search
 let _watchDebounceTimer   = null;  // 디바운스 타이머 — watch
 
 async function collectEvent(event_type, keyword, video_id = null) {
+  if (!isContextValid()) return;
   const jwt = await getJwt();
-  if (!jwt) return; // 로그인 안 된 경우 무시
+  if (!jwt) return;
 
   try {
     await fetch(`${API_BASE}/collect`, {
@@ -75,9 +76,20 @@ function getKeyword() {
 }
 
 function getJwt() {
-  return new Promise(resolve =>
-    chrome.storage.local.get(["jwt"], r => resolve(r.jwt || ""))
-  );
+  return new Promise(resolve => {
+    try {
+      chrome.storage.local.get(["jwt"], r => {
+        if (chrome.runtime.lastError) { resolve(""); return; }
+        resolve(r.jwt || "");
+      });
+    } catch (e) {
+      resolve("");
+    }
+  });
+}
+
+function isContextValid() {
+  try { return !!chrome.runtime.id; } catch (e) { return false; }
 }
 
 // ── 플로팅 버튼 생성 ──────────────────────────────────────────────────────────
@@ -88,86 +100,50 @@ function createFloatBtn() {
   const btn = document.createElement("div");
   btn.id = BTN_ID;
 
-  // 기본 스타일 (접힌 상태: 아이콘만 보임)
   Object.assign(btn.style, {
-    position:     "fixed",
-    top:          "50%",
-    right:        "0",
-    transform:    "translateY(-50%)",
-    zIndex:       "99999",
-    display:      "flex",
-    alignItems:   "center",
-    gap:          "0px",
-    background:   "#ff4444",
-    color:        "#fff",
-    borderRadius: "8px 0 0 8px",
-    padding:      "10px 8px",
-    cursor:       "pointer",
-    boxShadow:    "-2px 0 12px rgba(0,0,0,0.4)",
-    transition:   "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-    overflow:     "hidden",
-    maxWidth:     "36px",  // 접힌 상태 너비
-    userSelect:   "none",
+    position:        "fixed",
+    bottom:          "24px",
+    right:           "24px",
+    zIndex:          "99999",
+    width:           "56px",
+    height:          "56px",
+    background:      "#ff0000",
+    borderRadius:    "50%",
+    display:         "flex",
+    alignItems:      "center",
+    justifyContent:  "center",
+    cursor:          "pointer",
+    boxShadow:       "0 4px 16px rgba(0,0,0,0.35)",
+    transition:      "transform 0.2s ease, box-shadow 0.2s ease",
+    userSelect:      "none",
+    flexShrink:      "0",
   });
 
   btn.innerHTML = `
-    <span id="tv-icon" style="font-size:1rem;flex-shrink:0;line-height:1;">✦</span>
-    <span id="tv-label" style="
-      font-family:'Segoe UI',sans-serif;
-      font-size:0.8rem;
-      font-weight:700;
-      white-space:nowrap;
-      overflow:hidden;
-      max-width:0;
-      opacity:0;
-      transition:max-width 0.25s ease, opacity 0.2s ease, margin 0.25s ease;
-      margin-left:0;
-    ">유튜브 검색 요약보기</span>
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
   `;
 
-  const label = btn.querySelector("#tv-label");
-
-  // 호버: 펼쳐짐
   btn.addEventListener("mouseenter", () => {
-    btn.style.maxWidth = "190px";
-    btn.style.padding = "10px 14px 10px 10px";
-    label.style.maxWidth = "160px";
-    label.style.opacity = "1";
-    label.style.marginLeft = "8px";
+    btn.style.transform = "scale(1.1)";
+    btn.style.boxShadow = "0 6px 24px rgba(0,0,0,0.45)";
   });
 
-  // 호버 아웃: 접힘
   btn.addEventListener("mouseleave", () => {
-    btn.style.maxWidth = "36px";
-    btn.style.padding = "10px 8px";
-    label.style.maxWidth = "0";
-    label.style.opacity = "0";
-    label.style.marginLeft = "0";
+    btn.style.transform = "scale(1)";
+    btn.style.boxShadow = "0 4px 16px rgba(0,0,0,0.35)";
   });
 
-  // 클릭: 사이드 패널 오픈 (background.js를 통해 chrome.sidePanel.open 호출)
   btn.addEventListener("click", async () => {
     const keyword = getKeyword();
 
     if (!keyword) {
-      label.textContent = "검색어가 없습니다";
-      btn.style.maxWidth = "190px";
-      btn.style.padding = "10px 14px 10px 10px";
-      label.style.maxWidth = "160px";
-      label.style.opacity = "1";
-      label.style.marginLeft = "8px";
-      setTimeout(() => {
-        label.textContent = "유튜브 검색 요약보기";
-        btn.style.maxWidth = "36px";
-        btn.style.padding = "10px 8px";
-        label.style.maxWidth = "0";
-        label.style.opacity = "0";
-        label.style.marginLeft = "0";
-      }, 2000);
+      btn.style.background = "#cc0000";
+      setTimeout(() => { btn.style.background = "#ff0000"; }, 300);
       return;
     }
 
-    /* background.js에 사이드 패널 오픈 요청 (keyword 포함 → storage에 저장 후 open) */
     try {
       chrome.runtime.sendMessage({
         type:    "OPEN_SIDE_PANEL",
@@ -175,22 +151,7 @@ function createFloatBtn() {
         keyword: keyword,
       });
     } catch (e) {
-      /* 익스텐션 재로드 후 탭 미갱신 시 context invalidated — 페이지 새로고침 안내 */
       console.warn("[Tubify] 익스텐션이 재로드됐습니다. 페이지를 새로고침(F5)해주세요.");
-      label.textContent = "페이지를 새로고침해주세요";
-      btn.style.maxWidth = "210px";
-      btn.style.padding = "10px 14px 10px 10px";
-      label.style.maxWidth = "180px";
-      label.style.opacity = "1";
-      label.style.marginLeft = "8px";
-      setTimeout(() => {
-        label.textContent = "유튜브 검색 요약보기";
-        btn.style.maxWidth = "36px";
-        btn.style.padding = "10px 8px";
-        label.style.maxWidth = "0";
-        label.style.opacity = "0";
-        label.style.marginLeft = "0";
-      }, 3000);
     }
   });
 
@@ -226,6 +187,7 @@ function init() {
 // ── YouTube SPA 네비게이션 감지 ───────────────────────────────────────────────
 
 window.addEventListener("yt-navigate-finish", () => {
+  if (!isContextValid()) return;
   init();
   if (isSearchPage())  debouncedCollectSearch();
   if (isWatchPage())   debouncedCollectWatch();

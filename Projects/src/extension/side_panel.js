@@ -20,25 +20,50 @@ function showScreen(id) {
 }
 
 function setStep(n, state) {
-  var row = document.getElementById("s" + n);
-  var icon = document.getElementById("s" + n + "-icon");
-  if (!row || !icon) return;
-  row.classList.remove("active", "done");
-  if (state) row.classList.add(state);
-  if (state === "active") { icon.innerHTML = '<span class="spinner"></span>'; }
-  else if (state === "done") { icon.textContent = "OK"; }
-  else { icon.textContent = ["", "?", "?", "?"][n]; }
+  var item = document.getElementById("s" + n);
+  var ind  = document.getElementById("s" + n + "-icon");
+  if (!item || !ind) return;
+  item.classList.remove("active", "done");
+  if (state) item.classList.add(state);
+  if (state === "active") {
+    ind.innerHTML = '<div class="step-ring"></div>';
+  } else if (state === "done") {
+    ind.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  } else {
+    ind.innerHTML = '<span class="step-num">' + n + '</span>';
+  }
 }
 
 // ── 탭 전환 ───────────────────────────────────────────────────────────────────
 
-document.querySelectorAll(".tab-btn").forEach(function (btn) {
+function switchTab(tabName) {
+  document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
+  document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
+  var btn = document.querySelector('[data-tab="' + tabName + '"]');
+  var panel = document.getElementById("tab-" + tabName);
+  if (btn) btn.classList.add("active");
+  if (panel) panel.classList.add("active");
+}
+
+document.querySelectorAll(".tab-btn[data-tab]").forEach(function (btn) {
   btn.addEventListener("click", function () {
-    document.querySelectorAll(".tab-btn").forEach(function (b) { b.classList.remove("active"); });
-    document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
-    btn.classList.add("active");
-    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab) switchTab(btn.dataset.tab);
   });
+});
+
+/* 설정 버튼 — 대시보드로 이동 */
+var btnSettings = document.getElementById("btn-settings");
+if (btnSettings) {
+  btnSettings.addEventListener("click", function () {
+    chrome.tabs.create({ url: API_BASE + "/dashboard" });
+  });
+}
+
+/* VIEW ALL — SOURCES 탭으로 전환 */
+document.addEventListener("click", function (e) {
+  if (e.target && e.target.id === "btn-view-all") {
+    switchTab("sources");
+  }
 });
 
 // ── 카테고리별 색상 테마 ───────────────────────────────────────────────────────
@@ -63,7 +88,6 @@ function renderResults(data) {
   var theme        = CATEGORY_THEME[category] || CATEGORY_THEME["정보탐색형"];
 
   document.getElementById("kw-title-s").textContent = keyword;
-  document.getElementById("kw-title-i").textContent = keyword;
 
   /* 캐시 히트 안내 배너 */
   var cacheNotice = "";
@@ -89,31 +113,44 @@ function renderResults(data) {
   }
   document.getElementById("summary-sections").innerHTML = summaryHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">요약 정보가 없습니다.</div>';
 
-  var insightsHTML = "";
-  if (conclusion) {
-    insightsHTML += '<div class="conclusion-box"><div style="font-size:0.68rem;font-weight:700;color:#ff4444;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;">&#128161; AI 결론</div>' + esc(conclusion) + '</div>';
-  }
+  /* 쟁점 섹션 (INSIGHTS 탭 내) */
+  var controversyHTML = "";
   if (controversies.length) {
     var cBullets = controversies.map(function (c) {
       return '<div class="bullet-item"><span class="bullet-dot dot-yellow"></span><span>' + esc(c) + '</span></div>';
     }).join("");
-    insightsHTML += '<div class="section-block"><div class="section-header"><div class="section-icon-box icon-yellow">&#9889;</div><div class="section-title-text">쟁점 및 논란</div></div><div class="bullet-list">' + cBullets + '</div></div>';
+    controversyHTML = '<div class="section-block" style="border-left-color:#f59e0b"><div class="section-header"><div class="section-icon-box icon-yellow">⚡</div><div class="section-title-text">주요 쟁점</div></div><div class="bullet-list">' + cBullets + '</div></div>';
   }
-  document.getElementById("insights-sections").innerHTML = insightsHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">인사이트 정보가 없습니다.</div>';
+  document.getElementById("controversy-section").innerHTML = controversyHTML;
 
-  if (videos.length) {
-    document.getElementById("sources-list").innerHTML = videos.map(function (v) {
-      var vid = v.video_id || v.id || "";
-      var thumb = v.thumbnail_url
-        ? '<div class="video-thumb-wrap"><a href="https://youtube.com/watch?v=' + esc(vid) + '" target="_blank"><img class="video-thumb" src="' + esc(v.thumbnail_url) + '" alt="" loading="lazy"></a></div>'
+  /* 소스 프리뷰 (INSIGHTS 탭 하단, 최대 3개) */
+  function buildVideoCard(v, compact) {
+    var vid = v.video_id || v.id || "";
+    var url = "https://youtube.com/watch?v=" + esc(vid);
+    var thumbSrc = v.thumbnail_url || ("https://img.youtube.com/vi/" + esc(vid) + "/mqdefault.jpg");
+    if (compact) {
+      var thumbEl = vid
+        ? '<div class="source-thumb-compact"><a href="' + url + '" target="_blank"><img src="' + esc(thumbSrc) + '" alt="" loading="lazy"></a></div>'
+        : '<div class="source-thumb-placeholder-compact">▶</div>';
+      var ch = v.channel_title ? '<div class="source-channel-compact">' + esc(v.channel_title).toUpperCase() + '</div>' : "";
+      return '<div class="source-card-compact">' + thumbEl + '<div class="source-info-compact"><a class="source-title-compact" href="' + url + '" target="_blank">' + esc(v.title) + '</a>' + ch + '</div></div>';
+    } else {
+      var thumb = thumbSrc
+        ? '<div class="video-thumb-wrap"><a href="' + url + '" target="_blank"><img class="video-thumb" src="' + esc(thumbSrc) + '" alt="" loading="lazy"></a></div>'
         : '<div class="video-thumb-placeholder">▶</div>';
       var adBadge   = v.ad_detected ? '<span class="badge badge-ad">광고 포함</span>' : '<span class="badge badge-noad">광고 없음</span>';
       var credBadge = v.credibility_score != null ? '<span class="badge badge-cred">신뢰도 ' + Math.round(v.credibility_score * 100) + '%</span>' : "";
       var chBadge   = v.channel_title ? '<span class="channel-badge">' + esc(v.channel_title).toUpperCase() + '</span>' : "";
-      var url = "https://youtube.com/watch?v=" + esc(vid);
       return '<div class="video-card"><div class="video-card-inner">' + thumb + '<div class="video-info"><a class="video-title-text" href="' + url + '" target="_blank">' + esc(v.title) + '</a>' + (v.summary ? '<div class="video-subtitle">' + esc(v.summary) + '</div>' : "") + '<div class="video-meta-row">' + chBadge + adBadge + credBadge + '</div></div></div></div>';
-    }).join("");
+    }
+  }
+
+  if (videos.length) {
+    document.getElementById("sources-in-insights").classList.remove("hidden");
+    document.getElementById("sources-preview").innerHTML = videos.slice(0, 3).map(function(v) { return buildVideoCard(v, true); }).join("");
+    document.getElementById("sources-list").innerHTML = videos.map(function(v) { return buildVideoCard(v, false); }).join("");
   } else {
+    document.getElementById("sources-in-insights").classList.add("hidden");
     document.getElementById("sources-list").innerHTML = '<div style="color:#555;font-size:0.82rem;padding:10px 0;">영상 정보가 없습니다.</div>';
   }
 
@@ -125,6 +162,8 @@ function renderResults(data) {
 async function analyze(keyword, jwt) {
   currentKeyword = keyword;
   currentJwt = jwt;
+  var loadingKw = document.getElementById("loading-kw");
+  if (loadingKw) loadingKw.textContent = keyword;
   showScreen("screen-loading");
   setStep(1, "active"); setStep(2, ""); setStep(3, "");
   try {
