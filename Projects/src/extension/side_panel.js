@@ -243,8 +243,17 @@ document.getElementById("btn-login").addEventListener("click", function () {
 
   if (!keyword.trim()) {
     showScreen("screen-empty");
-    return;
+  } else {
+    analyze(keyword.trim(), jwt);
   }
-
-  analyze(keyword.trim(), jwt);
 })();
+
+// ── 플로팅 버튼 클릭 시 이미 열린 패널에서 키워드 감지 ───────────────────────
+// pendingKeyword가 storage에 저장되는 순간 자동으로 분석 트리거
+chrome.storage.onChanged.addListener(function (changes, area) {
+  if (area !== "local" || !changes.pendingKeyword) return;
+  var keyword = changes.pendingKeyword.newValue;
+  if (!keyword || !currentJwt) return;
+  chrome.storage.local.remove("pendingKeyword");
+  analyze(keyword.trim(), currentJwt);
+});
