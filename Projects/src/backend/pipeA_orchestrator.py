@@ -35,7 +35,7 @@ class VideoItem(TypedDict, total=False):
     video_id:          str
     title:             str
     channel_title:     str
-    thumbnail:         str    # mqdefault.jpg URL
+    thumbnail_url:     str    # mqdefault.jpg URL
     url:               str    # youtube.com/watch?v=…
     credibility_score: float  # 0.0 ~ 1.0
     ad_detected:       bool
@@ -107,8 +107,8 @@ def _build_dashboard(
             "video_id":          v.get("video_id", ""),
             "title":             v.get("title", ""),
             "channel_title":     v.get("channel_title", ""),
-            "thumbnail":         v.get("thumbnail",
-                                      f"https://img.youtube.com/vi/{v.get('video_id', '')}/mqdefault.jpg"),
+            "thumbnail_url":      v.get("thumbnail_url", v.get("thumbnail",
+                                      f"https://img.youtube.com/vi/{v.get('video_id', '')}/mqdefault.jpg")),
             "url":               f"https://youtube.com/watch?v={v.get('video_id', '')}",
             "credibility_score": v.get("credibility_score", 0.5),
             "ad_detected":       v.get("ad_detected", False),

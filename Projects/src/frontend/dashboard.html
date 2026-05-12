@@ -186,7 +186,7 @@
   <div class="header">
     <span class="logo">✦ Tubify</span>
     <div style="display:flex;gap:8px;align-items:center">
-      <a href="/" style="color:#888;font-size:0.82rem;text-decoration:none;">검색</a>
+      <a href="/mypage.html" style="color:#888;font-size:0.82rem;text-decoration:none;">마이페이지</a>
       <button class="btn-logout" onclick="logout()">로그아웃</button>
     </div>
   </div>
@@ -294,6 +294,24 @@
 
   <script>
     const API = "";  // 같은 서버에서 서빙 — 상대 경로 사용
+
+    // OAuth 콜백 후 URL에 token이 있으면 저장하고 URL 정리
+    (function() {
+      const params = new URLSearchParams(location.search);
+      const urlToken = params.get("token");
+      if (urlToken) {
+        localStorage.setItem("access_token", urlToken);
+        sessionStorage.setItem("loggedIn", "1");
+        const EXTENSION_IDS = ["haagaoipcidfnhojkjdiajieiejocckk", "caaoacncggbohojcejagaijcpoigcpga"];
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+          EXTENSION_IDS.forEach(id => {
+            try { chrome.runtime.sendMessage(id, { type: "SET_TOKEN", token: urlToken }, () => {}); } catch (_) {}
+          });
+        }
+        history.replaceState({}, "", location.pathname);
+      }
+    })();
+
     const token = localStorage.getItem("access_token");
     if (!token) { window.location.href = "/"; }
 
