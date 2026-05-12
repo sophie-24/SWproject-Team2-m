@@ -1439,7 +1439,7 @@ async def analyze_search(
     """검색어 기반 즉석 분석 — popup/search_dashboard에서 호출."""
     from pipeA_orchestrator import run_pipeline_a
 
-    user_id = user.get("sub", "")
+    user_id = user["user_id"]
     cache_key = f"{user_id}:{keyword}"
 
     if cache_key in _search_analysis_cache:
