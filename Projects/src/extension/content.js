@@ -47,7 +47,7 @@ function maybeCollectWatch() {
 
   // 영상 제목 추출 (YouTube DOM)
   const titleEl = document.querySelector("h1.ytd-video-primary-info-renderer, h1.style-scope.ytd-video-primary-info-renderer");
-  const title = titleEl ? titleEl.textContent.trim() : videoId;
+  const title = titleEl?.textContent.trim() || videoId;
 
   _lastCollectedVideoId = videoId;
   collectEvent("watch", title, videoId);

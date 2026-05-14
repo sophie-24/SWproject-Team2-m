@@ -245,7 +245,7 @@ class NewsletterItem(BaseModel):
     subject: str
     content_json: Optional[str] = None
     delivered_at: str
-    delivery_type: Optional[str] = None
+    delivery_status: Optional[str] = None
 
 
 class NewsletterHistoryResponse(BaseModel):
@@ -447,7 +447,9 @@ async def callback(
     )
 
     # 신규 유저 → 로딩(히스토리 분석), 기존 유저 → 마이페이지
-    if not user.initial_intent:
+    # interest_categories나 delivery_type이 있으면 온보딩 완료로 간주 (initial_intent만 누락된 불완전 상태 대응)
+    is_onboarded = bool(user.initial_intent or user.interest_categories or user.delivery_type)
+    if not is_onboarded:
         redirect_url = f"{FRONTEND_URL}/loading.html?token={jwt_token}"
     else:
         redirect_url = f"{FRONTEND_URL}/mypage.html?token={jwt_token}"
@@ -1325,10 +1327,11 @@ async def newsletter_history(
     return JSONResponse({
         "newsletters": [
             {
-                "id":           str(n.id),
-                "subject":      n.subject,
-                "content_json": n.content_json,
-                "delivered_at": n.delivered_at.isoformat(),
+                "id":              str(n.id),
+                "subject":         n.subject,
+                "content_json":    n.content_json,
+                "delivered_at":    n.delivered_at.isoformat(),
+                "delivery_status": n.delivery_status,
             }
             for n in newsletters
         ]
@@ -1415,6 +1418,10 @@ async def send_now(
 
     record.delivery_status = "sent" if email_result.get("success") else "failed"
     await db.commit()
+
+    # 관심사 weight 누적 (스케줄러와 동일 로직)
+    from scheduler import _update_user_interests
+    await _update_user_interests(db, user_id, topics)
 
     return JSONResponse({
         **newsletter,

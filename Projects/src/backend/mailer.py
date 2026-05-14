@@ -123,13 +123,13 @@ def _build_topic_section(topic_data: Dict[str, Any], intent_type: str = "지식�
         left_items = [f for f in common_facts if f]
     if not left_items:
         left_items = [p for p in pros if p]
-    left_text = " ".join(left_items) if left_items else "관련 영상을 분석 중입니다."
+    left_text = " ".join(left_items) if left_items else "자막이 없는 영상으로 구성되어 요약을 생성하지 못했습니다. 아래 소스 영상을 직접 확인해보세요."
 
     # 오른쪽: 쟁점 + 단점
     right_items = [c for c in controversies if c]
     if not right_items:
         right_items = [c for c in cons if c]
-    right_text = " ".join(right_items) if right_items else "추가 분석 정보를 수집 중입니다."
+    right_text = " ".join(right_items) if right_items else "영상 간 관점 차이를 분석하지 못했습니다."
 
     source_html = _source_cards(sources)
 

@@ -55,7 +55,7 @@ document.querySelectorAll(".tab-btn[data-tab]").forEach(function (btn) {
 var btnSettings = document.getElementById("btn-settings");
 if (btnSettings) {
   btnSettings.addEventListener("click", function () {
-    chrome.tabs.create({ url: API_BASE + "/dashboard" });
+    chrome.tabs.create({ url: API_BASE + "/dashboard.html" });
   });
 }
 
@@ -65,14 +65,6 @@ document.addEventListener("click", function (e) {
     switchTab("sources");
   }
 });
-
-// ── 카테고리별 색상 테마 ───────────────────────────────────────────────────────
-
-var CATEGORY_THEME = {
-  "정보탐색형":    { color: "#6699ff", border: "#1e2d4a", bg: "#111827" },
-  "비교구매형":    { color: "#ff9944", border: "#3d2210", bg: "#1a1207" },
-  "학습튜토리얼형": { color: "#44cc88", border: "#0d3322", bg: "#071a12" },
-};
 
 // ── 결과 렌더링 ───────────────────────────────────────────────────────────────
 
@@ -85,7 +77,6 @@ function renderResults(data) {
   var conclusion   = data.common_conclusion || "";
   var category     = data.category || "";
   var cached       = data.cached || false;
-  var theme        = CATEGORY_THEME[category] || CATEGORY_THEME["정보탐색형"];
 
   document.getElementById("kw-title-s").textContent = keyword;
 
@@ -95,21 +86,31 @@ function renderResults(data) {
     cacheNotice = '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>';
   }
 
+  var SUMMARY_TITLE = {
+    "정보탐색형": "핵심 인사이트",
+    "유희탐색형": "화제 포인트",
+    "구매탐색형": "장점 요약",
+  };
+  var FACTS_TITLE = {
+    "정보탐색형": "전문가 분석",
+    "유희탐색형": "반응 및 의견",
+    "구매탐색형": "전문가 평가",
+  };
+
   var summaryHTML = cacheNotice;
-  if (category) {
-    summaryHTML += '<div class="category-badge" style="background:' + theme.bg + ';color:' + theme.color + ';border:1px solid ' + theme.border + '">' + esc(category) + '</div>';
-  }
   if (summaryLines.length) {
     var bullets = summaryLines.map(function (l) {
       return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
     }).join("");
-    summaryHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">⚡</div><div class="section-title-text">주요 혁신 및 스펙 요약</div></div><div class="bullet-list">' + bullets + '</div></div>';
+    var summaryTitle = SUMMARY_TITLE[category] || "주요 요약";
+    summaryHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">⚡</div><div class="section-title-text">' + summaryTitle + '</div></div><div class="bullet-list">' + bullets + '</div></div>';
   }
   if (commonFacts.length) {
     var factBullets = commonFacts.map(function (f) {
       return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
     }).join("");
-    summaryHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">📊</div><div class="section-title-text">시장 기대 및 전문가 분석</div></div><div class="bullet-list">' + factBullets + '</div></div>';
+    var factsTitle = FACTS_TITLE[category] || "공통 사실";
+    summaryHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">📊</div><div class="section-title-text">' + factsTitle + '</div></div><div class="bullet-list">' + factBullets + '</div></div>';
   }
   document.getElementById("summary-sections").innerHTML = summaryHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">요약 정보가 없습니다.</div>';
 

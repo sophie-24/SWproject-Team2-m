@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from zoneinfo import ZoneInfo
-from sqlalchemy import or_
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -188,14 +188,6 @@ async def _run_batch_for_send_time(send_time: str) -> None:
     logger.info(f"[scheduler] {send_time} batch start")
 
     async with AsyncSessionLocal() as db:
-        if send_time == "21:00":
-            time_filter = or_(
-                User.send_time == send_time,
-                User.send_time == None,  # noqa: E711
-            )
-        else:
-            time_filter = (User.send_time == send_time)
-
         result = await db.execute(
             select(User).where(User.is_subscribed == True)  # noqa: E712
         )
@@ -215,7 +207,11 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                 now = datetime.now(timezone.utc).replace(tzinfo=None)
 
                 # 1. ReportBatch 생성 (status='created') — window_type / period_start / period_end 기록
-                today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                # KST 자정 기준 today_start (UTC로 변환) — behavior_store.get_today_logs와 일치
+                today_start = (
+                    datetime.now(KST).replace(hour=0, minute=0, second=0, microsecond=0)
+                    .astimezone(timezone.utc).replace(tzinfo=None)
+                )
                 # send_time 배열 중 가장 이른 시각이고 2회 이상 발송 설정이면 before_cutoff
                 user_times = sorted(_parse_send_times(user.send_time))
                 window_type = (

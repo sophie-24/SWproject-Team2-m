@@ -33,16 +33,18 @@ async def save_behavior(
     db.add(log)
     await db.commit()
 
-    # 오늘 같은 키워드 횟수 카운트
-    today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0, tzinfo=None
-    )
+    # 오늘 같은 키워드 횟수 카운트 (KST 자정 기준)
+    from zoneinfo import ZoneInfo
+    KST = ZoneInfo("Asia/Seoul")
+    kst_midnight = datetime.now(KST).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ).astimezone(timezone.utc).replace(tzinfo=None)
 
     result = await db.execute(
         select(func.count())
         .where(BehaviorLog.user_id == user_id)
         .where(BehaviorLog.keyword == keyword)
-        .where(BehaviorLog.logged_at >= today_start)
+        .where(BehaviorLog.logged_at >= kst_midnight)
     )
     count = result.scalar()
     return {"saved": True, "count": count}
@@ -53,13 +55,15 @@ async def get_today_logs(db: AsyncSession, user_id: str) -> list[dict]:
     오늘 해당 유저의 행동 로그 전체 조회
     → trigger.py에서 사용
     """
-    today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0, tzinfo=None
-    )
+    from zoneinfo import ZoneInfo
+    KST = ZoneInfo("Asia/Seoul")
+    kst_midnight = datetime.now(KST).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ).astimezone(timezone.utc).replace(tzinfo=None)
     result = await db.execute(
         select(BehaviorLog)
         .where(BehaviorLog.user_id == user_id)
-        .where(BehaviorLog.logged_at >= today_start)
+        .where(BehaviorLog.logged_at >= kst_midnight)
         .order_by(BehaviorLog.logged_at)
     )
     logs = result.scalars().all()
