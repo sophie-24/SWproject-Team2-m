@@ -207,12 +207,8 @@ document.getElementById("btn-refresh").addEventListener("click", function () {
   if (currentKeyword && currentJwt) analyze(currentKeyword, currentJwt);
 });
 document.getElementById("btn-login").addEventListener("click", function () {
-  /* 팝업 창으로 OAuth 진행 → window.opener 존재 → app.js가 자동 닫기 + SET_TOKEN 전송 */
-  var authWin = window.open(
-    API_BASE + "/auth/login",
-    "tubify_auth",
-    "width=520,height=660,left=300,top=80,toolbar=no,menubar=no,scrollbars=yes"
-  );
+  /* 일반 탭으로 열어야 chrome.tabs.onUpdated fallback이 확실히 동작함 */
+  chrome.tabs.create({ url: API_BASE + "/auth/login" });
 
   /* JWT가 storage에 저장될 때까지 1초마다 확인 */
   var poll = setInterval(async function () {
@@ -222,7 +218,6 @@ document.getElementById("btn-login").addEventListener("click", function () {
     if (!stored.jwt) return;
 
     clearInterval(poll);
-    try { authWin && authWin.close(); } catch (e) {}
 
     currentJwt = stored.jwt;
 
