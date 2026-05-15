@@ -21,11 +21,12 @@
   },
 
   "externally_connectable": {
-    "matches": ["http://localhost:8000/*"]
+    "matches": ["http://localhost:8000/*", "http://127.0.0.1:8000/*"]
   },
 
   "host_permissions": [
     "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*",
     "https://www.youtube.com/*"
   ],
 

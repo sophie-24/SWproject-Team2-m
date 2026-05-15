@@ -210,13 +210,42 @@ document.getElementById("btn-refresh").addEventListener("click", function () {
   if (currentKeyword && currentJwt) analyze(currentKeyword, currentJwt);
 });
 document.getElementById("btn-login").addEventListener("click", function () {
-  /* 팝업 창으로 OAuth 진행 → /auth/extension-done이 window.close() 처리
-     JWT 저장은 background.js tabs.onUpdated → storage.onChanged로 감지 (polling 불필요) */
-  window.open(
-    API_BASE + "/auth/login?ext=1",
-    "tubify_auth",
-    "width=520,height=660,left=300,top=80,toolbar=no,menubar=no,scrollbars=yes"
-  );
+  /* 일반 탭으로 열어야 chrome.tabs.onUpdated fallback이 확실히 동작함 */
+  chrome.tabs.create({ url: API_BASE + "/auth/login" });
+
+  /* JWT가 storage에 저장될 때까지 1초마다 확인 */
+  var poll = setInterval(async function () {
+    var stored = await new Promise(function (r) {
+      chrome.storage.local.get(["jwt", "loggedIn"], r);
+    });
+    if (!stored.jwt) return;
+
+    clearInterval(poll);
+
+    currentJwt = stored.jwt;
+
+    /* 로그인 완료 후 현재 탭 키워드로 바로 분석 시작 */
+    var tabs = await new Promise(function (r) {
+      chrome.tabs.query({ active: true, currentWindow: true }, r);
+    });
+    var tab = tabs[0];
+    var keyword = "";
+    try {
+      var u = new URL(tab && tab.url);
+      if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
+        keyword = u.searchParams.get("search_query") || "";
+      }
+    } catch (e) {}
+
+    if (keyword.trim()) {
+      analyze(keyword.trim(), stored.jwt);
+    } else {
+      showScreen("screen-empty");
+    }
+  }, 1000);
+
+  /* 60초 후 polling 자동 종료 */
+  setTimeout(function () { clearInterval(poll); }, 60000);
 });
 
 // ── 초기화 ────────────────────────────────────────────────────────────────────
@@ -262,7 +291,6 @@ chrome.storage.onChanged.addListener(function (changes, area) {
   if (area !== "local") return;
 
   // 로그인 완료 감지 — polling 없이 즉시 반응
-  // /auth/extension-done → background.js tabs.onUpdated → storage.jwt 저장 → 여기서 캐치
   if (changes.jwt && changes.jwt.newValue && !currentJwt) {
     var jwt = changes.jwt.newValue;
     currentJwt = jwt;
@@ -287,7 +315,7 @@ chrome.storage.onChanged.addListener(function (changes, area) {
     });
   }
 
-  // 검색 키워드 변화 감지 — 플로팅 버튼 클릭 시 트리거
+  // 검색 키워드 변화 감지
   if (changes.pendingKeyword) {
     var keyword = changes.pendingKeyword.newValue;
     if (!keyword || !currentJwt) return;

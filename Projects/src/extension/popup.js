@@ -159,18 +159,8 @@ function renderLoggedOut() {
 // ── 이벤트 ───────────────────────────────────────────────────────────────────
 
 document.getElementById("btn-login").addEventListener("click", async () => {
-  // 새 탭 대신 작은 팝업창에서 OAuth 진행
-  // → 로그인 완료 시 창이 자동으로 닫히고 JWT가 chrome.storage에 저장됨
-  const authWin = window.open(
-    `${API_BASE}/auth/login`,
-    "tubify_auth",
-    "width=520,height=660,left=300,top=80,toolbar=no,menubar=no,scrollbars=yes"
-  );
-
-  if (!authWin) {
-    // 팝업 차단된 경우 fallback: 새 탭으로 열기
-    chrome.tabs.create({ url: `${API_BASE}/auth/login` });
-  }
+  // 일반 탭으로 열어야 chrome.tabs.onUpdated fallback이 확실히 동작함
+  chrome.tabs.create({ url: `${API_BASE}/auth/login` });
 
   // JWT가 storage에 저장될 때까지 1초마다 확인
   const poll = setInterval(async () => {

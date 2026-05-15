@@ -59,23 +59,39 @@ chrome.runtime.onMessageExternal.addListener(
 // ── OAuth 콜백 URL 감시 → JWT 자동 저장 (SET_TOKEN 실패 fallback) ────────────
 // app.js의 EXTENSION_ID가 실제 ID와 다를 경우 SET_TOKEN이 전달되지 않을 수 있다.
 // chrome.tabs.onUpdated로 localhost:8000/?token=... URL을 직접 감지해 JWT를 저장한다.
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "complete") return;
-  const url = tab.url || "";
-  if (!url.startsWith("http://localhost:8000/")) return;
-
+function handleTabUrl(url) {
+  if (!url) return;
+  if (!url.startsWith("http://localhost:8000/") && !url.startsWith("http://127.0.0.1:8000/")) return;
   try {
     const token = new URL(url).searchParams.get("token");
     if (!token) return;
-
-    chrome.storage.local.get(["jwt"], (stored) => {
-      // 이미 저장된 JWT와 동일하면 중복 저장 생략
-      if (stored.jwt === token) return;
+    chrome.storage.local.get(["jwt", "loggedIn"], (stored) => {
+      if (stored.jwt === token && stored.loggedIn) return;
       chrome.storage.local.set({ jwt: token, loggedIn: true }, () => {
-        console.log("[Tubify] OAuth fallback: JWT 자동 저장 완료");
+        console.log("[Tubify] OAuth fallback: JWT 자동 저장 완료", url);
       });
     });
-  } catch (e) { /* URL 파싱 실패 무시 */ }
+  } catch (e) {}
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // changeInfo.url은 navigation 시작 시 (loading 단계) 바로 제공됨
+  // mypage.html?token=... 같이 즉시 다른 페이지로 리다이렉트되는 경우
+  // "complete" 이벤트가 발생할 때는 이미 token이 없는 URL로 이동한 뒤라 여기서 먼저 잡아야 함
+  if (changeInfo.url) {
+    handleTabUrl(changeInfo.url);
+    return;
+  }
+  if (changeInfo.status !== "complete") return;
+  const url = tab.url || "";
+  if (url) {
+    handleTabUrl(url);
+  } else {
+    chrome.tabs.get(tabId, (t) => {
+      if (chrome.runtime.lastError) return;
+      handleTabUrl(t.url || "");
+    });
+  }
 });
 
 // ── 내부 메시지 처리 (content.js / popup.js / onboarding.html 요청) ─────────
