@@ -89,19 +89,11 @@ ADMIN_SECRET=
 
 ```bash
 psql -U postgres
-CREATE DATABASE techvisibility;
+CREATE DATABASE tubify;
 \q
 ```
 
 > 테이블은 서버 시작 시 자동 생성됨
-> 단, 기존 테이블에 컬럼 추가 시 아래 SQL을 pgAdmin에서 직접 실행:
-
-```sql
-ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS initial_intent      VARCHAR(20),
-  ADD COLUMN IF NOT EXISTS interest_categories TEXT,
-  ADD COLUMN IF NOT EXISTS send_time           VARCHAR(5) DEFAULT '21:00';
-```
 
 ### 5. 서버 실행
 

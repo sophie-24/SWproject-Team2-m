@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from sqlalchemy import Column, String, DateTime, Text, Boolean, Integer, UniqueConstraint, Index
+from sqlalchemy import Column, String, DateTime, Text, Boolean, Integer, UniqueConstraint, Index, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from dotenv import load_dotenv
 
@@ -56,7 +56,7 @@ class BehaviorLog(Base):
 
     id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id      = Column(String(255), nullable=False)   # google_id 기준
-    event_type   = Column(String(10), nullable=False)    # 'search' | 'watch'
+    event_type   = Column(SAEnum('search', 'watch', name='event_type', create_type=False), nullable=False)
     keyword      = Column(String(500), nullable=False)
     video_id     = Column(String(50), nullable=True)
     logged_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
@@ -153,7 +153,4 @@ async def init_db():
 
 async def get_db():
     async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+        yield session

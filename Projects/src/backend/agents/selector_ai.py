@@ -20,10 +20,9 @@ import re
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-from googleapiclient.discovery import build
 from dotenv import load_dotenv
 
-from youtube_search import search_videos
+from youtube_search import search_videos, _get_api_client
 
 load_dotenv()
 from logger import get_logger
@@ -127,7 +126,7 @@ def _get_subscriber_counts(channel_ids: List[str]) -> Dict[str, int]:
     if not channel_ids or not YOUTUBE_API_KEY:
         return {}
 
-    youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+    youtube = _get_api_client()
     response = (
         youtube.channels()
         .list(part="statistics", id=",".join(channel_ids))

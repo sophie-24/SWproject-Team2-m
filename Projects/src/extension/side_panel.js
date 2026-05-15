@@ -177,9 +177,12 @@ async function analyze(keyword, jwt) {
       headers: { "Authorization": "Bearer " + jwt }
     });
     if (res.status === 401) {
-      document.getElementById("err-msg").textContent = "세션이 만료됐습니다.";
-      document.getElementById("err-sub").textContent = "팝업에서 다시 로그인해주세요.";
-      showScreen("screen-error"); return;
+      /* JWT 만료 → storage 정리 후 로그인 화면으로 자동 전환
+         재로그인 완료 시 btn-login 핸들러가 현재 탭 키워드로 분석을 자동 재시작함 */
+      chrome.storage.local.remove(["jwt", "loggedIn"]);
+      currentJwt = "";
+      showScreen("screen-login");
+      return;
     }
     if (!res.ok) {
       var err = await res.json().catch(function () { return {}; });
@@ -256,7 +259,7 @@ document.getElementById("btn-login").addEventListener("click", function () {
   var pendingKeyword = stored.pendingKeyword;
 
   if (pendingKeyword) chrome.storage.local.remove("pendingKeyword");
-  if (!jwt || !loggedIn) { showScreen("screen-login"); return; }
+  if (!jwt) { showScreen("screen-login"); return; }
   currentJwt = jwt;
 
   /* 키워드 우선순위: pendingKeyword(storage) → 현재 탭 URL */
@@ -283,8 +286,7 @@ document.getElementById("btn-login").addEventListener("click", function () {
   }
 })();
 
-// ── 플로팅 버튼 클릭 시 이미 열린 패널에서 키워드 감지 ───────────────────────
-// pendingKeyword가 storage에 저장되는 순간 자동으로 분석 트리거
+// ── storage 변화 감지 — 로그인 완료 + 플로팅 버튼 키워드 ────────────────────
 chrome.storage.onChanged.addListener(function (changes, area) {
   if (area !== "local") return;
 

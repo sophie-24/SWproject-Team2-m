@@ -113,6 +113,7 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 # Redis 도입 전 임시 구현 — 단일 워커 환경에서만 안전
 _oauth_sessions: dict[str, str] = {}  # {state: code_verifier}
 _oauth_credentials: dict[str, dict] = {}  # {state: credentials}
+_oauth_ext_states: set = set()          # 익스텐션 팝업 로그인 state 집합
 
 _transcript_cache: dict = {}
 # Pipeline A 분석 캐시 — shared_cache 모듈과 동일 객체 참조
@@ -384,10 +385,12 @@ def health():
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 @app.get("/auth/login", tags=["인증"], summary="Google OAuth 로그인 시작 ✅", response_class=RedirectResponse)
-def login():
+def login(ext: bool = False):
     auth_url, state, code_verifier = create_auth_url()
-    _oauth_sessions[state] = code_verifier  # state별로 분리 저장
-    logger.debug(f"[login] state 저장: {state}")
+    _oauth_sessions[state] = code_verifier
+    if ext:
+        _oauth_ext_states.add(state)  # 익스텐션 팝업 로그인으로 표시
+    logger.debug(f"[login] state 저장: {state} ext={ext}")
     return RedirectResponse(auth_url)
 
 
@@ -445,7 +448,13 @@ async def callback(
         user_id=user_info["google_id"],
         email=user_info["email"],
     )
+    # 익스텐션 팝업 로그인 → 자동 닫힘 전용 페이지로 리다이렉트
+is_ext = state in _oauth_ext_states
+_oauth_ext_states.discard(state)  # 사용 후 즉시 제거
 
+if is_ext:
+    redirect_url = f"{FRONTEND_URL}/auth/extension-done?token={jwt_token}"
+else:
     # 신규 유저 → 로딩(히스토리 분석), 기존 유저 → 마이페이지
     # delivery_type은 기본값이 있으므로 온보딩 완료 판단에서 제외
     is_onboarded = bool(user.initial_intent or user.interest_categories)
@@ -463,6 +472,27 @@ async def callback(
         secure=False,
     )
     return response
+
+
+@app.get("/auth/extension-done", tags=["인증"], summary="익스텐션 팝업 로그인 완료 — 자동 닫힘")
+def extension_done(token: str = ""):
+    """
+    익스텐션 팝업 OAuth 완료 후 리다이렉트되는 페이지.
+    - background.js tabs.onUpdated가 ?token= 을 감지해 JWT를 storage에 저장.
+    - 페이지 자체는 window.close()로 팝업을 즉시 닫음.
+    """
+    from fastapi.responses import HTMLResponse
+    html = """<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Tubify 로그인 완료</title></head>
+<body>
+<p style="font-family:sans-serif;text-align:center;margin-top:60px;color:#555;">
+  로그인 완료! 이 창은 자동으로 닫힙니다…
+</p>
+<script>window.close();</script>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 
 @app.get("/auth/me", response_model=AuthMeResponse, tags=["인증"], summary="현재 로그인 사용자 조회 ✅")
