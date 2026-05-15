@@ -62,20 +62,24 @@ chrome.runtime.onMessageExternal.addListener(
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;
   const url = tab.url || "";
+  console.log("[Tubify] tab updated:", url);
   if (!url.startsWith("http://localhost:8000/")) return;
 
   try {
     const token = new URL(url).searchParams.get("token");
+    console.log("[Tubify] token found:", !!token);
     if (!token) return;
 
     chrome.storage.local.get(["jwt", "loggedIn"], (stored) => {
-      // 동일 토큰이고 loggedIn도 이미 설정돼 있으면 생략
-      if (stored.jwt === token && stored.loggedIn) return;
+      if (stored.jwt === token && stored.loggedIn) {
+        console.log("[Tubify] 동일 토큰 이미 저장됨, 생략");
+        return;
+      }
       chrome.storage.local.set({ jwt: token, loggedIn: true }, () => {
         console.log("[Tubify] OAuth fallback: JWT 자동 저장 완료");
       });
     });
-  } catch (e) { /* URL 파싱 실패 무시 */ }
+  } catch (e) { console.log("[Tubify] URL 파싱 오류:", e); }
 });
 
 // ── 내부 메시지 처리 (content.js / popup.js / onboarding.html 요청) ─────────
