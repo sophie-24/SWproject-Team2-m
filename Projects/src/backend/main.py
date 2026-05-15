@@ -449,19 +449,19 @@ async def callback(
         email=user_info["email"],
     )
     # 익스텐션 팝업 로그인 → 자동 닫힘 전용 페이지로 리다이렉트
-is_ext = state in _oauth_ext_states
-_oauth_ext_states.discard(state)  # 사용 후 즉시 제거
+    is_ext = state in _oauth_ext_states
+    _oauth_ext_states.discard(state)  # 사용 후 즉시 제거
 
-if is_ext:
-    redirect_url = f"{FRONTEND_URL}/auth/extension-done?token={jwt_token}"
-else:
+    if is_ext:
+        redirect_url = f"{FRONTEND_URL}/auth/extension-done?token={jwt_token}"
+    else:
     # 신규 유저 → 로딩(히스토리 분석), 기존 유저 → 마이페이지
     # delivery_type은 기본값이 있으므로 온보딩 완료 판단에서 제외
-    is_onboarded = bool(user.initial_intent or user.interest_categories)
-    if not is_onboarded:
-        redirect_url = f"{FRONTEND_URL}/loading.html?token={jwt_token}"
-    else:
-        redirect_url = f"{FRONTEND_URL}/mypage.html?token={jwt_token}"
+        is_onboarded = bool(user.initial_intent or user.interest_categories)
+        if not is_onboarded:
+            redirect_url = f"{FRONTEND_URL}/loading.html?token={jwt_token}"
+        else:
+            redirect_url = f"{FRONTEND_URL}/mypage.html?token={jwt_token}"
 
     response = RedirectResponse(url=redirect_url)
     response.set_cookie(
