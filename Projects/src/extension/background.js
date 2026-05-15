@@ -68,9 +68,9 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const token = new URL(url).searchParams.get("token");
     if (!token) return;
 
-    chrome.storage.local.get(["jwt"], (stored) => {
-      // 이미 저장된 JWT와 동일하면 중복 저장 생략
-      if (stored.jwt === token) return;
+    chrome.storage.local.get(["jwt", "loggedIn"], (stored) => {
+      // 동일 토큰이고 loggedIn도 이미 설정돼 있으면 생략
+      if (stored.jwt === token && stored.loggedIn) return;
       chrome.storage.local.set({ jwt: token, loggedIn: true }, () => {
         console.log("[Tubify] OAuth fallback: JWT 자동 저장 완료");
       });
