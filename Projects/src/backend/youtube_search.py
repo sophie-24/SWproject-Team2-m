@@ -9,13 +9,27 @@ load_dotenv()
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
+# ── 싱글톤 클라이언트 ─────────────────────────────────────────────────────────
+# API 키 기반 클라이언트는 모듈 레벨에서 1회만 생성.
+# build()는 내부적으로 discovery 문서 HTTP 요청 또는 캐시 확인을 하므로 재생성 시 오버헤드 발생.
+# OAuth(get_subscriptions)는 사용자별 credentials가 다르므로 per-request 유지.
+_youtube_api_client = None
+
+
+def _get_api_client():
+    """API 키 기반 YouTube 클라이언트 싱글톤 반환"""
+    global _youtube_api_client
+    if _youtube_api_client is None and YOUTUBE_API_KEY:
+        _youtube_api_client = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+    return _youtube_api_client
+
 
 def search_videos(keyword: str, max_results: int = 10) -> List[dict]:
     """
     키워드로 YouTube 영상 검색 후 메타데이터 반환.
     반환 필드: video_id, title, channel_id, channel_title, published_at, description, thumbnail
     """
-    youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+    youtube = _get_api_client()
 
     search_response = (
         youtube.search()
@@ -89,14 +103,17 @@ def fetch_video_by_id(video_id: str) -> dict:
                view_count, like_count, duration, has_paid_placement)
     API 오류 또는 영상 없음 시 video_id만 포함한 최소 dict 반환.
     """
+    _empty = {
+        "video_id": video_id, "title": "", "channel_id": "",
+        "channel_title": "", "published_at": "", "description": "",
+        "thumbnail": "", "view_count": 0, "like_count": 0,
+        "duration": "", "has_paid_placement": None,
+    }
     if not YOUTUBE_API_KEY:
-        return {"video_id": video_id, "title": "", "channel_id": "",
-                "channel_title": "", "published_at": "", "description": "",
-                "thumbnail": "", "view_count": 0, "like_count": 0,
-                "duration": "", "has_paid_placement": None}
+        return _empty
 
     try:
-        youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+        youtube = _get_api_client()
         resp = (
             youtube.videos()
             .list(
@@ -107,10 +124,7 @@ def fetch_video_by_id(video_id: str) -> dict:
         )
         items = resp.get("items", [])
         if not items:
-            return {"video_id": video_id, "title": "", "channel_id": "",
-                    "channel_title": "", "published_at": "", "description": "",
-                    "thumbnail": "", "view_count": 0, "like_count": 0,
-                    "duration": "", "has_paid_placement": None}
+            return _empty
 
         item = items[0]
         snippet    = item.get("snippet", {})
@@ -119,31 +133,29 @@ def fetch_video_by_id(video_id: str) -> dict:
         status     = item.get("status", {})
 
         return {
-            "video_id":          video_id,
-            "title":             snippet.get("title", ""),
-            "channel_id":        snippet.get("channelId", ""),
-            "channel_title":     snippet.get("channelTitle", ""),
-            "published_at":      snippet.get("publishedAt", ""),
-            "description":       snippet.get("description", ""),
-            "thumbnail":         snippet.get("thumbnails", {}).get("medium", {}).get("url", ""),
-            "view_count":        int(statistics.get("viewCount", 0)),
-            "like_count":        int(statistics.get("likeCount", 0)),
-            "duration":          details.get("duration", ""),
+            "video_id":           video_id,
+            "title":              snippet.get("title", ""),
+            "channel_id":         snippet.get("channelId", ""),
+            "channel_title":      snippet.get("channelTitle", ""),
+            "published_at":       snippet.get("publishedAt", ""),
+            "description":        snippet.get("description", ""),
+            "thumbnail":          snippet.get("thumbnails", {}).get("medium", {}).get("url", ""),
+            "view_count":         int(statistics.get("viewCount", 0)),
+            "like_count":         int(statistics.get("likeCount", 0)),
+            "duration":           details.get("duration", ""),
             "has_paid_placement": status.get("hasPaidProductPlacement", None),
         }
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"[youtube] fetch_video_by_id 실패 {video_id}: {e}")
-        return {"video_id": video_id, "title": "", "channel_id": "",
-                "channel_title": "", "published_at": "", "description": "",
-                "thumbnail": "", "view_count": 0, "like_count": 0,
-                "duration": "", "has_paid_placement": None}
+        return _empty
 
 
 def get_subscriptions(credentials: Credentials) -> list[dict]:
     """
     인증된 사용자의 YouTube 구독 채널 목록을 반환.
     - channel_id, channel_title, thumbnail, subscriber_count 포함
+    OAuth 사용자별 credentials가 다르므로 per-request build 유지.
     """
     youtube = build("youtube", "v3", credentials=credentials)
 
@@ -166,10 +178,10 @@ def get_subscriptions(credentials: Credentials) -> list[dict]:
             snippet = item["snippet"]
             subscriptions.append(
                 {
-                    "channel_id": snippet["resourceId"]["channelId"],
+                    "channel_id":    snippet["resourceId"]["channelId"],
                     "channel_title": snippet["title"],
-                    "description": snippet.get("description", ""),
-                    "thumbnail": snippet["thumbnails"].get("default", {}).get("url", ""),
+                    "description":   snippet.get("description", ""),
+                    "thumbnail":     snippet["thumbnails"].get("default", {}).get("url", ""),
                     "subscribed_at": snippet.get("publishedAt", ""),
                 }
             )
