@@ -75,8 +75,15 @@ function handleTabUrl(url) {
 }
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // changeInfo.url은 navigation 시작 시 (loading 단계) 바로 제공됨
+  // mypage.html?token=... 같이 즉시 다른 페이지로 리다이렉트되는 경우
+  // "complete" 이벤트가 발생할 때는 이미 token이 없는 URL로 이동한 뒤라 여기서 먼저 잡아야 함
+  if (changeInfo.url) {
+    handleTabUrl(changeInfo.url);
+    return;
+  }
   if (changeInfo.status !== "complete") return;
-  const url = changeInfo.url || tab.url || "";
+  const url = tab.url || "";
   if (url) {
     handleTabUrl(url);
   } else {
