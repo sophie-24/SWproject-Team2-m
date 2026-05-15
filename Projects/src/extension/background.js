@@ -59,27 +59,32 @@ chrome.runtime.onMessageExternal.addListener(
 // ── OAuth 콜백 URL 감시 → JWT 자동 저장 (SET_TOKEN 실패 fallback) ────────────
 // app.js의 EXTENSION_ID가 실제 ID와 다를 경우 SET_TOKEN이 전달되지 않을 수 있다.
 // chrome.tabs.onUpdated로 localhost:8000/?token=... URL을 직접 감지해 JWT를 저장한다.
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "complete") return;
-  const url = tab.url || "";
-  console.log("[Tubify] tab updated:", url);
+function handleTabUrl(url) {
+  if (!url) return;
   if (!url.startsWith("http://localhost:8000/") && !url.startsWith("http://127.0.0.1:8000/")) return;
-
   try {
     const token = new URL(url).searchParams.get("token");
-    console.log("[Tubify] token found:", !!token);
     if (!token) return;
-
     chrome.storage.local.get(["jwt", "loggedIn"], (stored) => {
-      if (stored.jwt === token && stored.loggedIn) {
-        console.log("[Tubify] 동일 토큰 이미 저장됨, 생략");
-        return;
-      }
+      if (stored.jwt === token && stored.loggedIn) return;
       chrome.storage.local.set({ jwt: token, loggedIn: true }, () => {
-        console.log("[Tubify] OAuth fallback: JWT 자동 저장 완료");
+        console.log("[Tubify] OAuth fallback: JWT 자동 저장 완료", url);
       });
     });
-  } catch (e) { console.log("[Tubify] URL 파싱 오류:", e); }
+  } catch (e) {}
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete") return;
+  const url = changeInfo.url || tab.url || "";
+  if (url) {
+    handleTabUrl(url);
+  } else {
+    chrome.tabs.get(tabId, (t) => {
+      if (chrome.runtime.lastError) return;
+      handleTabUrl(t.url || "");
+    });
+  }
 });
 
 // ── 내부 메시지 처리 (content.js / popup.js / onboarding.html 요청) ─────────
