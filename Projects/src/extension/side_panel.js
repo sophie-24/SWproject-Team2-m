@@ -286,9 +286,38 @@ document.getElementById("btn-login").addEventListener("click", function () {
 // ── 플로팅 버튼 클릭 시 이미 열린 패널에서 키워드 감지 ───────────────────────
 // pendingKeyword가 storage에 저장되는 순간 자동으로 분석 트리거
 chrome.storage.onChanged.addListener(function (changes, area) {
-  if (area !== "local" || !changes.pendingKeyword) return;
-  var keyword = changes.pendingKeyword.newValue;
-  if (!keyword || !currentJwt) return;
-  chrome.storage.local.remove("pendingKeyword");
-  analyze(keyword.trim(), currentJwt);
+  if (area !== "local") return;
+
+  // 로그인 완료 감지 — polling 없이 즉시 반응
+  if (changes.jwt && changes.jwt.newValue && !currentJwt) {
+    var jwt = changes.jwt.newValue;
+    currentJwt = jwt;
+    chrome.storage.local.get(["pendingKeyword"], function (stored) {
+      var keyword = stored.pendingKeyword || "";
+      if (stored.pendingKeyword) chrome.storage.local.remove("pendingKeyword");
+      if (keyword.trim()) {
+        analyze(keyword.trim(), jwt);
+      } else {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+          var tab = tabs[0];
+          try {
+            var u = new URL(tab && tab.url);
+            if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
+              keyword = u.searchParams.get("search_query") || "";
+            }
+          } catch (e) {}
+          if (keyword.trim()) analyze(keyword.trim(), jwt);
+          else showScreen("screen-empty");
+        });
+      }
+    });
+  }
+
+  // 검색 키워드 변화 감지
+  if (changes.pendingKeyword) {
+    var keyword = changes.pendingKeyword.newValue;
+    if (!keyword || !currentJwt) return;
+    chrome.storage.local.remove("pendingKeyword");
+    analyze(keyword.trim(), currentJwt);
+  }
 });
