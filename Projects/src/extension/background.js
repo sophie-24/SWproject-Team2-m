@@ -63,7 +63,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;
   const url = tab.url || "";
   console.log("[Tubify] tab updated:", url);
-  if (!url.startsWith("http://localhost:8000/")) return;
+  if (!url.startsWith("http://localhost:8000/") && !url.startsWith("http://127.0.0.1:8000/")) return;
 
   try {
     const token = new URL(url).searchParams.get("token");
