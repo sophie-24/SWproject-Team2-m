@@ -447,8 +447,8 @@ async def callback(
     )
 
     # 신규 유저 → 로딩(히스토리 분석), 기존 유저 → 마이페이지
-    # interest_categories나 delivery_type이 있으면 온보딩 완료로 간주 (initial_intent만 누락된 불완전 상태 대응)
-    is_onboarded = bool(user.initial_intent or user.interest_categories or user.delivery_type)
+    # delivery_type은 기본값이 있으므로 온보딩 완료 판단에서 제외
+    is_onboarded = bool(user.initial_intent or user.interest_categories)
     if not is_onboarded:
         redirect_url = f"{FRONTEND_URL}/loading.html?token={jwt_token}"
     else:
