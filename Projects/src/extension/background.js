@@ -13,6 +13,12 @@ chrome.runtime.onInstalled.addListener(() => {
 // ── 웹사이트로부터 메시지 수신 (JWT 저장 / 검색 기록 요청) ──────────────────────
 chrome.runtime.onMessageExternal.addListener(
   (message, sender, sendResponse) => {
+    if (message.type === "GET_HISTORY") {
+      // TODO: Replace history-based analysis with explicit heart-based interests.
+      sendResponse({ success: false, keywords: [] });
+      return true;
+    }
+
     if (message.type === "SET_TOKEN") {
       chrome.storage.local.set({ jwt: message.token, loggedIn: true }, () => {
         console.log("[Tubify] JWT 저장 완료");
@@ -96,6 +102,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // ── 내부 메시지 처리 (content.js / popup.js / onboarding.html 요청) ─────────
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "GET_HISTORY") {
+    // TODO: Replace history-based analysis with explicit heart-based interests.
+    sendResponse({ success: false, keywords: [] });
+    return true;
+  }
 
   // GET_HISTORY: 최근 1개월 YouTube 검색 기록 수집 → 키워드 리스트 반환
   if (message.type === "GET_HISTORY") {
