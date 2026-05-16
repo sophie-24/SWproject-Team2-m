@@ -18,6 +18,7 @@ from auth import create_auth_url, exchange_code_for_tokens, create_jwt, verify_j
 from youtube_search import search_videos, get_subscriptions
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
+from gemini_client import call_gemini_async
 from shared_cache import search_analysis_cache as _search_analysis_cache_shared
 from database import init_db, get_db, Newsletter, UserInterest
 from behavior_store import save_behavior, get_today_logs
@@ -1513,6 +1514,149 @@ async def analyze_search(
         _search_analysis_cache[cache_key] = result
 
     return JSONResponse(result)
+
+
+# ── 영상 진입 분석 (현재 영상 요약 + 제목 기반 인사이트) ────────────────────────
+
+class AnalyzeVideoRequest(BaseModel):
+    video_id: str = Field(..., description="현재 보고 있는 YouTube video_id")
+    title: str    = Field(..., description="현재 영상 제목")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "video_id": "dQw4w9WgXcQ",
+                "title":    "갤럭시 S25 울트라 완벽 분석 리뷰",
+            }
+        }
+    )
+
+
+class AnalyzeVideoResponse(BaseModel):
+    video_id:          str
+    extracted_topic:   str
+    normalized_topic:  str
+    video_summary:     str
+    summary_lines:     list[str]
+    recommended_videos: list[Any]
+    sources:           list[Any]
+
+
+@app.post(
+    "/analyze_video",
+    response_model=AnalyzeVideoResponse,
+    tags=["AI 분석"],
+    summary="영상 진입 분석 — 현재 영상 요약 + 제목 기반 인사이트 ✅",
+)
+async def analyze_video(
+    data: AnalyzeVideoRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    사용자가 개별 영상 진입 시 호출.
+    1. 현재 영상 자막 기반 단일 요약 생성
+    2. 영상 제목에서 대표 토픽 추출 (title_topic_ai)
+    3. 추출 토픽으로 Pipeline A 흐름 재사용 → 추천 영상 + 인사이트 반환
+
+    # TODO: 현재 영상 기반 분석 API 연결 (프론트 side_panel.js)
+    """
+    from pipeA_orchestrator import run_pipeline_a
+    from agents.title_topic_ai import extract_topic_from_title
+
+    video_id = data.video_id
+    title    = data.title
+    user_id  = user["user_id"]
+
+    # ── Step 1: 제목 기반 토픽 추출 ──────────────────────────────────────────
+    topic_result      = await extract_topic_from_title(title)
+    extracted_topic   = topic_result["topic"]
+    normalized_topic  = topic_result["normalized_topic"]
+    logger.info(f"[analyze_video] topic='{extracted_topic}' video_id={video_id}")
+
+    # ── Step 2: 현재 영상 자막 단일 요약 ─────────────────────────────────────
+    video_summary = await _summarize_single_video(video_id, title)
+
+    # ── Step 3: 토픽 기반 Pipeline A (추천 영상 + 인사이트) ──────────────────
+    cache_key = f"{user_id}:video:{normalized_topic}"
+    if cache_key in _search_analysis_cache:
+        pipeline_result = _search_analysis_cache[cache_key]
+    else:
+        interest_result = await db.execute(
+            select(UserInterest.category)
+            .where(UserInterest.user_id == user_id)
+            .order_by(UserInterest.weight.desc())
+            .limit(10)
+        )
+        user_categories = [row[0] for row in interest_result.all()]
+
+        try:
+            pipeline_result = await run_pipeline_a(
+                keyword=extracted_topic,
+                subscribed_channel_ids=[],
+                user_categories=user_categories,
+                clicked_channel_ids=[],
+            )
+        except ValueError:
+            pipeline_result = {
+                "summary_lines": [],
+                "recommended_videos": [],
+                "sources": [],
+            }
+        _search_analysis_cache[cache_key] = pipeline_result
+
+    return JSONResponse({
+        "video_id":          video_id,
+        "extracted_topic":   extracted_topic,
+        "normalized_topic":  normalized_topic,
+        "video_summary":     video_summary,
+        "summary_lines":     pipeline_result.get("summary_lines", []),
+        "recommended_videos": pipeline_result.get("recommended_videos", []),
+        "sources":           pipeline_result.get("sources", []),
+    })
+
+
+async def _summarize_single_video(video_id: str, title: str) -> str:
+    """현재 영상 자막 기반 단일 요약 (2~3문장). 자막 없으면 제목 기반 fallback."""
+    cache_key = f"video_summary:{video_id}"
+    if cache_key in _search_analysis_cache:
+        return _search_analysis_cache[cache_key]
+
+    try:
+        transcript_text = await asyncio.to_thread(
+            _collect_transcript_for_summary, video_id
+        )
+        if not transcript_text:
+            raise ValueError("자막 없음")
+
+        prompt = (
+            f"다음은 YouTube 영상 '{title}'의 자막입니다.\n"
+            f"이 영상의 핵심 내용을 한국어로 2~3문장으로 요약하세요.\n"
+            f"요약문만 출력하고 다른 설명은 생략하세요.\n\n"
+            f"자막:\n{transcript_text[:8000]}"
+        )
+        summary = await call_gemini_async(prompt, temperature=0.2)
+        summary = summary.strip()
+    except Exception as e:
+        logger.warning(f"[analyze_video] 단일 요약 실패 ({video_id}): {e}")
+        summary = f"'{title}' 영상에 대한 요약을 생성할 수 없습니다."
+
+    _search_analysis_cache[cache_key] = summary
+    return summary
+
+
+def _collect_transcript_for_summary(video_id: str) -> Optional[str]:
+    """자막 수집 동기 함수 — asyncio.to_thread 용."""
+    from preprocessing import clean_transcript
+    raw = get_transcript(video_id)
+    if not raw:
+        return None
+    entries = format_transcript_with_timestamps(raw)
+    if not entries:
+        return None
+    full_text = " ".join(e["text"] for e in entries)
+    cleaned = clean_transcript(full_text)
+    return cleaned[:15_000] if cleaned else None
 
 
 # ── 단일 영상 AI 분석 ─────────────────────────────────────────────────────────
