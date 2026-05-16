@@ -1,8 +1,3 @@
-// ── 과거 YouTube 검색 기록 수집 ─────────────────────────────────────────────────
-// 호출: onboarding.html에서 chrome.runtime.sendMessage({ type: "GET_HISTORY" })
-// 반환: { success: true, keywords: ["검색어1", "검색어2", ...] }
-// 권한: manifest.json에 "history" 이미 포함됨
-
 // ── 설치 시 사이드패널 동작 설정 ───────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(() => {
   // 툴바 아이콘 클릭 시 사이드패널이 자동으로 열리도록 설정
@@ -10,11 +5,11 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log("[Tubify] 익스텐션 설치/업데이트 완료");
 });
 
-// ── 웹사이트로부터 메시지 수신 (JWT 저장 / 검색 기록 요청) ──────────────────────
+// ── 웹사이트로부터 메시지 수신 (JWT 저장) ────────────────────────────────────────
 chrome.runtime.onMessageExternal.addListener(
   (message, sender, sendResponse) => {
+    // GET_HISTORY: history 권한 제거로 비활성화 (chore/remove-history-permission)
     if (message.type === "GET_HISTORY") {
-      // TODO: Replace history-based analysis with explicit heart-based interests.
       sendResponse({ success: false, keywords: [] });
       return true;
     }
@@ -31,32 +26,6 @@ chrome.runtime.onMessageExternal.addListener(
       chrome.storage.local.remove(["jwt", "loggedIn"], () => {
         sendResponse({ success: true });
       });
-      return true;
-    }
-
-    // loading.html(웹페이지)에서 검색 기록 요청 — onMessage는 내부 전용이라 여기서도 처리
-    if (message.type === "GET_HISTORY") {
-      const oneMonthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      chrome.history.search(
-        { text: "youtube.com/results", maxResults: 500, startTime: oneMonthAgo },
-        (historyItems) => {
-          const keywords = [];
-          const seen = new Set();
-          for (const item of historyItems || []) {
-            try {
-              const url = new URL(item.url);
-              if (url.hostname.includes("youtube.com") && url.pathname === "/results") {
-                const kw = url.searchParams.get("search_query") || "";
-                if (kw && !seen.has(kw.toLowerCase())) {
-                  seen.add(kw.toLowerCase());
-                  keywords.push(kw);
-                }
-              }
-            } catch (e) {}
-          }
-          sendResponse({ success: true, keywords });
-        }
-      );
       return true;
     }
   }
@@ -102,36 +71,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // ── 내부 메시지 처리 (content.js / popup.js / onboarding.html 요청) ─────────
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // GET_HISTORY: history 권한 제거로 비활성화 (chore/remove-history-permission)
   if (message.type === "GET_HISTORY") {
-    // TODO: Replace history-based analysis with explicit heart-based interests.
     sendResponse({ success: false, keywords: [] });
     return true;
-  }
-
-  // GET_HISTORY: 최근 1개월 YouTube 검색 기록 수집 → 키워드 리스트 반환
-  if (message.type === "GET_HISTORY") {
-    const oneMonthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    chrome.history.search(
-      { text: "youtube.com/results", maxResults: 500, startTime: oneMonthAgo },
-      (historyItems) => {
-        const keywords = [];
-        const seen = new Set();
-        for (const item of historyItems || []) {
-          try {
-            const url = new URL(item.url);
-            if (url.hostname.includes("youtube.com") && url.pathname === "/results") {
-              const kw = url.searchParams.get("search_query") || "";
-              if (kw && !seen.has(kw.toLowerCase())) {
-                seen.add(kw.toLowerCase());
-                keywords.push(kw);
-              }
-            }
-          } catch (e) { /* URL 파싱 실패 무시 */ }
-        }
-        sendResponse({ success: true, keywords });
-      }
-    );
-    return true; // 비동기 sendResponse 유지
   }
 
   // OPEN_SIDE_PANEL: content.js는 chrome.sidePanel에 직접 접근 불가 → background.js로 전달
