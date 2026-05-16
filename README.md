@@ -169,7 +169,8 @@ SWproject-Team2/Projects/src/
 │       ├── cluster_ai.py         # 오늘 검색어를 시간 흐름 컨텍스트 포함해 의미 기반 주제 클러스터링
 │       ├── selector_ai.py        # YouTube 후보 수집 후 ViewRate × 개인화(키워드·구독·최신성) 공식으로 상위 5개 선정
 │       ├── analyzer_ai.py        # 자막 배치 분석 — 광고 탐지, 교차분석(공통사실·쟁점), 신뢰도 점수
-│       └── newsletter_ai.py      # analyzer 결과를 의도 타입별로 조립해 최종 뉴스레터 데이터 반환
+│       ├── newsletter_ai.py      # analyzer 결과를 의도 타입별로 조립해 최종 뉴스레터 데이터 반환
+│       └── title_topic_ai.py     # 영상 제목 기반 관심 토픽 추출 — topic, normalized_topic, related_keywords 반환
 │
 ├── extension/                    # Chrome 익스텐션
 │   ├── manifest.json             # 익스텐션 설정 및 권한 선언
