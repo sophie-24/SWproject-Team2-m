@@ -521,6 +521,7 @@ class CollectData(BaseModel):
 @app.post(
     "/collect",
     response_model=CollectResponse,
+    deprecated=True,
     tags=["행동 수집"],
     summary="검색/시청 로그 저장 ✅",
 )
@@ -546,6 +547,7 @@ async def collect(
 @app.get(
     "/collect/today",
     response_model=TodayLogsResponse,
+    deprecated=True,
     tags=["행동 수집"],
     summary="오늘 수집된 행동 로그 조회 ✅",
 )
@@ -566,6 +568,7 @@ async def today_logs(
 @app.get(
     "/my/logs",
     response_model=MyLogsResponse,
+    deprecated=True,
     tags=["행동 수집"],
     summary="내 행동 로그 및 트리거 주제 조회 ✅",
 )
@@ -1108,6 +1111,7 @@ class HistoryAnalyzeRequest(BaseModel):
 @app.post(
     "/profile/analyze-history",
     response_model=HistoryAnalyzeResponse,
+    deprecated=True,
     tags=["온보딩"],
     summary="검색 기록 기반 관심사 분석 ✅",
 )
