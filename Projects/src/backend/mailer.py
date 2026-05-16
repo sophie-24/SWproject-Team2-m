@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 
 RESEND_API_KEY   = os.getenv("RESEND_API_KEY")
 RESEND_FROM      = os.getenv("RESEND_FROM_EMAIL", "curator@tubify.com")
-
+RESEND_TEST_RECIPIENT = os.getenv("RESEND_TEST_RECIPIENT")
 resend.api_key = RESEND_API_KEY
 
 

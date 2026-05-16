@@ -14,6 +14,9 @@ let _searchDebounceTimer  = null;  // 디바운스 타이머 — search
 let _watchDebounceTimer   = null;  // 디바운스 타이머 — watch
 
 async function collectEvent(event_type, keyword, video_id = null) {
+  // TODO: Replace automatic behavior collection with explicit heart-based interests.
+  return;
+
   if (!isContextValid()) return;
   const jwt = await getJwt();
   if (!jwt) return;
