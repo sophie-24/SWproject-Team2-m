@@ -61,7 +61,7 @@ class BehaviorLog(Base):
     video_id     = Column(String(50), nullable=True)
     logged_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     # 배치 처리 상태 추적
-    status       = Column(String(20), nullable=False, default="pending")  # 'pending'|'processed'|'archived'
+    status       = Column(SAEnum('pending', 'processed', 'archived', name='log_status', create_type=False), nullable=False, default="pending")
     processed_at = Column(DateTime, nullable=True)                         # processed 상태로 바뀐 시점
     batch_id     = Column(UUID(as_uuid=True), nullable=True)              # 처리한 ReportBatch.id
 
@@ -82,7 +82,7 @@ class Newsletter(Base):
     content_json     = Column(Text, nullable=False)       # newsletter_ai 출력값 JSON 문자열
     delivered_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     # 발송 결과 추적
-    delivery_status  = Column(String(20), nullable=False, default="generated")  # 'generated'|'sent'|'failed'
+    delivery_status  = Column(SAEnum('generated', 'sent', 'failed', name='delivery_status', create_type=False), nullable=False, default="generated")
     error_message    = Column(Text, nullable=True)        # 실패 시 오류 메시지
     batch_id         = Column(UUID(as_uuid=True), nullable=True)  # 생성한 ReportBatch.id
 
@@ -102,10 +102,10 @@ class ReportBatch(Base):
     user_id      = Column(String(255), nullable=False)   # google_id 기준
     started_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     finished_at  = Column(DateTime, nullable=True)
-    status       = Column(String(20), nullable=False, default="created")  # 'created'|'processing'|'completed'|'failed'
+    status       = Column(SAEnum('created', 'processing', 'completed', 'failed', name='batch_status', create_type=False), nullable=False, default="created")
     topic_count  = Column(Integer, nullable=True)    # Pipeline B가 추출한 최종 토픽 수
     # 2차 설계: 배치가 커버한 기간 및 발송 시점 구분
-    window_type  = Column(String(30), nullable=True)    # 'before_cutoff'|'after_cutoff' (오전/오후 발송 구분)
+    window_type  = Column(SAEnum('before_cutoff', 'after_cutoff', name='window_type', create_type=False), nullable=True)
     period_start = Column(DateTime, nullable=True)       # 이번 배치가 커버한 로그 시작 시점
     period_end   = Column(DateTime, nullable=True)       # 이번 배치가 커버한 로그 종료 시점 (= 배치 실행 시각)
 
@@ -127,7 +127,7 @@ class UserInterest(Base):
     user_id      = Column(String(255), nullable=False)   # google_id 기준
     category     = Column(String(100), nullable=False)   # cluster_ai 토픽명 (ex: "아이폰 16")
     weight       = Column(Integer, nullable=False, default=1)
-    source       = Column(String(20), nullable=False, default="behavior")  # 'behavior'|'onboarding'|'manual'
+    source       = Column(SAEnum('behavior', 'onboarding', 'manual', name='interest_source', create_type=False), nullable=False, default="behavior")
     last_seen_at = Column(DateTime, nullable=True)        # 해당 토픽이 마지막으로 관찰된 시점
     created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     updated_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
