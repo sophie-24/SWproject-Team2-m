@@ -276,6 +276,11 @@ document.getElementById("btn-login").addEventListener("click", function () {
       if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
         keyword = u.searchParams.get("search_query") || "";
       }
+      // TODO: 현재 영상 기반 분석 API 연결
+      // YouTube 영상 진입 페이지(/watch?v=...) 감지 시 POST /analyze_video 호출
+      // 요청: { video_id: u.searchParams.get("v"), title: tab.title }
+      // 응답: { video_summary, extracted_topic, summary_lines, recommended_videos, sources }
+      // 현재는 /results 페이지 진입 시 /analyze_search 흐름만 동작함
     } catch (e) { }
   }
 
