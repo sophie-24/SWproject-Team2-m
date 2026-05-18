@@ -1038,6 +1038,262 @@ async def my_interests(
     }
 
 
+# ── 하트 기반 관심 토픽 관리 (/interests) ────────────────────────────────────
+
+INTEREST_LIMIT = 5  # 관심 토픽 최대 개수
+
+
+class InterestAddRequest(BaseModel):
+    video_id: str  = Field(..., description="하트를 누른 YouTube video_id")
+    title:    str  = Field(..., description="하트를 누른 영상 제목")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {"video_id": "dQw4w9WgXcQ", "title": "갤럭시 S25 울트라 완벽 분석"}
+        }
+    )
+
+
+class InterestAddResponse(BaseModel):
+    added:            bool
+    deduped:          bool
+    topic:            str
+    normalized_topic: str
+    count:            int
+    limit:            int
+
+
+@app.get(
+    "/interests",
+    tags=["관심사"],
+    summary="하트 기반 관심 토픽 목록 조회 ✅",
+)
+async def get_interests(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    사용자의 활성 관심 토픽 목록 반환.
+    각 토픽에 연결된 영상 수(video_count)도 포함.
+    """
+    rows = await db.execute(
+        select(UserInterest)
+        .where(
+            UserInterest.user_id == user["user_id"],
+            UserInterest.is_active == True,
+        )
+        .order_by(UserInterest.created_at.asc())
+    )
+    interests = rows.scalars().all()
+
+    result = []
+    for i in interests:
+        video_count_row = await db.execute(
+            select(func.count()).select_from(UserInterestVideo)
+            .where(UserInterestVideo.user_interest_id == i.id)
+        )
+        video_count = video_count_row.scalar() or 0
+        result.append({
+            "id":               str(i.id),
+            "topic":            i.category,
+            "normalized_topic": i.normalized_topic,
+            "video_count":      video_count,
+            "created_at":       i.created_at.isoformat() if i.created_at else None,
+        })
+
+    return JSONResponse({"interests": result, "count": len(result), "limit": INTEREST_LIMIT})
+
+
+@app.post(
+    "/interests",
+    response_model=InterestAddResponse,
+    tags=["관심사"],
+    summary="하트 기반 관심 토픽 추가 ✅",
+)
+async def add_interest(
+    data: InterestAddRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    영상에 하트를 눌렀을 때 호출.
+    1. 영상 제목에서 토픽 추출 (title_topic_ai)
+    2. normalized_topic 기준으로 기존 관심사와 중복 판단
+    3. 중복이면 영상만 연결 (슬롯 소비 없음)
+    4. 신규이면 5개 제한 검사 후 추가
+    5. 409: 이미 5개인데 신규 토픽 추가 시도
+
+    # TODO: 하트 관심 토픽 API 연결 (프론트 side_panel.js)
+    # TODO: 관심 토픽 최대 5개 안내 후 마이페이지 이동 (409 응답 시 프론트 처리)
+    """
+    import re as _re
+    from agents.title_topic_ai import extract_topic_from_title
+    from datetime import datetime, timezone
+
+    user_id = user["user_id"]
+
+    # ── Step 1: 제목에서 토픽 추출 ────────────────────────────────────────────
+    topic_result     = await extract_topic_from_title(data.title)
+    topic            = topic_result["topic"]
+    normalized_topic = topic_result["normalized_topic"]
+
+    # ── Step 2: 기존 관심사 중복 판단 (normalized_topic 기준) ─────────────────
+    existing_row = await db.execute(
+        select(UserInterest).where(
+            UserInterest.user_id         == user_id,
+            UserInterest.normalized_topic == normalized_topic,
+        )
+    )
+    existing = existing_row.scalar_one_or_none()
+
+    if existing:
+        # 비활성 상태였으면 다시 활성화
+        if not existing.is_active:
+            existing.is_active = True
+            await db.commit()
+
+        # 영상 reference 연결 (중복 video_id는 무시)
+        await _link_video(db, existing.id, data.video_id, data.title)
+
+        active_count = await _active_interest_count(db, user_id)
+        logger.info(f"[interests] 중복 토픽 — 영상만 연결: user={user_id} topic={topic}")
+        return {
+            "added":            False,
+            "deduped":          True,
+            "topic":            existing.category,
+            "normalized_topic": existing.normalized_topic,
+            "count":            active_count,
+            "limit":            INTEREST_LIMIT,
+        }
+
+    # ── Step 3: 신규 토픽 — 5개 제한 검사 ────────────────────────────────────
+    active_count = await _active_interest_count(db, user_id)
+    if active_count >= INTEREST_LIMIT:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": f"관심 토픽은 최대 {INTEREST_LIMIT}개까지 저장할 수 있습니다.",
+                "count":   active_count,
+                "limit":   INTEREST_LIMIT,
+            },
+        )
+
+    # ── Step 4: 신규 관심 토픽 저장 ──────────────────────────────────────────
+    new_interest = UserInterest(
+        user_id          = user_id,
+        category         = topic,
+        normalized_topic = normalized_topic,
+        source           = "manual",
+        weight           = 1,
+        is_active        = True,
+        last_seen_at     = datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    db.add(new_interest)
+    await db.flush()   # id 확보
+
+    await _link_video(db, new_interest.id, data.video_id, data.title)
+    await db.commit()
+
+    active_count += 1
+    logger.info(f"[interests] 신규 토픽 추가: user={user_id} topic={topic} count={active_count}")
+    return {
+        "added":            True,
+        "deduped":          False,
+        "topic":            topic,
+        "normalized_topic": normalized_topic,
+        "count":            active_count,
+        "limit":            INTEREST_LIMIT,
+    }
+
+
+@app.delete(
+    "/interests/{topic}",
+    tags=["관심사"],
+    summary="관심 토픽 취소 ✅",
+)
+async def delete_interest(
+    topic: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    관심 토픽 취소 — normalized_topic 기준으로 soft delete (is_active=False).
+    연결된 영상(user_interest_videos)은 유지.
+    """
+    import re as _re
+    normalized = _re.sub(r"\s+", " ", topic.lower()).strip()
+
+    row = await db.execute(
+        select(UserInterest).where(
+            UserInterest.user_id          == user["user_id"],
+            UserInterest.normalized_topic == normalized,
+            UserInterest.is_active        == True,
+        )
+    )
+    interest = row.scalar_one_or_none()
+    if not interest:
+        raise HTTPException(status_code=404, detail="해당 관심 토픽을 찾을 수 없습니다.")
+
+    interest.is_active = False
+    await db.commit()
+
+    logger.info(f"[interests] 토픽 취소: user={user['user_id']} topic={topic}")
+    return JSONResponse({"ok": True, "topic": interest.category, "normalized_topic": normalized})
+
+
+# ── /interests 헬퍼 ────────────────────────────────────────────────────────────
+
+async def _active_interest_count(db: AsyncSession, user_id: str) -> int:
+    """활성 관심 토픽 수 반환."""
+    result = await db.execute(
+        select(func.count()).select_from(UserInterest).where(
+            UserInterest.user_id  == user_id,
+            UserInterest.is_active == True,
+        )
+    )
+    return result.scalar() or 0
+
+
+async def _link_video(
+    db: AsyncSession,
+    user_interest_id,
+    video_id: str,
+    title: str,
+) -> None:
+    """관심 토픽에 영상 연결 — 중복 video_id는 무시."""
+    from sqlalchemy.dialects.postgresql import insert as pg_insert_local
+    stmt = (
+        pg_insert_local(UserInterestVideo)
+        .values(
+            user_interest_id=user_interest_id,
+            video_id=video_id,
+            title=title,
+        )
+        .on_conflict_do_nothing(constraint="uq_interest_video")
+    )
+    await db.execute(stmt)
+
+
+@app.get(
+    "/interests/unsubscribe-confirm",
+    tags=["관심사"],
+    summary="메일 내 관심 토픽 취소 확인 진입점 (Issue 5)",
+    response_class=RedirectResponse,
+)
+async def interest_unsubscribe_confirm(
+    topic: str = Query(..., description="취소할 관심 토픽"),
+):
+    """
+    뉴스레터 메일의 관심 토픽 취소 링크 클릭 시 진입.
+    즉시 삭제하지 않고 마이페이지로 이동시켜 확인 팝업을 띄운다.
+
+    # TODO: 관심 토픽 취소 확인 팝업 표시 (프론트 mypage.html)
+    # TODO: 메일 링크 위변조 방지 토큰 검증 추가 (Issue 5)
+    """
+    redirect_url = f"{FRONTEND_URL}/mypage.html?unsubscribe_topic={topic}"
+    return RedirectResponse(url=redirect_url)
+
+
 class ProfileInitData(BaseModel):
     initial_intent: str = Field("지식형", description="'유희형' | '지식형' | '구매형'")
     interest_categories: list[str] = Field(
