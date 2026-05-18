@@ -1,5 +1,5 @@
-# SQLAlchemy ORM 모델 정의 및 비동기 DB 연결 (User, BehaviorLog, Newsletter, ReportBatch, UserInterest, UserSubscription)
-# 2차 DB 설계 반영: behavior_logs.processed_at / user_interests.(source,last_seen_at,created_at) / report_batches.(window_type,period_start,period_end)
+# SQLAlchemy ORM 모델 정의 및 비동기 DB 연결
+# refactor/db-interest-schema: user_interests를 하트 토픽 저장 중심으로 단순화
 import os
 import uuid
 from datetime import datetime, timezone
@@ -38,19 +38,20 @@ class User(Base):
     # 온보딩 프로파일링
     initial_intent       = Column(String(20), nullable=True)   # '유희형'|'지식형'|'구매형'
     interest_categories  = Column(Text, nullable=True)         # JSON 문자열 — 관심사 카테고리 목록
-    # 사용자 설정 발송 시간 — JSON 배열 문자열로 1개 이상 저장 (예: '["08:00","21:00"]')
+    # 발송 시간 — JSON 배열 문자열 (Issue 7에서 단일 시간으로 정리 예정)
     send_time            = Column(Text, nullable=False, default='["21:00"]', server_default='["21:00"]')
     # 수신 동의 여부 — False이면 배치에서 완전히 제외
     is_subscribed        = Column(Boolean, nullable=False, default=True)
     unsubscribed_at      = Column(DateTime, nullable=True)
-    # 유튜브 구독 채널 ID 캐시 — JSON 배열 문자열 (예: '["UCxxx","UCyyy"]')
-    # GET /subscriptions 호출 시 갱신, scheduler에서 selector_ai 가산점에 사용
+    # DEPRECATED: scheduler selector_ai 가산점용 구독 채널 캐시 — 행동기록 기반 파이프라인 제거로 불필요
     subscribed_channels  = Column(Text, nullable=True)
     # Google OAuth credentials JSON — 서버 재시작 후에도 /subscriptions 호출 가능하도록 DB에 저장
     oauth_credentials    = Column(Text, nullable=True)
     created_at           = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
+# DEPRECATED: 행동기록 기반 파이프라인 제거(Issue 8)로 더 이상 사용하지 않음
+# /collect, /collect/today API도 deprecated 처리됨
 class BehaviorLog(Base):
     __tablename__ = "behavior_logs"
 
@@ -60,15 +61,12 @@ class BehaviorLog(Base):
     keyword      = Column(String(500), nullable=False)
     video_id     = Column(String(50), nullable=True)
     logged_at    = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    # 배치 처리 상태 추적
     status       = Column(SAEnum('pending', 'processed', 'archived', name='log_status', create_type=False), nullable=False, default="pending")
-    processed_at = Column(DateTime, nullable=True)                         # processed 상태로 바뀐 시점
-    batch_id     = Column(UUID(as_uuid=True), nullable=True)              # 처리한 ReportBatch.id
+    processed_at = Column(DateTime, nullable=True)
+    batch_id     = Column(UUID(as_uuid=True), nullable=True)
 
     __table_args__ = (
-        # 스케줄러: user_id + status='pending' 필터링 → logged_at 정렬
         Index("idx_behavior_logs_status",   "user_id", "status", "logged_at"),
-        # batch_id 역추적 (ReportBatch 단위 로그 조회)
         Index("idx_behavior_logs_batch_id", "batch_id"),
     )
 
@@ -79,66 +77,92 @@ class Newsletter(Base):
     id               = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id          = Column(String(255), nullable=False)
     subject          = Column(String(500), nullable=True)
-    content_json     = Column(Text, nullable=False)       # newsletter_ai 출력값 JSON 문자열
+    content_json     = Column(Text, nullable=False)
     delivered_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    # 발송 결과 추적
     delivery_status  = Column(SAEnum('generated', 'sent', 'failed', name='delivery_status', create_type=False), nullable=False, default="generated")
-    error_message    = Column(Text, nullable=True)        # 실패 시 오류 메시지
-    batch_id         = Column(UUID(as_uuid=True), nullable=True)  # 생성한 ReportBatch.id
+    error_message    = Column(Text, nullable=True)
+    batch_id         = Column(UUID(as_uuid=True), nullable=True)
 
     __table_args__ = (
-        # 대시보드 히스토리 목록: user_id 필터 + delivered_at 정렬
         Index("idx_newsletters_history",  "user_id", "delivered_at"),
-        # 발송 실패 추적: delivery_status='failed' 필터링
         Index("idx_newsletters_delivery", "user_id", "delivery_status"),
     )
 
 
+# DEPRECATED: 행동기록 기반 파이프라인 제거(Issue 8)로 더 이상 사용하지 않음
 class ReportBatch(Base):
-    """Pipeline B 1회 실행 단위. behavior_logs.batch_id → report_batches.id 로 역추적 가능."""
     __tablename__ = "report_batches"
 
     id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id      = Column(String(255), nullable=False)   # google_id 기준
+    user_id      = Column(String(255), nullable=False)
     started_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     finished_at  = Column(DateTime, nullable=True)
     status       = Column(SAEnum('created', 'processing', 'completed', 'failed', name='batch_status', create_type=False), nullable=False, default="created")
-    topic_count  = Column(Integer, nullable=True)    # Pipeline B가 추출한 최종 토픽 수
-    # 2차 설계: 배치가 커버한 기간 및 발송 시점 구분
+    topic_count  = Column(Integer, nullable=True)
     window_type  = Column(SAEnum('before_cutoff', 'after_cutoff', name='window_type', create_type=False), nullable=True)
-    period_start = Column(DateTime, nullable=True)       # 이번 배치가 커버한 로그 시작 시점
-    period_end   = Column(DateTime, nullable=True)       # 이번 배치가 커버한 로그 종료 시점 (= 배치 실행 시각)
+    period_start = Column(DateTime, nullable=True)
+    period_end   = Column(DateTime, nullable=True)
 
     __table_args__ = (
-        # 유저별 배치 실행 이력 조회: user_id 필터 + started_at 정렬
         Index("idx_report_batches_user", "user_id", "started_at"),
     )
 
 
 class UserInterest(Base):
-    """유저 카테고리별 관심도 누적 테이블.
-    온보딩 시 weight=1 초기화, Pipeline B 실행마다 해당 토픽 weight++.
-    Gemini 추가 호출 없이 cluster_ai 결과(merged_topics)를 그대로 재활용.
-    2차 설계: source(출처 구분) / last_seen_at(최근성 판단) / created_at(최초 등장) 추가.
+    """사용자가 하트한 관심 토픽 저장 테이블.
+    - 하트 1회 = 1개 토픽 (normalized_topic 기준 중복 제거)
+    - 최대 5개 제한은 API 레이어(Issue 3)에서 처리
+    - user_interest_videos 테이블과 1:N 관계 (Issue 4)
     """
     __tablename__ = "user_interests"
 
-    id           = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id      = Column(String(255), nullable=False)   # google_id 기준
-    category     = Column(String(100), nullable=False)   # cluster_ai 토픽명 (ex: "아이폰 16")
-    weight       = Column(Integer, nullable=False, default=1)
-    source       = Column(SAEnum('behavior', 'onboarding', 'manual', name='interest_source', create_type=False), nullable=False, default="behavior")
-    last_seen_at = Column(DateTime, nullable=True)        # 해당 토픽이 마지막으로 관찰된 시점
-    created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    updated_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-                          onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    id                = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id           = Column(String(255), nullable=False)   # google_id 기준
+    # 사용자에게 보여줄 대표 토픽명 (title_topic_ai 출력)
+    category          = Column(String(100), nullable=False)
+    # 중복 판단 및 5개 제한 카운트 기준 (소문자·공백 정규화)
+    normalized_topic  = Column(String(100), nullable=True)
+    # source: 하트 기반 관심사는 'manual', 온보딩 초기화는 'onboarding'
+    source            = Column(SAEnum('behavior', 'onboarding', 'manual', name='interest_source', create_type=False), nullable=False, default="manual")
+    # weight: 하위 호환 유지 (행동기록 기반 누적 로직은 Issue 8에서 제거)
+    weight            = Column(Integer, nullable=False, default=1)
+    # soft delete — False이면 관심사 취소 상태 (DELETE /interests/{topic} 시 활용)
+    is_active         = Column(Boolean, nullable=False, default=True)
+    last_seen_at      = Column(DateTime, nullable=True)
+    created_at        = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at        = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+                               onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     __table_args__ = (
+        # 신규 기준: (user_id, normalized_topic) — 같은 토픽 중복 저장 방지
+        UniqueConstraint("user_id", "normalized_topic", name="uq_user_interest_normalized"),
+        # 하위 호환: 기존 온보딩/profile_init 코드에서 category 기준 삽입 시 사용
         UniqueConstraint("user_id", "category", name="uq_user_interest_category"),
-        # 관심도 상위 카테고리 조회: user_id 필터 + weight 정렬
         Index("idx_user_interests_user", "user_id", "weight"),
+        Index("idx_user_interests_active", "user_id", "is_active"),
     )
 
+
+class UserInterestVideo(Base):
+    """관심 토픽에 연결된 하트 영상 테이블.
+    - 하나의 관심 토픽(UserInterest)에 여러 영상 연결 가능 (1:N)
+    - 동일 관심 토픽 안에서 같은 video_id 중복 저장 방지
+    - 관심 토픽 삭제(UserInterest 삭제) 시 연결 영상도 CASCADE 삭제
+    """
+    __tablename__ = "user_interest_videos"
+
+    id               = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # user_interests.id 참조 — ON DELETE CASCADE
+    user_interest_id = Column(UUID(as_uuid=True), nullable=False)
+    video_id         = Column(String(50), nullable=False)   # YouTube video_id
+    title            = Column(Text, nullable=True)           # 영상 제목 (참고용)
+    created_at       = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+    __table_args__ = (
+        # 동일 관심 토픽 안에서 같은 video_id 중복 저장 방지
+        UniqueConstraint("user_interest_id", "video_id", name="uq_interest_video"),
+        Index("idx_interest_videos_interest", "user_interest_id"),
+    )
 
 
 # ── DB 초기화 (테이블 생성) ────────────────────────────────────────────────────

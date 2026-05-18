@@ -20,7 +20,7 @@ from transcript_service import get_transcript, format_transcript_with_timestamps
 from preprocessing import chunk_transcript
 from gemini_client import call_gemini_async
 from shared_cache import search_analysis_cache as _search_analysis_cache_shared
-from database import init_db, get_db, Newsletter, UserInterest
+from database import init_db, get_db, Newsletter, UserInterest, UserInterestVideo
 from behavior_store import save_behavior, get_today_logs
 from trigger import get_triggered_topics
 from agents.pipeB_orchestrator import run_pipeline
@@ -933,17 +933,21 @@ async def update_my_profile(
         db_user.send_time = _serialize_send_times(data.send_time)
 
     if data.interest_categories is not None:
+        import re as _re
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
         for category in data.interest_categories:
+            normalized = _re.sub(r"\s+", " ", category.lower()).strip()
             stmt = (
                 pg_insert(UserInterest)
                 .values(
                     user_id=user["user_id"],
                     category=category,
+                    normalized_topic=normalized,
+                    source="onboarding",
                     weight=1,
                     updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
-                .on_conflict_do_nothing(constraint="uq_user_interest_category")
+                .on_conflict_do_nothing(constraint="uq_user_interest_normalized")
             )
             await db.execute(stmt)
 
@@ -1077,16 +1081,20 @@ async def profile_init(
     db_user.initial_intent      = data.initial_intent
     db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
 
+    import re as _re
     for category in data.interest_categories:
+        normalized = _re.sub(r"\s+", " ", category.lower()).strip()
         stmt = (
             pg_insert(UserInterest)
             .values(
                 user_id=user["user_id"],
                 category=category,
+                normalized_topic=normalized,
+                source="onboarding",
                 weight=1,
                 updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
             )
-            .on_conflict_do_nothing(constraint="uq_user_interest_category")
+            .on_conflict_do_nothing(constraint="uq_user_interest_normalized")
         )
         await db.execute(stmt)
 
@@ -1252,7 +1260,7 @@ async def withdraw(
 ):
     """
     회원 탈퇴 — 사용자 계정 및 관련 데이터 삭제.
-    users, user_interests, behavior_logs, newsletters 모두 제거.
+    users, user_interests(→ user_interest_videos CASCADE), behavior_logs, newsletters 모두 제거.
     """
     from database import User, UserInterest, BehaviorLog, Newsletter
     from sqlalchemy import delete as sql_delete
