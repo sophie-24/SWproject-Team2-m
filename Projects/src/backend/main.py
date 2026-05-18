@@ -191,21 +191,28 @@ class MyLogsResponse(BaseModel):
 
 
 class SendTimeResponse(SuccessResponse):
-    send_time: list[str]
+    send_time: str          # 단일 HH:MM 문자열
 
 
 class SettingsResponse(BaseModel):
-    send_time: list[str]
+    send_time: str          # 단일 HH:MM 문자열
     is_subscribed: bool
     delivery_type: Optional[str] = None
     email: Optional[str] = None
 
 
+class InterestTopicItem(BaseModel):
+    """GET /my/profile 응답에 포함되는 하트 관심 토픽 요약."""
+    topic: str
+    normalized_topic: Optional[str] = None
+
+
 class ProfileResponse(BaseModel):
     email: Optional[str] = None
-    send_time: list[str]
+    send_time: str                          # 단일 HH:MM 문자열 (Issue 7)
     initial_intent: Optional[str] = None
     interest_categories: list[str]
+    interests: list[InterestTopicItem]      # 하트 관심 토픽 목록 (Issue 7)
     is_subscribed: bool
     created_at: Optional[str] = None
 
@@ -724,9 +731,9 @@ async def _get_or_create_user(db: AsyncSession, current_user: dict):
 class SubscribeData(BaseModel):
     delivery_type: str = Field("email", description="현재는 email만 사용")
     email: Optional[str] = Field("test@example.com", description="뉴스레터 수신 이메일")
-    send_time: Optional[list[str]] = Field(
-        default_factory=lambda: ["08:00", "21:00"],
-        description="오전/오후 발송 시간 목록",
+    send_time: Optional[str] = Field(
+        "21:00",
+        description="발송 시간 (HH:MM 형식, 예: '08:00', '21:00')",
     )
 
     model_config = ConfigDict(
@@ -734,7 +741,7 @@ class SubscribeData(BaseModel):
             "example": {
                 "delivery_type": "email",
                 "email": "test@example.com",
-                "send_time": ["08:00", "21:00"],
+                "send_time": "21:00",
             }
         }
     )
@@ -772,7 +779,9 @@ async def subscribe(
             )
         db_user.email = data.email
     if data.send_time:
-        db_user.send_time = _serialize_send_times(data.send_time)
+        import json as _json
+        validated = _validate_send_time(data.send_time)
+        db_user.send_time = _json.dumps([validated], ensure_ascii=False)
 
     await db.commit()
     print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
@@ -781,13 +790,13 @@ async def subscribe(
 # ── 마이페이지: 발송 시간 변경 ────────────────────────────────────────────────
 
 class SendTimeData(BaseModel):
-    send_time: list[str] = Field(
-        default_factory=lambda: ["08:00", "21:00"],
-        description="오전/오후 발송 시간 목록",
+    send_time: str = Field(
+        "21:00",
+        description="발송 시간 (HH:MM 형식, 예: '08:00', '21:00')",
     )
 
     model_config = ConfigDict(
-        json_schema_extra={"example": {"send_time": ["08:00", "21:00"]}}
+        json_schema_extra={"example": {"send_time": "21:00"}}
     )
 
 
@@ -811,23 +820,23 @@ async def update_send_time(
     """
     마이페이지에서 뉴스레터 발송 시간 변경.
 
-    INPUT:  { "send_time": "08:00" }  또는  { "send_time": "21:00" }
-    OUTPUT: { "success": true, "send_time": "08:00" }
+    INPUT:  { "send_time": "21:00" }  — 단일 HH:MM 문자열
+    OUTPUT: { "success": true, "send_time": "21:00" }
 
-    허용값: "08:00" (아침 8시 KST) | "21:00" (저녁 9시 KST, 기본값)
     변경 즉시 다음 배치부터 반영됩니다.
     """
-    serialized_times = _serialize_send_times(data.send_time)
-    validated_times = _parse_send_times(serialized_times)
+    validated = _validate_send_time(data.send_time)
+    import json as _json
+    serialized = _json.dumps([validated], ensure_ascii=False)  # DB: JSON 배열로 저장 (스케줄러 하위 호환)
 
     db_user = await _get_or_create_user(db, user)
 
     prev_time = db_user.send_time
-    db_user.send_time = serialized_times
+    db_user.send_time = serialized
     await db.commit()
 
-    logger.info(f"[send-time] {user['user_id']} {prev_time} → {serialized_times}")
-    return {"success": True, "send_time": validated_times}
+    logger.info(f"[send-time] {user['user_id']} {prev_time} → {serialized}")
+    return {"success": True, "send_time": validated}
 
 
 @app.get(
@@ -846,8 +855,9 @@ async def get_my_settings(
     """
     db_user = await _get_or_create_user(db, user)
 
+    times = _parse_send_times(db_user.send_time)
     return {
-        "send_time":      _parse_send_times(db_user.send_time),
+        "send_time":      times[0] if times else "21:00",
         "is_subscribed":  db_user.is_subscribed,
         "delivery_type":  db_user.delivery_type,
         "email":          db_user.email,
@@ -866,11 +876,12 @@ async def my_profile(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """프로필 전체 조회 — 이메일, 발송 시간, 의도 유형, 관심사 카테고리"""
+    """프로필 전체 조회 — 이메일, 발송 시간(단일), 의도 유형, 관심사 카테고리, 하트 관심 토픽"""
     import json as _json
 
     db_user = await _get_or_create_user(db, user)
 
+    # interest_categories: 온보딩 시 저장된 JSON 배열
     categories = []
     if db_user.interest_categories:
         try:
@@ -878,21 +889,38 @@ async def my_profile(
         except Exception:
             pass
 
+    # send_time: DB의 JSON 배열에서 첫 번째 값만 반환 (단일 시간)
     times = _parse_send_times(db_user.send_time)
+    single_time = times[0] if times else "21:00"
+
+    # interests: user_interests 테이블의 활성 하트 토픽
+    interest_rows = await db.execute(
+        select(UserInterest)
+        .where(
+            UserInterest.user_id == user["user_id"],
+            UserInterest.is_active == True,  # noqa: E712
+        )
+        .order_by(UserInterest.created_at.asc())
+    )
+    interests = [
+        {"topic": i.category, "normalized_topic": i.normalized_topic}
+        for i in interest_rows.scalars().all()
+    ]
 
     return {
         "email":               db_user.email,
-        "send_time":           times,
+        "send_time":           single_time,
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
+        "interests":           interests,
         "is_subscribed":       db_user.is_subscribed,
         "created_at":          db_user.created_at.isoformat() if db_user.created_at else None,
     }
 
 class ProfileUpdateData(BaseModel):
-    send_time: Optional[list[str]] = Field(
+    send_time: Optional[str] = Field(
         None,
-        description="오전/오후 발송 시간 목록",
+        description="발송 시간 (HH:MM 형식, 예: '08:00', '21:00')",
     )
     interest_categories: Optional[list[str]] = Field(
         None,
@@ -902,7 +930,7 @@ class ProfileUpdateData(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "send_time": ["08:00", "21:00"],
+                "send_time": "21:00",
                 "interest_categories": ["AI", "경제", "테크"],
             }
         }
@@ -922,7 +950,7 @@ async def update_my_profile(
 ):
     """발송 시간 / 관심사 수정.
     관심사 변경 시 user_interests에 신규 카테고리만 추가 (기존 weight 유지).
-    send_time 배열을 수용합니다.
+    send_time은 단일 HH:MM 문자열로 수용 (DB는 JSON 배열로 저장 — 스케줄러 하위 호환).
     """
     import json as _json
     from datetime import datetime, timezone
@@ -930,7 +958,8 @@ async def update_my_profile(
     db_user = await _get_or_create_user(db, user)
 
     if data.send_time is not None:
-        db_user.send_time = _serialize_send_times(data.send_time)
+        validated = _validate_send_time(data.send_time)
+        db_user.send_time = _json.dumps([validated], ensure_ascii=False)
 
     if data.interest_categories is not None:
         import re as _re
