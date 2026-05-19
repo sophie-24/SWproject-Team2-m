@@ -8,12 +8,6 @@ chrome.runtime.onInstalled.addListener(() => {
 // ── 웹사이트로부터 메시지 수신 (JWT 저장) ────────────────────────────────────────
 chrome.runtime.onMessageExternal.addListener(
   (message, sender, sendResponse) => {
-    // GET_HISTORY: history 권한 제거로 비활성화 (chore/remove-history-permission)
-    if (message.type === "GET_HISTORY") {
-      sendResponse({ success: false, keywords: [] });
-      return true;
-    }
-
     if (message.type === "SET_TOKEN") {
       chrome.storage.local.set({ jwt: message.token, loggedIn: true }, () => {
         console.log("[Tubify] JWT 저장 완료");
@@ -69,14 +63,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// ── 내부 메시지 처리 (content.js / popup.js / onboarding.html 요청) ─────────
+// ── 내부 메시지 처리 (content.js / side_panel.js 요청) ──────────────────────
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // GET_HISTORY: history 권한 제거로 비활성화 (chore/remove-history-permission)
-  if (message.type === "GET_HISTORY") {
-    sendResponse({ success: false, keywords: [] });
-    return true;
-  }
-
   // OPEN_SIDE_PANEL: content.js는 chrome.sidePanel에 직접 접근 불가 → background.js로 전달
   if (message.type === "OPEN_SIDE_PANEL") {
     const tabId = message.tabId || sender.tab?.id;

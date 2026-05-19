@@ -590,7 +590,9 @@
       updateSelectedCount();
     }
 
-    // 익스텐션 GET_HISTORY → /profile/analyze-history 호출
+    // TODO: [Issue #38] loadHistoryAndAnalyze() 함수 제거 필요
+    // history 권한 제거로 GET_HISTORY는 항상 빈 응답 → showDefaultCategories() fallback만 남음
+    // 이 함수 전체 삭제 후 호출부를 showDefaultCategories() 직접 호출로 교체할 것
     async function loadHistoryAndAnalyze() {
       const jwt = getJwt();
 
