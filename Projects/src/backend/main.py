@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from agents.cluster_ai import cluster_topics
 from auth import create_auth_url, exchange_code_for_tokens, create_jwt, verify_jwt
 from youtube_search import search_videos, get_subscriptions
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
@@ -1071,7 +1070,7 @@ INTEREST_LIMIT = 5  # 관심 토픽 최대 개수
 
 
 class InterestAddRequest(BaseModel):
-    video_id: str  = Field(..., description="하트를 누른 YouTube video_id")
+    video_id: Optional[str] = Field(None, description="하트를 누른 YouTube video_id")
     title:    str  = Field(..., description="하트를 누른 영상 제목")
 
     model_config = ConfigDict(
@@ -1217,7 +1216,8 @@ async def add_interest(
             await db.commit()
 
         # 영상 reference 연결 (중복 video_id는 무시)
-        await _link_video(db, existing.id, data.video_id, data.title)
+        if data.video_id:
+            await _link_video(db, existing.id, data.video_id, data.title)
 
         active_count = await _active_interest_count(db, user_id)
         logger.info(f"[interests] 중복 토픽 — 영상만 연결: user={user_id} topic={topic}")
@@ -1255,7 +1255,8 @@ async def add_interest(
     db.add(new_interest)
     await db.flush()   # id 확보
 
-    await _link_video(db, new_interest.id, data.video_id, data.title)
+    if data.video_id:
+        await _link_video(db, new_interest.id, data.video_id, data.title)
     await db.commit()
 
     active_count += 1
