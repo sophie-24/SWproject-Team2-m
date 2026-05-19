@@ -1,6 +1,7 @@
-# Resend API를 통한 HTML 뉴스레터 이메일 발송 — 의도별 카드 레이아웃(썸네일·쟁점배지·채널명)
+# Resend API를 통한 HTML 뉴스레터 이메일 발송 — 의도별 카드 레이아웃(썸네일·쟁점배지·채널명·토픽별 수신취소)
 import os
 from typing import Dict, Any, List
+from urllib.parse import quote
 from dotenv import load_dotenv
 
 import resend
@@ -11,6 +12,7 @@ logger = get_logger(__name__)
 
 RESEND_API_KEY   = os.getenv("RESEND_API_KEY")
 RESEND_FROM      = os.getenv("RESEND_FROM_EMAIL", "curator@tubify.com")
+BACKEND_URL      = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 resend.api_key = RESEND_API_KEY
 
@@ -114,8 +116,8 @@ def _source_cards(sources: List[Dict[str, Any]], accent: str) -> str:
     )
 
 
-def _build_topic_card(topic_data: Dict[str, Any], accent: str) -> str:
-    """주제 1개 → 카드형 HTML 블록 (썸네일, 채널명, 쟁점 배지, 공통 사실 포함)"""
+def _build_topic_card(topic_data: Dict[str, Any], accent: str, unsubscribe_url: str = "") -> str:
+    """주제 1개 → 카드형 HTML 블록 (썸네일, 채널명, 쟁점 배지, 공통 사실, 토픽 수신취소 링크 포함)"""
     topic        = topic_data.get("topic", "")
     summary      = topic_data.get("summary", [])
     pros         = topic_data.get("pros", [])
@@ -155,6 +157,12 @@ def _build_topic_card(topic_data: Dict[str, Any], accent: str) -> str:
     controversy_html  = _controversy_badges(controversies, accent)
     common_facts_html = _common_facts_block(common_facts)
     source_html       = _source_cards(sources, accent)
+    unsubscribe_html  = (
+        f'<div style="text-align:right; padding:6px 20px 14px;">'
+        f'<a href="{unsubscribe_url}" '
+        f'style="font-size:0.75em; color:#bbb; text-decoration:none;">'
+        f'이 주제 구독 취소</a></div>'
+    ) if unsubscribe_url else ""
 
     return f'''
     <div style="background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08);
@@ -192,6 +200,9 @@ def _build_topic_card(topic_data: Dict[str, Any], accent: str) -> str:
         </div>
         {source_html}
       </div>
+
+      <!-- 토픽 수신취소 링크 -->
+      {unsubscribe_html}
     </div>'''
 
 
@@ -204,7 +215,16 @@ def _format_html(newsletter: Dict[str, Any]) -> str:
     accent       = _INTENT_COLOR.get(intent_type, "#4A90D9")
     intent_label = _INTENT_LABEL.get(intent_type, "")
 
-    cards = "".join(_build_topic_card(t, accent) for t in topics)
+    cards = "".join(
+        _build_topic_card(
+            t, accent,
+            unsubscribe_url=(
+                f"{BACKEND_URL}/interests/unsubscribe-confirm"
+                f"?topic={quote(t.get('topic', ''), safe='')}"
+            ),
+        )
+        for t in topics
+    )
 
     return f'''<!DOCTYPE html>
 <html lang="ko">
@@ -243,7 +263,7 @@ def _format_html(newsletter: Dict[str, Any]) -> str:
                         padding:20px 32px; text-align:center;">
           <p style="color:#aaa; font-size:0.78em; margin:0; line-height:1.6;">
             Tubify — 유튜브 알고리즘 대신, 오늘 당신이 관심 가진 주제를 분석해드립니다.<br>
-            수신 거부는 대시보드에서 설정할 수 있습니다.
+            각 주제 카드 하단의 <strong style="color:#bbb;">이 주제 구독 취소</strong> 링크를 누르면 해당 토픽만 취소할 수 있습니다.
           </p>
         </td></tr>
 
