@@ -98,10 +98,8 @@ def _build_dashboard(
     cat_map = _INTENT_TO_CATEGORY.get(intent_type, _DEFAULT_CATEGORY)
     summary_lines: List[str] = analyzer_result.get("summary", [])
 
-    # 광고 영상 제외 → 없으면 전체 포함
-    clean_videos = [v for v in analyzer_result.get("videos", []) if not v.get("ad_detected", False)]
-    source_videos = clean_videos or analyzer_result.get("videos", [])
-
+    # 분석된 영상 전체를 노출 — ad_detected 여부로 필터하지 않음
+    # (광고 여부는 프론트에서 뱃지로 표시, 쟁점·공통사실과 소스 목록이 항상 일치)
     recommended_videos: List[VideoItem] = [
         {
             "video_id":          v.get("video_id", ""),
@@ -114,7 +112,7 @@ def _build_dashboard(
             "ad_detected":       v.get("ad_detected", False),
             "summary":           v.get("summary", ""),
         }
-        for v in source_videos
+        for v in analyzer_result.get("videos", [])
     ]
 
     return {

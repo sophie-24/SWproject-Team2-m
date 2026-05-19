@@ -1,8 +1,9 @@
-# Pipeline B 총괄 오케스트레이터 — intent→cluster→select→analyze→newsletter 순차 실행
+# Pipeline B 총괄 오케스트레이터 — 토픽별 (intent∥select → analyze) 순차 반복 → newsletter
 import asyncio
+from collections import Counter
 from typing import List, Dict, Any, Optional
 
-from agents.intent_ai import classify_intent
+from agents.intent_ai import classify_intent, FORMAT_MAP as INTENT_FORMAT_MAP
 from agents.selector_ai import select_top_videos
 from agents.analyzer_ai import analyze_videos
 from agents.newsletter_ai import generate_newsletter
@@ -49,26 +50,21 @@ async def run_pipeline(
     raw_keywords: List[str],
     subscribed_channel_ids: List[str] = None,
     clicked_video_titles: List[str] = None,
-    initial_intent: Optional[str] = None,
     pipeline_a_cache: Optional[Dict[str, Any]] = None,
-    today_logs: Optional[List[Dict[str, Any]]] = None,
-    skip_clustering: bool = False,
+    skip_clustering: bool = True,  # 항상 True — cluster_ai 제거 (Issue 10)
 ) -> Dict[str, Any]:
     """
-    오늘 수집된 키워드를 받아 전체 AI 파이프라인 실행 후 뉴스레터 데이터 반환.
+    하트 관심 토픽을 받아 전체 AI 파이프라인 실행 후 뉴스레터 데이터 반환.
 
     모든 Gemini 호출이 async로 처리되므로 여러 사용자가 동시에 파이프라인을
     실행해도 이벤트 루프를 블로킹하지 않는다.
-    각 await 시점에 다른 코루틴으로 양보가 일어나 동시 처리가 가능하다.
 
     Args:
-        user_id:                  사용자 ID (google_id)
-        raw_keywords:             오늘 수집된 검색어/영상 제목 전체
-        subscribed_channel_ids:   사용자 구독 채널 ID 목록
-        clicked_video_titles:     오늘 클릭/시청한 영상 제목 목록 (intent 판단용)
-        initial_intent:           온보딩 설정 초기 의도 — 로그 부족 시 intent_ai 폴백으로 사용
-        today_logs:               behavior_store.get_today_logs() 반환값 (시간 메타데이터용)
-                                  전달 시 cluster_ai가 시간 흐름 컨텍스트를 활용해 클러스터링
+        user_id:                사용자 ID (google_id)
+        raw_keywords:           하트 관심 토픽 목록 (이미 정제됨)
+        subscribed_channel_ids: 사용자 구독 채널 ID 목록
+        clicked_video_titles:   시청한 영상 제목 목록 (intent 판단 보조용)
+        pipeline_a_cache:       Pipeline A 캐시 (동일 키워드 재활용용)
 
     Returns:
         generate_newsletter() 반환값
@@ -78,7 +74,7 @@ async def run_pipeline(
         }
 
     Raises:
-        ValueError: 클러스터링 결과가 없거나 분석 가능한 주제가 없는 경우
+        ValueError: 분석 가능한 주제가 없는 경우
     """
     if subscribed_channel_ids is None:
         subscribed_channel_ids = []
@@ -92,60 +88,77 @@ async def run_pipeline(
         except ImportError:
             pipeline_a_cache = {}
 
-    # ── Step 0: 의도 분류 (format_style 포함) ─────────────────────────────────
-    logger.info("[orchestrator] Step 0 — 의도 분류")
-    intent_result = await classify_intent(raw_keywords, clicked_video_titles)
+    # ── Step 0: 토픽 목록 구성 (cluster_ai 제거 — 하트 토픽은 이미 정제됨) ────
+    clusters = [{"topic": kw, "keywords": [kw]} for kw in raw_keywords]
+    logger.info(f"[orchestrator] Step 0 — {len(clusters)}개 토픽 직접 사용")
 
-    intent_type = intent_result.get("intent_type") or initial_intent or "지식형"
-    format_style = intent_result["format_style"]
-    logger.info(f"[orchestrator] 의도={intent_type} / 길이={format_style['length']}")
-
-    # ── Step 1: 주제 클러스터링 ────────────────────────────────────────────────
-    if skip_clustering:
-        # 관심사 카테고리 fallback: 이미 정제된 토픽이므로 클러스터링 건너뜀
-        clusters = [{"topic": kw, "keywords": [kw]} for kw in raw_keywords]
-        logger.info(f"[orchestrator] Step 1 — 클러스터링 스킵, {len(clusters)}개 토픽 직접 사용")
-    else:
-        logger.info(f"[orchestrator] Step 1 — 주제 클러스터링 ({len(raw_keywords)}개 키워드)")
-        clusters = await cluster_topics(raw_keywords, today_logs=today_logs)
-        if not clusters:
-            raise ValueError("클러스터링 결과 없음 — 키워드 부족")
-        logger.info(f"[orchestrator] 클러스터 {len(clusters)}개 생성됨")
-
-    # ── Step 2, 3: 주제별 순차 처리 ──────────────────────────────────────────────
-    # 각 클러스터 토픽에 대해 영상 선정 → 분석 수행
-    # Pipeline A 캐시 히트 시 Gemini 호출 없이 재활용
+    # ── Step 1·2·3: 토픽별 순차 반복 (토픽 간 순차, 토픽 내 일부 병렬) ─────────
+    # ∙ 캐시 미스: intent_ai(Gemini) + select_top_videos(YouTube API) 병렬 실행
+    #              → 두 작업이 서로 독립적이므로 asyncio.gather 적용 (Pipeline A와 동일)
+    # ∙ 캐시 히트: select_top_videos 불필요 → intent_ai만 단독 실행 (YouTube API 절약)
+    # ∙ 토픽 간은 analyzer_ai Gemini 호출 순서 보장을 위해 순차 유지
     analyses: List[Dict[str, Any]] = []
+
+    _default_intent = lambda: {          # noqa: E731  — 기본값 팩토리
+        "intent_type": "지식형",
+        "format_style": dict(INTENT_FORMAT_MAP["지식형"]),
+    }
 
     for cluster in clusters:
         topic = cluster.get("topic", "")
         if not topic:
             continue
 
-        # Pipeline A 캐시 확인 — 같은 키워드가 이미 분석된 경우 재활용
+        # Pipeline A 캐시 확인 — 캐시 히트 여부에 따라 병렬 범위 결정
         cache_hit = pipeline_a_cache.get(topic) or pipeline_a_cache.get(f"{user_id}:{topic}")
+
         if cache_hit:
-            logger.info(f"[orchestrator] '{topic}' → Pipeline A 캐시 재활용")
-            analyses.append(_dashboard_to_analysis(topic, cache_hit))
+            # 캐시 히트: intent_ai만 실행 (영상 선정 불필요)
+            logger.info(f"[orchestrator] Step 1 — '{topic}' 의도 분류 (캐시 히트)")
+            try:
+                intent_result = await classify_intent([topic], clicked_video_titles)
+            except Exception as e:
+                logger.warning(f"[orchestrator] '{topic}' 의도 분류 실패 — 기본값: {e}")
+                intent_result = _default_intent()
+            intent_type  = intent_result.get("intent_type") or "지식형"
+            format_style = intent_result["format_style"]
+            logger.info(f"[orchestrator] '{topic}' → Pipeline A 캐시 재활용 / 의도={intent_type}")
+            analysis = _dashboard_to_analysis(topic, cache_hit)
+            analysis["intent_type"]  = intent_type
+            analysis["format_style"] = format_style
+            analyses.append(analysis)
             continue
 
-        # 영상 선정 (Step 2)
-        logger.info(f"[orchestrator] Step 2 — '{topic}' 영상 선정")
-        try:
-            videos = await asyncio.to_thread(
-                select_top_videos,
-                topic,
-                subscribed_channel_ids,
-            )
-        except Exception as e:
-            logger.warning(f"[orchestrator] '{topic}' 영상 선정 실패: {e}")
+        # 캐시 미스: Step 1(intent) + Step 2(영상 선정) 병렬 실행
+        logger.info(f"[orchestrator] Step 1+2 — '{topic}' 의도 분류 + 영상 선정 병렬")
+        results = await asyncio.gather(
+            classify_intent([topic], clicked_video_titles),
+            asyncio.to_thread(select_top_videos, topic, subscribed_channel_ids),
+            return_exceptions=True,
+        )
+
+        # intent 결과 처리
+        if isinstance(results[0], Exception):
+            logger.warning(f"[orchestrator] '{topic}' 의도 분류 실패 — 기본값: {results[0]}")
+            intent_result = _default_intent()
+        else:
+            intent_result = results[0]
+        intent_type  = intent_result.get("intent_type") or "지식형"
+        format_style = intent_result["format_style"]
+        logger.info(f"[orchestrator] '{topic}' 의도={intent_type} / 길이={format_style['length']}")
+
+        # 영상 선정 결과 처리
+        if isinstance(results[1], Exception):
+            logger.warning(f"[orchestrator] '{topic}' 영상 선정 실패: {results[1]}")
             videos = []
+        else:
+            videos = results[1]
 
         if not videos:
             logger.warning(f"[orchestrator] '{topic}' 영상 없음 — 스킵")
             continue
 
-        # 영상 분석 (Step 3)
+        # Step 3: 영상 분석 (intent + format 확정 후 실행)
         logger.info(f"[orchestrator] Step 3 — '{topic}' 영상 {len(videos)}개 분석")
         try:
             analysis = await analyze_videos(
@@ -154,6 +167,9 @@ async def run_pipeline(
                 format_style=format_style,
                 intent_type=intent_type,
             )
+            # 토픽별 intent 정보를 analysis에 저장 → newsletter_ai에서 섹션별 포맷 적용
+            analysis["intent_type"]  = intent_type
+            analysis["format_style"] = format_style
             analyses.append(analysis)
         except Exception as e:
             logger.warning(f"[orchestrator] '{topic}' 분석 실패: {e}")
@@ -162,12 +178,22 @@ async def run_pipeline(
         raise ValueError("분석 가능한 주제 없음 — 영상 선정 실패")
 
     # ── Step 4: 뉴스레터 조립 ──────────────────────────────────────────────────
-    logger.info(f"[orchestrator] Step 4 — 뉴스레터 조립 ({len(analyses)}개 주제)")
+    # 뉴스레터 제목/전체 포맷은 dominant intent(가장 많이 나온 의도)로 결정
+    intent_counts    = Counter(a.get("intent_type", "지식형") for a in analyses)
+    dominant_intent  = intent_counts.most_common(1)[0][0]
+    dominant_format  = next(
+        (a["format_style"] for a in analyses if a.get("intent_type") == dominant_intent),
+        dict(INTENT_FORMAT_MAP["지식형"]),
+    )
+    logger.info(
+        f"[orchestrator] Step 4 — 뉴스레터 조립 ({len(analyses)}개 주제)"
+        f" / dominant 의도={dominant_intent}"
+    )
     newsletter = await generate_newsletter(
         user_id=user_id,
         analyses=analyses,
-        format_style=format_style,
-        intent_type=intent_type,
+        format_style=dominant_format,
+        intent_type=dominant_intent,
     )
     logger.info(f"[orchestrator] 완료 — subject='{newsletter.get('subject', '')}'")
     return newsletter
