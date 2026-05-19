@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 
 RESEND_API_KEY   = os.getenv("RESEND_API_KEY")
 RESEND_FROM      = os.getenv("RESEND_FROM_EMAIL", "curator@tubify.com")
-BACKEND_URL      = os.getenv("BACKEND_URL", "http://localhost:8000")
+BACKEND_URL      = os.getenv("FRONTEND_URL", "http://localhost:8000")
 
 resend.api_key = RESEND_API_KEY
 
