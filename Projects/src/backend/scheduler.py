@@ -193,20 +193,4 @@ def stop_scheduler():
     logger.info("[scheduler] 스케줄러 종료")
 
 
-# ── 하위 호환 export (main.py send_now에서 사용) ──────────────────────────────
-
-def _merge_keywords(triggered: List[str], profile: List[str]) -> List[str]:
-    """DEPRECATED: 행동기록 기반 파이프라인에서 사용하던 함수. 하위 호환 유지."""
-    seen: set = set()
-    merged: List[str] = []
-    for kw in triggered + profile:
-        kw_lower = kw.strip().lower()
-        if kw_lower and kw_lower not in seen:
-            seen.add(kw_lower)
-            merged.append(kw.strip())
-    return merged[:10]
-
-
-async def _update_user_interests(db, user_id: str, topics: List[str]) -> None:
-    """DEPRECATED: 행동기록 기반 weight 누적 함수. 하위 호환 유지."""
-    pass
+# Issue 8: _merge_keywords, _update_user_interests DEPRECATED 함수 제거 완료
