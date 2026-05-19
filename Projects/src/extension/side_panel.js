@@ -5,8 +5,98 @@
 
 let currentKeyword = "";
 let currentJwt = "";
+let currentVideoId = "";   // 하트 추가 시 사용할 대표 video_id
+let heartedTopic = "";     // 현재 하트된 토픽명 (DELETE 시 사용)
 
 // ── 유틸 ──────────────────────────────────────────────────────────────────────
+
+function showToast(msg) {
+  var t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(function () { t.classList.remove("show"); }, 2800);
+}
+
+function setHeartState(isHearted) {
+  var btn = document.getElementById("btn-heart");
+  if (!btn) return;
+  btn.classList.toggle("hearted", isHearted);
+}
+
+async function checkHeartState(keyword) {
+  if (!currentJwt || !keyword) return;
+  try {
+    var res = await fetch(API_BASE + "/interests", {
+      headers: { "Authorization": "Bearer " + currentJwt }
+    });
+    if (!res.ok) return;
+    var data = await res.json();
+    var interests = data.interests || [];
+    var kw = keyword.toLowerCase().replace(/\s+/g, " ").trim();
+    var matched = interests.find(function (i) {
+      return (i.normalized_topic || "").toLowerCase().replace(/\s+/g, " ").trim() === kw
+        || (i.topic || i.category || "").toLowerCase().replace(/\s+/g, " ").trim() === kw;
+    });
+    if (matched) {
+      heartedTopic = matched.topic || matched.category || keyword;
+      setHeartState(true);
+    } else {
+      heartedTopic = "";
+      setHeartState(false);
+    }
+  } catch (e) {}
+}
+
+async function toggleHeart() {
+  if (!currentJwt) { showToast("로그인 후 이용할 수 있습니다."); return; }
+  var btn = document.getElementById("btn-heart");
+  var isHearted = btn && btn.classList.contains("hearted");
+
+  if (isHearted) {
+    // 하트 해제
+    var topic = heartedTopic || currentKeyword;
+    try {
+      var res = await fetch(API_BASE + "/interests/" + encodeURIComponent(topic), {
+        method: "DELETE",
+        headers: { "Authorization": "Bearer " + currentJwt }
+      });
+      if (res.ok) {
+        heartedTopic = "";
+        setHeartState(false);
+        showToast("관심 토픽에서 제거됐어요. 더 이상 메일을 받지 않아요.");
+      } else {
+        showToast("오류가 발생했어요. 다시 시도해주세요.");
+      }
+    } catch (e) { showToast("서버에 연결할 수 없어요."); }
+  } else {
+    // 하트 추가
+    try {
+      var payload = { title: currentKeyword };
+      if (currentVideoId) payload.video_id = currentVideoId;
+      var res = await fetch(API_BASE + "/interests", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + currentJwt, "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.status === 409) {
+        showToast("관심 토픽은 최대 5개까지 저장할 수 있어요.");
+        return;
+      }
+      if (res.ok) {
+        var data = await res.json();
+        heartedTopic = data.topic || currentKeyword;
+        setHeartState(true);
+        showToast("'" + heartedTopic + "' 관련 뉴스레터를 보내드릴게요! 💌");
+      } else {
+        var errBody = await res.json().catch(function () { return {}; });
+        var errMsg = (errBody.detail && typeof errBody.detail === "string") ? errBody.detail : ("서버 오류 " + res.status);
+        showToast(errMsg);
+        console.error("[heart] POST /interests 실패:", res.status, errBody);
+      }
+    } catch (e) { showToast("서버에 연결할 수 없어요."); }
+  }
+}
 
 function esc(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -79,6 +169,15 @@ function renderResults(data) {
   var cached       = data.cached || false;
 
   document.getElementById("kw-title-s").textContent = keyword;
+
+  // 대표 video_id 저장 (하트 추가 시 사용 — 광고 없는 첫 번째 영상 우선)
+  var repVideo = videos.find(function (v) { return !v.ad_detected && v.video_id; }) || videos[0];
+  currentVideoId = (repVideo && repVideo.video_id) || "";
+
+  // 하트 상태 초기화 후 확인
+  setHeartState(false);
+  heartedTopic = "";
+  checkHeartState(keyword);
 
   /* 캐시 히트 안내 배너 */
   var cacheNotice = "";
@@ -202,6 +301,8 @@ async function analyze(keyword, jwt) {
 }
 
 // ── 버튼 이벤트 ───────────────────────────────────────────────────────────────
+
+document.getElementById("btn-heart").addEventListener("click", toggleHeart);
 
 document.getElementById("btn-retry").addEventListener("click", function () {
   if (currentKeyword && currentJwt) analyze(currentKeyword, currentJwt);

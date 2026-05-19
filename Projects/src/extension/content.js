@@ -139,19 +139,23 @@ function createFloatBtn() {
   });
 
   btn.addEventListener("click", async () => {
-    const keyword = getKeyword();
+    let keyword = getKeyword();
 
-    if (!keyword) {
-      btn.style.background = "#cc0000";
-      setTimeout(() => { btn.style.background = "#ff0000"; }, 300);
-      return;
+    // 영상 시청 페이지: 검색어 없으므로 영상 제목을 keyword로 사용
+    if (!keyword && isWatchPage()) {
+      const titleEl = document.querySelector(
+        "ytd-video-primary-info-renderer h1 yt-formatted-string, " +
+        "h1.ytd-video-primary-info-renderer"
+      );
+      keyword = (titleEl && titleEl.textContent.trim())
+        || document.title.replace(/ - YouTube$/, "").trim();
     }
 
     try {
       chrome.runtime.sendMessage({
         type:    "OPEN_SIDE_PANEL",
         tabId:   null,
-        keyword: keyword,
+        keyword: keyword || "",
       });
     } catch (e) {
       console.warn("[Tubify] 익스텐션이 재로드됐습니다. 페이지를 새로고침(F5)해주세요.");

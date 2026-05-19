@@ -687,6 +687,73 @@
     }
 
     /* ── 인사이트 내 소스 프리뷰 ── */
+    /* ── 하트 버튼 ── */
+    .keyword-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .btn-heart {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 6px;
+      transition: transform 0.15s;
+    }
+
+    .btn-heart:hover { transform: scale(1.15); }
+    .btn-heart:active { transform: scale(0.9); }
+
+    .btn-heart svg {
+      width: 24px;
+      height: 24px;
+      transition: fill 0.2s, stroke 0.2s;
+    }
+
+    .btn-heart.hearted svg {
+      fill: red;
+      stroke: red;
+    }
+
+    .btn-heart:not(.hearted) svg {
+      fill: none;
+      stroke: #aaa;
+    }
+
+    /* ── 토스트 ── */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: #191c1e;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 9px 16px;
+      border-radius: 9999px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 9999;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
     .sources-in-insights {
       margin-top: 8px;
     }
@@ -883,7 +950,14 @@
 
       <!-- 인사이트 탭 -->
       <div id="tab-summary" class="tab-panel active">
-        <div class="keyword-title" id="kw-title-s">-</div>
+        <div class="keyword-title-row">
+          <div class="keyword-title" id="kw-title-s">-</div>
+          <button class="btn-heart" id="btn-heart" title="관심 토픽으로 저장">
+            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </button>
+        </div>
         <div class="keyword-underline"></div>
         <div id="summary-sections"></div>
         <div id="controversy-section"></div>
@@ -906,6 +980,9 @@
 
     </div>
   </div>
+
+  <!-- 토스트 -->
+  <div class="toast" id="toast"></div>
 
   <script src="config.js"></script>
   <script src="side_panel.js"></script>
