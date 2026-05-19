@@ -103,7 +103,7 @@ PATCH /settings/send_time  { "send_time": "08:00" }
     openapi_tags=[
         {"name": "인증",        "description": "Google OAuth 로그인 및 JWT 발급. `/auth/login`으로 시작 → 리다이렉트 URL의 `?token=` 값을 Authorize에 입력하세요."},
         {"name": "프로필",      "description": "내 프로필 조회·수정. `GET /my/profile`은 하트 관심 토픽 목록도 함께 반환합니다."},
-        {"name": "온보딩",      "description": "회원가입 후 최초 1회 — 의도 유형·관심사·발송 시간 설정."},
+        # DEPRECATED (Issue 9): 온보딩 태그 제거
         {"name": "구독 설정",   "description": "뉴스레터 수신 동의·거부 및 발송 시간 변경. `PATCH /settings/send_time`으로 단일 HH:MM 문자열 전송."},
         {"name": "관심사",      "description": "하트(♥) 기반 관심 토픽 관리. 최대 5개. `POST /interests`로 추가, `DELETE /interests/{topic}`으로 취소(soft delete)."},
         {"name": "AI 분석",     "description": "Pipeline A — 실시간 검색 분석(사이드패널). `GET /analyze_search?keyword=검색어`로 즉시 테스트 가능."},
@@ -268,10 +268,7 @@ class InterestsResponse(BaseModel):
     interests: list[InterestItem]
 
 
-class HistoryAnalyzeResponse(BaseModel):
-    categories: list[str]
-    intent_type: str
-
+# DEPRECATED (Issue 9): HistoryAnalyzeResponse 제거 — /profile/analyze-history 엔드포인트 제거
 
 class SubscriptionsResponse(BaseModel):
     count: int
@@ -380,7 +377,8 @@ def search_dashboard():
 def mypage():
     return FileResponse(os.path.join(FRONTEND_DIR, "mypage.html"))
 
-@app.get("/loading.html", tags=["프론트엔드"], summary="로딩 페이지 제공 ✅", response_class=HTMLResponse)
+# TODO (Issue 9): /loading.html 엔드포인트 제거 — 신규 유저 리다이렉트가 /onboarding.html로 변경됨 (프론트 loading.html 삭제 후 제거)
+@app.get("/loading.html", tags=["프론트엔드"], summary="로딩 페이지 제공 (DEPRECATED)", response_class=HTMLResponse, deprecated=True)
 def loading():
     with open(os.path.join(FRONTEND_DIR, "loading.html"), "r", encoding="utf-8") as f:
         html = f.read()
@@ -469,6 +467,7 @@ async def callback(
     )
     user = result.scalar_one_or_none()
 
+    is_new_user = False
     if not user:
         user = User(
             google_id=user_info["google_id"],
@@ -477,6 +476,7 @@ async def callback(
         db.add(user)
         await db.commit()
         await db.refresh(user)
+        is_new_user = True
         logger.info(f"[callback] 신규 유저 생성: {user_info['email']}")
     else:
         logger.info(f"[callback] 기존 유저 로그인: {user_info['email']}")
@@ -497,13 +497,12 @@ async def callback(
     if is_ext:
         redirect_url = f"{FRONTEND_URL}/auth/extension-done?token={jwt_token}"
     else:
-    # 신규 유저 → 로딩(히스토리 분석), 기존 유저 → 마이페이지
-    # delivery_type은 기본값이 있으므로 온보딩 완료 판단에서 제외
-        is_onboarded = bool(user.initial_intent or user.interest_categories)
-        if not is_onboarded:
-            redirect_url = f"{FRONTEND_URL}/loading.html?token={jwt_token}"
+        # 신규 유저 → send_time 설정 화면, 기존 유저 → 메인(index.html)
+        # TODO: 신규 유저 리다이렉트 URL을 send_time 설정 모달 페이지로 교체 (프론트 준비되면)
+        if is_new_user:
+            redirect_url = f"{FRONTEND_URL}/onboarding.html?token={jwt_token}"
         else:
-            redirect_url = f"{FRONTEND_URL}/mypage.html?token={jwt_token}"
+            redirect_url = f"{FRONTEND_URL}?token={jwt_token}"
 
     response = RedirectResponse(url=redirect_url)
     response.set_cookie(
@@ -705,75 +704,7 @@ async def _get_or_create_user(db: AsyncSession, current_user: dict):
     return db_user
 
 # ── 구독 설정 ─────────────────────────────────────────────────────────────────
-
-class SubscribeData(BaseModel):
-    delivery_type: str = Field("email", description="현재는 email만 사용")
-    email: Optional[str] = Field("test@example.com", description="뉴스레터 수신 이메일")
-    send_time: Optional[str] = Field(
-        "21:00",
-        description="발송 시간 (HH:MM 형식, 예: '08:00', '21:00')",
-    )
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "delivery_type": "email",
-                "email": "test@example.com",
-                "send_time": "21:00",
-            }
-        }
-    )
-
-
-@app.post(
-    "/subscribe",
-    response_model=SuccessResponse,
-    tags=["구독 설정"],
-    summary="뉴스레터 수신 정보 저장 ✅",
-)
-async def subscribe(
-    data: SubscribeData,
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    온보딩에서 이메일과 발송 시간을 저장합니다.
-
-    **요청 예시:**
-    ```json
-    { "delivery_type": "email", "email": "you@example.com", "send_time": "21:00" }
-    ```
-
-    - `send_time`: HH:MM 형식 단일 문자열
-    - **409:** 다른 계정에서 이미 사용 중인 이메일
-    """
-    from database import User
-
-    db_user = await _get_or_create_user(db, user)
-
-    db_user.delivery_type = "email"
-    if data.email:
-        # 이메일 중복 체크 — 다른 유저가 이미 사용 중인 이메일인지 확인
-        dup = await db.execute(
-            select(User).where(
-                User.email == data.email,
-                User.google_id != user["user_id"],
-            )
-        )
-        if dup.scalar_one_or_none():
-            raise HTTPException(
-                status_code=409,
-                detail="이미 다른 계정에서 사용 중인 이메일입니다.",
-            )
-        db_user.email = data.email
-    if data.send_time:
-        import json as _json
-        validated = _validate_send_time(data.send_time)
-        db_user.send_time = _json.dumps([validated], ensure_ascii=False)
-
-    await db.commit()
-    print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
-    return {"success": True}
+# DEPRECATED (Issue 9): SubscribeData / /subscribe 엔드포인트 제거 — send_time 설정은 PATCH /settings/send_time 사용
 
 # ── 마이페이지: 발송 시간 변경 ────────────────────────────────────────────────
 
@@ -1365,150 +1296,10 @@ async def interest_unsubscribe_confirm(
     return RedirectResponse(url=redirect_url)
 
 
-class ProfileInitData(BaseModel):
-    initial_intent: str = Field("지식형", description="'유희형' | '지식형' | '구매형'")
-    interest_categories: list[str] = Field(
-        default_factory=lambda: ["AI", "경제", "테크"],
-        description="온보딩에서 선택한 관심사 목록",
-    )
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "initial_intent": "지식형",
-                "interest_categories": ["AI", "경제", "테크"],
-            }
-        }
-    )
+# DEPRECATED (Issue 9): /profile/init 엔드포인트 제거 — 온보딩 플로우 제거
 
 
-@app.post(
-    "/profile/init",
-    response_model=OkResponse,
-    tags=["온보딩"],
-    summary="초기 관심사 프로필 저장 ✅",
-)
-async def profile_init(
-    data: ProfileInitData,
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    온보딩 Step2 완료 — initial_intent + interest_categories 저장.
-    user_interests 테이블에 weight=1 초기화 (신규 카테고리만).
-    """
-    import json as _json
-    from datetime import datetime, timezone
-
-    if data.initial_intent not in {"유희형", "지식형", "구매형"}:
-        raise HTTPException(status_code=400, detail="initial_intent는 유희형|지식형|구매형 중 하나여야 합니다.")
-
-    db_user = await _get_or_create_user(db, user)
-
-    db_user.initial_intent      = data.initial_intent
-    db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
-
-    import re as _re
-    for category in data.interest_categories:
-        normalized = _re.sub(r"\s+", " ", category.lower()).strip()
-        stmt = (
-            pg_insert(UserInterest)
-            .values(
-                user_id=user["user_id"],
-                category=category,
-                normalized_topic=normalized,
-                source="onboarding",
-                weight=1,
-                updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            )
-            .on_conflict_do_nothing(constraint="uq_user_interest_normalized")
-        )
-        await db.execute(stmt)
-
-    await db.commit()
-    logger.info(f"[profile/init] {user['user_id']} intent={data.initial_intent} categories={data.interest_categories}")
-    return {"ok": True}
-
-
-class HistoryAnalyzeRequest(BaseModel):
-    keywords: list[str] = Field(
-        default_factory=lambda: ["생성형 AI", "경제 뉴스", "테크 리뷰"],
-        description="분석할 검색/시청 키워드 목록",
-    )
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "keywords": ["생성형 AI", "경제 뉴스", "테크 리뷰"]
-            }
-        }
-    )
-
-@app.post(
-    "/profile/analyze-history",
-    response_model=HistoryAnalyzeResponse,
-    deprecated=True,
-    tags=["온보딩"],
-    summary="검색 기록 기반 관심사 분석 ✅",
-)
-async def analyze_history(
-    body: HistoryAnalyzeRequest,
-    user=Depends(get_current_user),
-):
-    """
-    온보딩 — 유튜브 검색 기록 키워드를 받아 미리 정의된 관심 카테고리로 매핑.
-    """
-    import json as _json
-    from agents.intent_ai import classify_intent
-    from gemini_client import call_gemini_async
-
-    PRESET_CATEGORIES = [
-        "여행", "테크놀로지", "경제", "디자인", "정치", "과학",
-        "라이프스타일", "뷰티", "철학", "예술", "역사", "기후",
-        "웰니스", "우주", "미식",
-    ]
-
-    keywords = [kw.strip() for kw in body.keywords if kw.strip()]
-    if not keywords:
-        return {"categories": [], "intent_type": "지식형"}
-
-    keywords = keywords[:100]
-
-    prompt = f"""다음은 사용자의 최근 1개월 유튜브 검색 기록입니다.
-
-검색 기록:
-{chr(10).join(f"- {kw}" for kw in keywords)}
-
-아래 카테고리 목록 중에서 이 검색 기록과 관련된 것만 골라주세요.
-
-카테고리 목록:
-{", ".join(PRESET_CATEGORIES)}
-
-규칙:
-1. 반드시 위 목록에 있는 카테고리만 선택하세요 (임의로 만들지 마세요)
-2. 관련성이 높은 순으로 최대 5개까지만 선택하세요
-3. 반드시 JSON 배열 형식으로만 응답하세요
-
-응답 예시: ["테크놀로지", "경제", "과학"]"""
-
-    try:
-        text = await call_gemini_async(prompt, temperature=0.1, json_mode=True)
-        import re as _re
-        match = _re.search(r"\[.*?\]", text, _re.DOTALL)
-        raw = _json.loads(match.group()) if match else []
-        categories = [c for c in raw if c in PRESET_CATEGORIES]
-    except Exception as e:
-        logger.error(f"[analyze-history] Gemini 오류: {e}")
-        categories = []
-
-    intent_result = await classify_intent(keywords[:10], [])
-    intent_type = intent_result.get("intent_type", "지식형")
-
-    logger.info(
-        f"[analyze-history] user={user['user_id']} "
-        f"keywords={len(keywords)} → categories={categories}, intent={intent_type}"
-    )
-    return {"categories": categories, "intent_type": intent_type}
+# DEPRECATED (Issue 9): /profile/analyze-history 엔드포인트 제거 — 온보딩 플로우 제거
 
 
 @app.delete(
@@ -1726,20 +1517,18 @@ async def send_now(
     """
     스케줄러를 기다리지 않고 즉시 뉴스레터를 생성·발송합니다. **테스트용으로 자주 사용하세요.**
 
-    **발송 토픽 선정 순위:**
-    1. 하트 관심 토픽 (`user_interests.is_active=True`, 최신 순)
-    2. 온보딩 관심사 (`users.interest_categories`)
+    **발송 토픽:** 하트 관심 토픽 (`user_interests.is_active=True`, 최신 순)
 
-    **400:** 1~2순위 모두 토픽이 없을 때 (하트도 없고 온보딩도 안 한 경우)
+    **400:** 하트한 관심 토픽이 없을 때 — 마이페이지에서 관심사를 먼저 추가하세요
 
     **주의:** Gemini API를 실제로 호출하므로 무료 티어 한도 소모됩니다.
     """
     import json as _json
-    from database import Newsletter as NewsletterModel, User, UserInterest
+    from database import Newsletter as NewsletterModel, UserInterest
 
     user_id = user["user_id"]
 
-    # 1순위: 하트 관심 토픽 (is_active=True, 최신 순) — Issue 8 이후 최우선
+    # 하트 관심 토픽 (is_active=True, 최신 순) — 유일한 발송 기준
     interest_result = await db.execute(
         select(UserInterest.category)
         .where(
@@ -1750,30 +1539,17 @@ async def send_now(
         .limit(10)
     )
     topics = [row[0] for row in interest_result.all()]
-    skip_clustering = True  # 하트 토픽은 이미 정제됨
-
-    if not topics:
-        # 2순위: 온보딩 관심사 (interest_categories)
-        user_result = await db.execute(select(User).where(User.google_id == user_id))
-        db_user = user_result.scalar_one_or_none()
-        if db_user and db_user.interest_categories:
-            try:
-                cats = _json.loads(db_user.interest_categories)
-                topics = cats if isinstance(cats, list) else []
-                skip_clustering = False
-            except Exception:
-                topics = []
 
     if not topics:
         raise HTTPException(
             status_code=400,
-            detail="사용 가능한 토픽 없음 — 유튜브 검색 후 다시 시도하거나 온보딩에서 관심사를 설정하세요",
+            detail="하트한 관심 토픽 없음 — 마이페이지에서 관심사를 먼저 추가하세요",
         )
 
     newsletter = await run_pipeline(
         user_id=user_id,
         raw_keywords=topics,
-        skip_clustering=skip_clustering,
+        skip_clustering=True,  # 하트 토픽은 이미 정제됨
     )
 
     record = NewsletterModel(
@@ -1788,6 +1564,7 @@ async def send_now(
 
     # 이메일 발송
     from mailer import send_email as _send_email
+    from database import User
     user_result = await db.execute(select(User).where(User.google_id == user_id))
     db_user = user_result.scalar_one_or_none()
     email_result = _send_email(

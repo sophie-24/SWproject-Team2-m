@@ -39,15 +39,20 @@ async def generate_newsletter(
         format_style = {}
 
     length_hint = format_style.get("length", "long")
-    max_summary = _SUMMARY_LEN.get(length_hint, 3)
     subject = _SUBJECT_TEMPLATES.get(intent_type, _DEFAULT_SUBJECT)
-    logger.info(f"[newsletter_ai] 조립 시작 -- {len(analyses)}개 주제 / 의도={intent_type} / 길이={length_hint}")
+    logger.info(f"[newsletter_ai] 조립 시작 -- {len(analyses)}개 주제 / dominant 의도={intent_type} / 길이={length_hint}")
 
     topics_content = []
     for analysis in analyses:
         topic = analysis.get("keyword") or analysis.get("topic", "")
         if not topic:
             continue
+
+        # 토픽별 intent/format 우선 사용 — orchestrator가 analysis에 저장한 값
+        topic_intent  = analysis.get("intent_type") or intent_type
+        topic_format  = analysis.get("format_style") or format_style or {}
+        topic_length  = topic_format.get("length", "long")
+        max_summary   = _SUMMARY_LEN.get(topic_length, 3)
 
         raw_summary = analysis.get("summary", [])
         while len(raw_summary) < 3:
@@ -62,7 +67,7 @@ async def generate_newsletter(
             common_facts=analysis.get("common_facts", []),
             controversies=analysis.get("controversies", []),
             sources=analysis.get("sources", []),
-            intent_type=intent_type,
+            intent_type=topic_intent,
         )
         topics_content.append(topic_block)
 
