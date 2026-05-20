@@ -445,69 +445,59 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
   setStep(1, "active"); setStep(2, ""); setStep(3, "");
 
   try {
-    // Step 1: 단일 영상 AI 분석
-    var aiRes = await fetch(
-      API_BASE + "/ai_analyze/" + encodeURIComponent(videoId) + "?query=" + encodeURIComponent(keyword),
-      { headers: { "Authorization": "Bearer " + jwt } }
-    );
+    // /analyze_video 단일 호출 (영상 요약 + 관련 영상 인사이트 통합)
+    setStep(1, "active");
+    var res = await fetch(API_BASE + "/analyze_video", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + jwt,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ video_id: videoId, title: videoTitle })
+    });
 
-    var aiData = null;
-    if (aiRes.ok) {
-      aiData = await aiRes.json();
-    } else if (aiRes.status === 401) {
+    if (res.status === 401) {
       chrome.storage.local.remove(["jwt", "loggedIn"]);
       currentJwt = "";
       showScreen("screen-login");
       return;
     }
+    if (!res.ok) {
+      var err = await res.json().catch(function () { return {}; });
+      document.getElementById("err-msg").textContent = err.detail || ("서버 오류 " + res.status);
+      document.getElementById("err-sub").textContent = "잠시 후 다시 시도해주세요.";
+      showScreen("screen-error");
+      return;
+    }
 
+    var data = await res.json();
     setStep(1, "done"); setStep(2, "active");
-
-    // Step 2: 관련 영상 키워드 분석
-    var kwRes = await fetch(
-      API_BASE + "/analyze_search?keyword=" + encodeURIComponent(keyword),
-      { headers: { "Authorization": "Bearer " + jwt } }
-    );
-
-    if (kwRes.status === 401) {
-      chrome.storage.local.remove(["jwt", "loggedIn"]);
-      currentJwt = "";
-      showScreen("screen-login");
-      return;
-    }
-
-    var kwData = null;
-    if (kwRes.ok) {
-      kwData = await kwRes.json();
-    }
-
-    setStep(2, "done"); setStep(3, "active");
-    await new Promise(function (r) { setTimeout(r, 400); });
-    setStep(3, "done");
     await new Promise(function (r) { setTimeout(r, 300); });
+    setStep(2, "done"); setStep(3, "active");
+    await new Promise(function (r) { setTimeout(r, 300); });
+    setStep(3, "done");
+    await new Promise(function (r) { setTimeout(r, 200); });
 
-    // 하트 상태 초기화
+    // 키워드: extracted_topic 우선, 없으면 제목
+    currentKeyword = data.extracted_topic || keyword;
     setHeartState(false);
     heartedTopic = "";
-    checkHeartState(keyword);
+    checkHeartState(currentKeyword);
 
-    // 단일 영상 요약 렌더링
-    renderVideoSummary(videoTitle, aiData);
+    // SUMMARY 탭: 단일 영상 요약
+    renderVideoSummary(videoTitle, { summary: data.video_summary });
 
-    // 관련 영상 분석 렌더링 (keyword 제목행 숨김)
-    if (kwData) {
-      renderResults(kwData, true);
-    } else {
-      // 관련 영상 없이 단순 화면 전환
-      var summaryTabBtn2 = document.querySelector('[data-tab="summary"]');
-      if (summaryTabBtn2) summaryTabBtn2.style.display = "";
-      document.getElementById("insights-kw-header").style.display = "none";
-      document.getElementById("insights-kw-underline").style.display = "none";
-      document.getElementById("insights-sections").innerHTML = '<div style="color:#515f74;font-size:13px;padding:8px 0;">관련 영상 분석 결과가 없습니다.</div>';
-      document.getElementById("controversy-section").innerHTML = "";
-      document.getElementById("sources-in-insights").classList.add("hidden");
-      showScreen("screen-results");
-    }
+    // INSIGHTS + SOURCES 탭
+    renderResults({
+      keyword:             currentKeyword,
+      summary_lines:       data.summary_lines || [],
+      common_facts:        data.common_facts || [],
+      controversies:       data.controversies || [],
+      recommended_videos:  data.recommended_videos || data.sources || [],
+      category:            data.category || "",
+      cached:              data.cached || false,
+    }, true);
+
     switchTab("summary");
 
   } catch (e) {
