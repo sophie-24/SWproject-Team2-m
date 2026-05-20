@@ -144,7 +144,6 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                     user_id=str(user.google_id),
                     raw_keywords=topics,
                     skip_clustering=True,   # 하트 토픽은 이미 정제됨 — 클러스터링 불필요
-                    initial_intent=user.initial_intent,
                 )
 
                 # ── 뉴스레터 저장 ─────────────────────────────────────────
