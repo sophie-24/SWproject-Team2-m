@@ -1651,7 +1651,7 @@ async def analyze_search(
     return JSONResponse(result)
 
 
-# ── 영상 진입 분석 (현재 영상 요약 + 제목 기반 인사이트) ────────────────────────
+# ── 영상 진입 분석 (단일 영상 풀 분석 + 키워드 분석 병렬) ────────────────────────
 
 class AnalyzeVideoRequest(BaseModel):
     video_id: str = Field(..., description="현재 보고 있는 YouTube video_id")
@@ -1667,14 +1667,52 @@ class AnalyzeVideoRequest(BaseModel):
     )
 
 
+class SingleVideoTab(BaseModel):
+    """Tab 1 — 현재 시청 중인 영상 단독 분석."""
+    video_id:          str
+    title:             str
+    channel_title:     str
+    thumbnail_url:     str
+    url:               str
+    summary:           str
+    key_claims:        list[str]
+    ad_score:          int
+    ad_detected:       bool
+    credibility_score: float
+
+
+class KeywordAnalysisTab(BaseModel):
+    """Tab 2 — 키워드 기반 상위 5개 영상 통합 분석 (Pipeline A 결과)."""
+    keyword:            str
+    category:           str
+    layout:             str
+    intent_type:        str
+    summary_lines:      list[str]
+    common_facts:       list[str]
+    controversies:      list[str]
+    recommended_videos: list[Any]
+    pros:               list[Any]
+    cons:               list[Any]
+
+
+class VideoSourceItem(BaseModel):
+    """Tab 3 소스 아이템 — 단일 영상 + 키워드 영상 통합, video_id 기준 중복 제거."""
+    video_id:         str
+    title:            str
+    url:              str
+    channel_title:    str
+    thumbnail_url:    str
+    ad_detected:      bool
+    is_current_video: bool   # 현재 시청 중인 영상이면 True
+
+
 class AnalyzeVideoResponse(BaseModel):
     video_id:          str
     extracted_topic:   str
     normalized_topic:  str
-    video_summary:     str
-    summary_lines:     list[str]
-    recommended_videos: list[Any]
-    sources:           list[Any]
+    single_video:      SingleVideoTab
+    keyword_analysis:  KeywordAnalysisTab
+    sources:           list[VideoSourceItem]
 
 
 @app.post(
@@ -1691,22 +1729,15 @@ async def analyze_video(
     """
     사용자가 YouTube 영상 진입 시 호출합니다.
 
+    **사이드패널 3탭 구조 반환:**
+    - `single_video` (Tab 1): 현재 영상 단독 풀 분석 (요약·핵심주장·광고점수·신뢰도)
+    - `keyword_analysis` (Tab 2): 제목 추출 토픽 기반 상위 5개 영상 통합 분석
+    - `sources` (Tab 3): 두 분석에 사용된 영상 소스 통합, video_id 기준 중복 제거
+
     **처리 순서:**
     1. 영상 제목 → `title_topic_ai`로 대표 토픽 추출
-    2. 영상 자막 기반 단일 요약 생성
-    3. 추출 토픽으로 Pipeline A 실행 → 추천 영상 + 인사이트 반환
-
-    **요청 예시:**
-    ```json
-    { "video_id": "dQw4w9WgXcQ", "title": "갤럭시 S25 울트라 완벽 분석 리뷰" }
-    ```
-
-    **응답 주요 필드:**
-    - `extracted_topic`: 제목에서 추출한 관심 토픽명
-    - `video_summary`: 현재 영상 핵심 요약 (1~3줄)
-    - `recommended_videos`: 같은 토픽 관련 추천 영상 목록
-
-    # TODO: 현재 영상 기반 분석 API 연결 (프론트 side_panel.js)
+    2. 단일 영상 풀 분석 + Pipeline A를 asyncio.gather로 병렬 실행
+    3. 소스 중복 제거 (단일 영상이 상위 5개에 포함되면 최대 5개 소스 유지)
     """
     from pipeA_orchestrator import run_pipeline_a
     from agents.title_topic_ai import extract_topic_from_title
@@ -1716,80 +1747,153 @@ async def analyze_video(
     user_id  = user["user_id"]
 
     # ── Step 1: 제목 기반 토픽 추출 ──────────────────────────────────────────
-    topic_result      = await extract_topic_from_title(title)
-    extracted_topic   = topic_result["topic"]
-    normalized_topic  = topic_result["normalized_topic"]
+    topic_result     = await extract_topic_from_title(title)
+    extracted_topic  = topic_result["topic"]
+    normalized_topic = topic_result["normalized_topic"]
     logger.info(f"[analyze_video] topic='{extracted_topic}' video_id={video_id}")
 
-    # ── Step 2: 현재 영상 자막 단일 요약 ─────────────────────────────────────
-    video_summary = await _summarize_single_video(video_id, title)
+    # ── Step 2: 유저 관심사 조회 (Pipeline A 개인화용) ────────────────────────
+    interest_result = await db.execute(
+        select(UserInterest.category)
+        .where(UserInterest.user_id == user_id)
+        .order_by(UserInterest.weight.desc())
+        .limit(10)
+    )
+    user_categories = [row[0] for row in interest_result.all()]
 
-    # ── Step 3: 토픽 기반 Pipeline A (추천 영상 + 인사이트) ──────────────────
-    cache_key = f"{user_id}:video:{normalized_topic}"
-    if cache_key in _search_analysis_cache:
-        pipeline_result = _search_analysis_cache[cache_key]
-    else:
-        interest_result = await db.execute(
-            select(UserInterest.category)
-            .where(UserInterest.user_id == user_id)
-            .order_by(UserInterest.weight.desc())
-            .limit(10)
-        )
-        user_categories = [row[0] for row in interest_result.all()]
+    # ── Step 3: 단일 영상 풀 분석 + Pipeline A 병렬 실행 ─────────────────────
+    single_cache_key   = f"single_video_full:{video_id}"
+    pipeline_cache_key = f"{user_id}:video:{normalized_topic}"
 
+    async def _run_single():
+        if single_cache_key in _search_analysis_cache:
+            return _search_analysis_cache[single_cache_key]
+        result = await _full_analyze_single_video(video_id, title, extracted_topic)
+        _search_analysis_cache[single_cache_key] = result
+        return result
+
+    async def _run_pipeline():
+        if pipeline_cache_key in _search_analysis_cache:
+            return _search_analysis_cache[pipeline_cache_key]
         try:
-            pipeline_result = await run_pipeline_a(
+            result = await run_pipeline_a(
                 keyword=extracted_topic,
                 subscribed_channel_ids=[],
                 user_categories=user_categories,
                 clicked_channel_ids=[],
             )
         except ValueError:
-            pipeline_result = {
-                "summary_lines": [],
-                "recommended_videos": [],
-                "sources": [],
+            result = {
+                "keyword": extracted_topic, "category": "정보탐색형",
+                "layout": "summary_focus", "intent_type": "지식형",
+                "summary_lines": [], "common_facts": [], "controversies": [],
+                "recommended_videos": [], "pros": [], "cons": [], "sources": [],
             }
-        _search_analysis_cache[cache_key] = pipeline_result
+        _search_analysis_cache[pipeline_cache_key] = result
+        return result
+
+    single_result, pipeline_result = await asyncio.gather(_run_single(), _run_pipeline())
+
+    # ── Step 4: 소스 통합 — video_id 기준 중복 제거 ──────────────────────────
+    seen_ids: set[str] = set()
+    merged_sources = []
+
+    # 현재 영상을 첫 번째 소스로 추가
+    seen_ids.add(video_id)
+    merged_sources.append({
+        "video_id":         video_id,
+        "title":            title,
+        "url":              f"https://youtube.com/watch?v={video_id}",
+        "channel_title":    single_result.get("channel_title", ""),
+        "thumbnail_url":    f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+        "ad_detected":      single_result.get("ad_detected", False),
+        "is_current_video": True,
+    })
+
+    # 키워드 분석 소스 추가 (중복 제외)
+    for src in pipeline_result.get("sources", []):
+        src_vid = src.get("video_id") or src.get("url", "").split("v=")[-1].split("&")[0]
+        if src_vid and src_vid not in seen_ids:
+            seen_ids.add(src_vid)
+            merged_sources.append({
+                "video_id":         src_vid,
+                "title":            src.get("title", ""),
+                "url":              src.get("url", f"https://youtube.com/watch?v={src_vid}"),
+                "channel_title":    src.get("channel_title", ""),
+                "thumbnail_url":    src.get("thumbnail_url",
+                                        f"https://img.youtube.com/vi/{src_vid}/mqdefault.jpg"),
+                "ad_detected":      src.get("ad_detected", False),
+                "is_current_video": False,
+            })
 
     return JSONResponse({
-        "video_id":          video_id,
-        "extracted_topic":   extracted_topic,
-        "normalized_topic":  normalized_topic,
-        "video_summary":     video_summary,
-        "summary_lines":     pipeline_result.get("summary_lines", []),
-        "recommended_videos": pipeline_result.get("recommended_videos", []),
-        "sources":           pipeline_result.get("sources", []),
+        "video_id":         video_id,
+        "extracted_topic":  extracted_topic,
+        "normalized_topic": normalized_topic,
+        "single_video": {
+            "video_id":          video_id,
+            "title":             title,
+            "channel_title":     single_result.get("channel_title", ""),
+            "thumbnail_url":     f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+            "url":               f"https://youtube.com/watch?v={video_id}",
+            "summary":           single_result.get("summary", ""),
+            "key_claims":        single_result.get("key_claims", []),
+            "ad_score":          single_result.get("ad_score", 0),
+            "ad_detected":       single_result.get("ad_detected", False),
+            "credibility_score": single_result.get("credibility_score", 0.5),
+        },
+        "keyword_analysis": {
+            "keyword":            pipeline_result.get("keyword", extracted_topic),
+            "category":           pipeline_result.get("category", "정보탐색형"),
+            "layout":             pipeline_result.get("layout", "summary_focus"),
+            "intent_type":        pipeline_result.get("intent_type", "지식형"),
+            "summary_lines":      pipeline_result.get("summary_lines", []),
+            "common_facts":       pipeline_result.get("common_facts", []),
+            "controversies":      pipeline_result.get("controversies", []),
+            "recommended_videos": pipeline_result.get("recommended_videos", []),
+            "pros":               pipeline_result.get("pros", []),
+            "cons":               pipeline_result.get("cons", []),
+        },
+        "sources": merged_sources,
     })
 
 
-async def _summarize_single_video(video_id: str, title: str) -> str:
-    """현재 영상 자막 기반 단일 요약 (2~3문장). 자막 없으면 제목 기반 fallback."""
-    cache_key = f"video_summary:{video_id}"
-    if cache_key in _search_analysis_cache:
-        return _search_analysis_cache[cache_key]
+async def _full_analyze_single_video(
+    video_id: str,
+    title: str,
+    keyword: str,
+) -> dict:
+    """
+    현재 영상 단독 풀 분석 — analyzer_ai._analyze_single_video 사용.
+    YouTube API로 메타데이터 보완, 자막 수집 후 Gemini 1회 호출.
+    """
+    from agents.analyzer_ai import _analyze_single_video
+    from youtube_search import fetch_video_by_id
 
+    # 영상 메타데이터 조회 (channel_title, subscriber_count 등)
     try:
-        transcript_text = await asyncio.to_thread(
-            _collect_transcript_for_summary, video_id
-        )
-        if not transcript_text:
-            raise ValueError("자막 없음")
+        meta = await asyncio.to_thread(fetch_video_by_id, video_id)
+    except Exception:
+        meta = {"video_id": video_id, "title": title, "channel_title": "",
+                "channel_id": "", "subscriber_count": 0, "description": "",
+                "has_paid_placement": None}
 
-        prompt = (
-            f"다음은 YouTube 영상 '{title}'의 자막입니다.\n"
-            f"이 영상의 핵심 내용을 한국어로 2~3문장으로 요약하세요.\n"
-            f"요약문만 출력하고 다른 설명은 생략하세요.\n\n"
-            f"자막:\n{transcript_text[:8000]}"
-        )
-        summary = await call_gemini_async(prompt, temperature=0.2)
-        summary = summary.strip()
-    except Exception as e:
-        logger.warning(f"[analyze_video] 단일 요약 실패 ({video_id}): {e}")
-        summary = f"'{title}' 영상에 대한 요약을 생성할 수 없습니다."
+    video_info = {
+        "video_id":          video_id,
+        "title":             meta.get("title") or title,
+        "channel_id":        meta.get("channel_id", ""),
+        "channel_title":     meta.get("channel_title", ""),
+        "subscriber_count":  meta.get("subscriber_count", 0),
+        "description":       meta.get("description", ""),
+        "has_paid_placement": meta.get("has_paid_placement"),
+    }
 
-    _search_analysis_cache[cache_key] = summary
-    return summary
+    # 자막 수집
+    transcript = await asyncio.to_thread(_collect_transcript_for_summary, video_id)
+
+    # 단일 영상 분석 (Semaphore 1 — 단독 호출이므로 제한 불필요)
+    semaphore = asyncio.Semaphore(1)
+    return await _analyze_single_video(keyword, video_info, transcript, semaphore)
 
 
 def _collect_transcript_for_summary(video_id: str) -> Optional[str]:
