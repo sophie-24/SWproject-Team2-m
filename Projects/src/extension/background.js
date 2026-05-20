@@ -30,7 +30,7 @@ chrome.runtime.onMessageExternal.addListener(
 // chrome.tabs.onUpdated로 localhost:8000/?token=... URL을 직접 감지해 JWT를 저장한다.
 function handleTabUrl(url) {
   if (!url) return;
-  if (!url.startsWith("http://localhost:8000/") && !url.startsWith("http://127.0.0.1:8000/")) return;
+  if (!url.startsWith("http://localhost:8000/") && !url.startsWith("http://127.0.0.1:8000/") && !url.startsWith(API_BASE + "/")) return;
   try {
     const token = new URL(url).searchParams.get("token");
     if (!token) return;

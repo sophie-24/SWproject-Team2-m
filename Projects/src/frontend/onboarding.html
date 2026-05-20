@@ -323,16 +323,15 @@
   <div class="container">
     <div class="logo">✦ Tubify</div>
 
-    <!-- 스텝 인디케이터 (4단계) -->
+    <!-- 스텝 인디케이터 (3단계 — Step 1 관심사 설정 제거됨) -->
     <div class="step-indicator">
-      <div class="step-dot active" id="dot1"></div>
-      <div class="step-dot" id="dot2"></div>
+      <div class="step-dot active" id="dot2"></div>
       <div class="step-dot" id="dot3"></div>
       <div class="step-dot" id="dot4"></div>
     </div>
 
-    <!-- ── Step 1: 관심사 피드 맞춤 설정 ────────────────────── -->
-    <div id="step1">
+    <!-- ── Step 1: 관심사 피드 맞춤 설정 (제거됨 — 검색 기록/AI 분석 기능 삭제) ── -->
+    <div id="step1" class="hidden">
       <div class="card">
         <h2>관심사 피드 맞춤 설정</h2>
         <p>지난 한 달간의 유튜브 검색 기록을 바탕으로 관심사를 추출했어요.<br>원하는 주제를 선택하고, 추가적으로 더 넣을 수 있어요.</p>
@@ -369,7 +368,7 @@
     </div>
 
     <!-- ── Step 2: 이메일 주소 + 발송 시각 ──────────────────── -->
-    <div id="step2" class="hidden">
+    <div id="step2">
       <div class="card">
         <h2>뉴스레터 설정</h2>
         <p>매일 정해진 시간에 맞춤 유튜브 브리핑을 이메일로 보내드립니다.</p>
@@ -794,7 +793,8 @@
     }
 
     // ── 자동 시작 ──────────────────────────────────────────────────────────────
-    loadHistoryAndAnalyze();
+    // Step 1 (검색 기록 수집 / AI 관심사 분석) 제거됨 — Step 2부터 시작
+    // loadHistoryAndAnalyze(); // TODO: 함수 전체 삭제 예정 (Issue #38)
   </script>
 </body>
 
