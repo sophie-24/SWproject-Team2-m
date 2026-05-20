@@ -127,6 +127,8 @@ app.add_middleware(
         "http://localhost:8000",
         "http://127.0.0.1:8000",
         "https://www.youtube.com",  # content.js가 유튜브 페이지 컨텍스트에서 /collect 호출
+        os.getenv("FRONTEND_URL", ""),  # Cloudtype 배포 URL
+        "chrome-extension://" + os.getenv("EXTENSION_ID", ""),  # 크롬 익스텐션
     ],
     allow_credentials=True,
     allow_methods=["*"],
