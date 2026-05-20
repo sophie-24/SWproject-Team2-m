@@ -13,15 +13,13 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from agents.cluster_ai import cluster_topics
 from auth import create_auth_url, exchange_code_for_tokens, create_jwt, verify_jwt
 from youtube_search import search_videos, get_subscriptions
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
+from gemini_client import call_gemini_async
 from shared_cache import search_analysis_cache as _search_analysis_cache_shared
-from database import init_db, get_db, Newsletter, UserInterest
-from behavior_store import save_behavior, get_today_logs
-from trigger import get_triggered_topics
+from database import init_db, get_db, Newsletter, UserInterest, UserInterestVideo
 from agents.pipeB_orchestrator import run_pipeline
 from scheduler import start_scheduler, stop_scheduler
 
@@ -51,35 +49,72 @@ app = FastAPI(
     title="Tubify API",
     version="1.0.0",
     description="""
-유튜브 시청 행동 기반 맞춤 뉴스레터 서비스 백엔드입니다.
+사용자가 직접 하트(♥)한 관심 토픽을 AI가 분석해 개인화 뉴스레터를 발송하는 서비스입니다.
 
-## 인증
-모든 `/my/*`, `/collect/*`, `/analyze_search`, `/newsletter/*` 엔드포인트는
-`Authorization: Bearer <JWT>` 헤더가 필요합니다.
+---
 
-JWT는 `/auth/callback` 로그인 완료 후 리다이렉트 URL의 `?token=` 파라미터와
-HttpOnly `access_token` 쿠키로 전달됩니다.
+## 🔐 JWT 인증 방법
 
-## 테스트 상태
+**1단계 — 로그인 & 토큰 복사**
+1. [`/auth/login`](/auth/login) 접속 → Google 로그인
+2. 리다이렉트된 URL의 `?token=` 이후 값 전체 복사
+
+**2단계 — Swagger에서 인증**
+1. 이 페이지 우측 상단 **Authorize 🔓** 버튼 클릭
+2. `Bearer <복사한_토큰>` 입력 (앞에 `Bearer ` 포함) → Authorize
+
+이후 모든 API를 **Try it out → Execute** 로 바로 테스트할 수 있습니다.
+
+> JWT가 필요한 엔드포인트는 summary에 🔑 표시가 있습니다.
+
+---
+
+## 📋 주요 플로우
+
+### 하트 관심 토픽 추가
+```
+POST /analyze_video  { "video_id": "dQw4w9WgXcQ", "title": "영상 제목" }
+  → title_topic_ai가 토픽 추출
+  → POST /interests  { "title": "영상 제목", "video_id": "..." }
+  → 최대 5개 제한
+```
+
+### 뉴스레터 즉시 발송 테스트
+```
+POST /newsletter/send-now
+  → 내 하트 관심 토픽 기반으로 뉴스레터 생성 후 이메일 발송
+  → 관심 토픽이 0개이면 발송 안 됨
+```
+
+### 발송 시간 변경
+```
+PATCH /settings/send_time  { "send_time": "08:00" }
+  → 다음 배치부터 해당 시간에 발송
+```
+
+---
+
+## 🏷 아이콘 범례
 - ✅ 테스트 완료
 - 🚧 미테스트 / 개발 중
+- ⚠️ DEPRECATED — 뉴스레터 발송에 사용 안 함 (Issue 8 제거 예정)
 """,
     lifespan=lifespan,
     openapi_tags=[
-        {"name": "인증",        "description": "Google OAuth 로그인 및 JWT 발급"},
-        {"name": "행동 수집",   "description": "익스텐션에서 검색·시청 이벤트 수집"},
-        {"name": "프로필",      "description": "사용자 프로필 조회 및 수정"},
-        {"name": "온보딩",      "description": "온보딩 플로우 — 의도 설정 및 관심사 초기화"},
-        {"name": "구독 설정",   "description": "뉴스레터 수신 동의 및 발송 시간 설정"},
-        {"name": "YouTube",     "description": "YouTube 구독 목록 및 영상 검색"},
-        {"name": "뉴스레터",    "description": "뉴스레터 히스토리 조회 및 즉시 발송"},
-        {"name": "AI 분석",     "description": "Pipeline A — 실시간 검색 분석 (사이드패널)"},
-        {"name": "자막",        "description": "YouTube 영상 자막 조회 및 가용 언어 확인"},
-        {"name": "전처리",      "description": "자막 기반 분석 청크 생성"},
-        {"name": "관심사",      "description": "누적 관심사 조회 및 타임라인"},
-        {"name": "프론트엔드",  "description": "정적 HTML, CSS, JavaScript 파일 제공"},
-        {"name": "상태 확인",   "description": "서버 상태 및 헬스체크"},
-        {"name": "관리자",      "description": "관리자 전용 — Admin-Secret 헤더 필요"},
+        {"name": "인증",        "description": "Google OAuth 로그인 및 JWT 발급. `/auth/login`으로 시작 → 리다이렉트 URL의 `?token=` 값을 Authorize에 입력하세요."},
+        {"name": "프로필",      "description": "내 프로필 조회·수정. `GET /my/profile`은 하트 관심 토픽 목록도 함께 반환합니다."},
+        # DEPRECATED (Issue 9): 온보딩 태그 제거
+        {"name": "구독 설정",   "description": "뉴스레터 수신 동의·거부 및 발송 시간 변경. `PATCH /settings/send_time`으로 단일 HH:MM 문자열 전송."},
+        {"name": "관심사",      "description": "하트(♥) 기반 관심 토픽 관리. 최대 5개. `POST /interests`로 추가, `DELETE /interests/{topic}`으로 취소(soft delete)."},
+        {"name": "AI 분석",     "description": "Pipeline A — 실시간 검색 분석(사이드패널). `GET /analyze_search?keyword=검색어`로 즉시 테스트 가능."},
+        {"name": "뉴스레터",    "description": "뉴스레터 히스토리 조회 및 즉시 발송 테스트. `POST /newsletter/send-now`로 관심 토픽 기반 발송 테스트."},
+        {"name": "YouTube",     "description": "YouTube 구독 채널 목록 조회 및 영상 검색."},
+        {"name": "자막",        "description": "YouTube 영상 자막 원문 조회 및 가용 언어 확인."},
+        {"name": "전처리",      "description": "자막 청크 변환 — analyzer_ai에 넣기 전 전처리 결과 확인용."},
+        {"name": "행동 수집",   "description": "⚠️ DEPRECATED — 익스텐션 검색·시청 이벤트 수집. 뉴스레터 발송에 더 이상 사용 안 함."},
+        {"name": "프론트엔드",  "description": "정적 HTML, CSS, JS 파일 제공 (Swagger 테스트 불필요)."},
+        {"name": "상태 확인",   "description": "서버 헬스체크. 인증 없이 `GET /health`로 바로 확인 가능."},
+        {"name": "관리자",      "description": "관리자 전용. 요청 헤더에 `Admin-Secret: <값>` 필요. `POST /admin/pipeline/run?user_id=xxx`로 특정 유저 즉시 발송 테스트."},
     ],
 )
 security = HTTPBearer()
@@ -113,6 +148,7 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 # Redis 도입 전 임시 구현 — 단일 워커 환경에서만 안전
 _oauth_sessions: dict[str, str] = {}  # {state: code_verifier}
 _oauth_credentials: dict[str, dict] = {}  # {state: credentials}
+_oauth_ext_states: set = set()          # 익스텐션 팝업 로그인 state 집합
 
 _transcript_cache: dict = {}
 # Pipeline A 분석 캐시 — shared_cache 모듈과 동일 객체 참조
@@ -189,21 +225,28 @@ class MyLogsResponse(BaseModel):
 
 
 class SendTimeResponse(SuccessResponse):
-    send_time: list[str]
+    send_time: str          # 단일 HH:MM 문자열
 
 
 class SettingsResponse(BaseModel):
-    send_time: list[str]
+    send_time: str          # 단일 HH:MM 문자열
     is_subscribed: bool
     delivery_type: Optional[str] = None
     email: Optional[str] = None
 
 
+class InterestTopicItem(BaseModel):
+    """GET /my/profile 응답에 포함되는 하트 관심 토픽 요약."""
+    topic: str
+    normalized_topic: Optional[str] = None
+
+
 class ProfileResponse(BaseModel):
     email: Optional[str] = None
-    send_time: list[str]
+    send_time: str                          # 단일 HH:MM 문자열 (Issue 7)
     initial_intent: Optional[str] = None
     interest_categories: list[str]
+    interests: list[InterestTopicItem]      # 하트 관심 토픽 목록 (Issue 7)
     is_subscribed: bool
     created_at: Optional[str] = None
 
@@ -225,10 +268,7 @@ class InterestsResponse(BaseModel):
     interests: list[InterestItem]
 
 
-class HistoryAnalyzeResponse(BaseModel):
-    categories: list[str]
-    intent_type: str
-
+# DEPRECATED (Issue 9): HistoryAnalyzeResponse 제거 — /profile/analyze-history 엔드포인트 제거
 
 class SubscriptionsResponse(BaseModel):
     count: int
@@ -337,7 +377,8 @@ def search_dashboard():
 def mypage():
     return FileResponse(os.path.join(FRONTEND_DIR, "mypage.html"))
 
-@app.get("/loading.html", tags=["프론트엔드"], summary="로딩 페이지 제공 ✅", response_class=HTMLResponse)
+# TODO (Issue 9): /loading.html 엔드포인트 제거 — 신규 유저 리다이렉트가 /onboarding.html로 변경됨 (프론트 loading.html 삭제 후 제거)
+@app.get("/loading.html", tags=["프론트엔드"], summary="로딩 페이지 제공 (DEPRECATED)", response_class=HTMLResponse, deprecated=True)
 def loading():
     with open(os.path.join(FRONTEND_DIR, "loading.html"), "r", encoding="utf-8") as f:
         html = f.read()
@@ -384,10 +425,12 @@ def health():
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 @app.get("/auth/login", tags=["인증"], summary="Google OAuth 로그인 시작 ✅", response_class=RedirectResponse)
-def login():
+def login(ext: bool = False):
     auth_url, state, code_verifier = create_auth_url()
-    _oauth_sessions[state] = code_verifier  # state별로 분리 저장
-    logger.debug(f"[login] state 저장: {state}")
+    _oauth_sessions[state] = code_verifier
+    if ext:
+        _oauth_ext_states.add(state)  # 익스텐션 팝업 로그인으로 표시
+    logger.debug(f"[login] state 저장: {state} ext={ext}")
     return RedirectResponse(auth_url)
 
 
@@ -424,6 +467,7 @@ async def callback(
     )
     user = result.scalar_one_or_none()
 
+    is_new_user = False
     if not user:
         user = User(
             google_id=user_info["google_id"],
@@ -432,6 +476,7 @@ async def callback(
         db.add(user)
         await db.commit()
         await db.refresh(user)
+        is_new_user = True
         logger.info(f"[callback] 신규 유저 생성: {user_info['email']}")
     else:
         logger.info(f"[callback] 기존 유저 로그인: {user_info['email']}")
@@ -445,14 +490,19 @@ async def callback(
         user_id=user_info["google_id"],
         email=user_info["email"],
     )
+    # 익스텐션 팝업 로그인 → 자동 닫힘 전용 페이지로 리다이렉트
+    is_ext = state in _oauth_ext_states
+    _oauth_ext_states.discard(state)  # 사용 후 즉시 제거
 
-    # 신규 유저 → 로딩(히스토리 분석), 기존 유저 → 마이페이지
-    # interest_categories나 delivery_type이 있으면 온보딩 완료로 간주 (initial_intent만 누락된 불완전 상태 대응)
-    is_onboarded = bool(user.initial_intent or user.interest_categories or user.delivery_type)
-    if not is_onboarded:
-        redirect_url = f"{FRONTEND_URL}/loading.html?token={jwt_token}"
+    if is_ext:
+        redirect_url = f"{FRONTEND_URL}/auth/extension-done?token={jwt_token}"
     else:
-        redirect_url = f"{FRONTEND_URL}/mypage.html?token={jwt_token}"
+        # 신규 유저 → send_time 설정 화면, 기존 유저 → 메인(index.html)
+        # TODO: 신규 유저 리다이렉트 URL을 send_time 설정 모달 페이지로 교체 (프론트 준비되면)
+        if is_new_user:
+            redirect_url = f"{FRONTEND_URL}/onboarding.html?token={jwt_token}"
+        else:
+            redirect_url = f"{FRONTEND_URL}?token={jwt_token}"
 
     response = RedirectResponse(url=redirect_url)
     response.set_cookie(
@@ -463,6 +513,27 @@ async def callback(
         secure=False,
     )
     return response
+
+
+@app.get("/auth/extension-done", tags=["인증"], summary="익스텐션 팝업 로그인 완료 — 자동 닫힘")
+def extension_done(token: str = ""):
+    """
+    익스텐션 팝업 OAuth 완료 후 리다이렉트되는 페이지.
+    - background.js tabs.onUpdated가 ?token= 을 감지해 JWT를 storage에 저장.
+    - 페이지 자체는 window.close()로 팝업을 즉시 닫음.
+    """
+    from fastapi.responses import HTMLResponse
+    html = """<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>Tubify 로그인 완료</title></head>
+<body>
+<p style="font-family:sans-serif;text-align:center;margin-top:60px;color:#555;">
+  로그인 완료! 이 창은 자동으로 닫힙니다…
+</p>
+<script>window.close();</script>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 
 @app.get("/auth/me", response_model=AuthMeResponse, tags=["인증"], summary="현재 로그인 사용자 조회 ✅")
@@ -491,6 +562,7 @@ class CollectData(BaseModel):
 @app.post(
     "/collect",
     response_model=CollectResponse,
+    deprecated=True,
     tags=["행동 수집"],
     summary="검색/시청 로그 저장 ✅",
 )
@@ -500,22 +572,18 @@ async def collect(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    익스텐션에서 유저의 검색·시청 이벤트를 수집합니다.
-    - event_type: 'search' | 'watch'
-    - keyword: 검색어 또는 영상 제목
+    ⚠️ **DEPRECATED** — 행동 로그는 더 이상 뉴스레터 발송에 사용되지 않습니다.
+
+    익스텐션 하위 호환성을 위해 엔드포인트는 유지하되 저장하지 않습니다.
+    뉴스레터는 하트(♥) 관심 토픽(`POST /interests`) 기반으로 발송됩니다.
     """
-    result = await save_behavior(
-        db=db,
-        user_id=user["user_id"],
-        event_type=data.event_type,
-        keyword=data.keyword,
-        video_id=data.video_id,
-    )
-    return result
+    # DEPRECATED: behavior_store 제거 (Issue 8) — 익스텐션 호환성 유지를 위해 success만 반환
+    return {"success": True}
 
 @app.get(
     "/collect/today",
     response_model=TodayLogsResponse,
+    deprecated=True,
     tags=["행동 수집"],
     summary="오늘 수집된 행동 로그 조회 ✅",
 )
@@ -523,19 +591,19 @@ async def today_logs(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """오늘 수집된 행동 로그 확인용"""
-    logs = await get_today_logs(db, user_id=user["user_id"])
-    triggered = get_triggered_topics(logs)
-    return {
-        "total_logs": len(logs),
-        "logs": logs,
-        "triggered_topics": triggered,
-    }
+    """
+    ⚠️ **DEPRECATED** — 행동 로그 기반 파이프라인 제거(Issue 8)로 항상 빈 결과를 반환합니다.
+
+    하트 관심 토픽 확인: `GET /interests`
+    """
+    # DEPRECATED: behavior_store 제거 (Issue 8)
+    return {"total_logs": 0, "logs": [], "triggered_topics": []}
 
 
 @app.get(
     "/my/logs",
     response_model=MyLogsResponse,
+    deprecated=True,
     tags=["행동 수집"],
     summary="내 행동 로그 및 트리거 주제 조회 ✅",
 )
@@ -545,67 +613,17 @@ async def my_logs(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    내 행동 로그 투명성 엔드포인트 (검색어 로그 공개).
-    사용자가 자신의 수집된 행동 데이터를 직접 확인할 수 있도록 제공.
+    ⚠️ **DEPRECATED** — 행동 로그 기반 파이프라인 제거(Issue 8)로 항상 빈 결과를 반환합니다.
 
-    OUTPUT:
-      {
-        "total": int,
-        "logs": [
-          { "event_type": "search"|"watch", "keyword": str,
-            "video_id": str|null, "logged_at": ISO8601 }
-        ],
-        "triggered_topics": [str, ...],   -- 뉴스레터 주제로 사용될 키워드
-        "profile_categories": [str, ...], -- 온보딩 프로필 관심사
-        "merged_topics": [str, ...]        -- 합산 결과 (실제 사용 키워드)
-      }
+    하트 관심 토픽 확인: `GET /interests`
     """
-    import json as _json
-    from database import BehaviorLog, User
-
-    # 행동 로그 조회 (최신순)
-    result = await db.execute(
-        select(BehaviorLog)
-        .where(BehaviorLog.user_id == user["user_id"])
-        .order_by(BehaviorLog.logged_at.desc())
-        .limit(limit)
-    )
-    logs = result.scalars().all()
-
-    # 오늘 로그로 triggered_topics 계산
-    today_logs_list = await get_today_logs(db, user_id=user["user_id"])
-    triggered_topics = get_triggered_topics(today_logs_list)
-
-    # 프로필 카테고리 조회
-    user_result = await db.execute(
-        select(User).where(User.google_id == user["user_id"])
-    )
-    db_user = user_result.scalar_one_or_none()
-    profile_categories: list = []
-    if db_user and db_user.interest_categories:
-        try:
-            profile_categories = _json.loads(db_user.interest_categories)
-        except Exception:
-            profile_categories = []
-
-    # 합산 (scheduler와 동일 로직)
-    from scheduler import _merge_keywords
-    merged_topics = _merge_keywords(triggered_topics, profile_categories)
-
+    # DEPRECATED: BehaviorLog / trigger 제거 (Issue 8)
     return {
-        "total": len(logs),
-        "logs": [
-            {
-                "event_type": log.event_type,
-                "keyword":    log.keyword,
-                "video_id":   log.video_id,
-                "logged_at":  log.logged_at.isoformat(),
-            }
-            for log in logs
-        ],
-        "triggered_topics":  triggered_topics,
-        "profile_categories": profile_categories,
-        "merged_topics":      merged_topics,
+        "total":              0,
+        "logs":               [],
+        "triggered_topics":   [],
+        "profile_categories": [],
+        "merged_topics":      [],
     }
 
 # ── 발송 시간 유효성 검사 유틸 ────────────────────────────────────────────────
@@ -686,74 +704,18 @@ async def _get_or_create_user(db: AsyncSession, current_user: dict):
     return db_user
 
 # ── 구독 설정 ─────────────────────────────────────────────────────────────────
-
-class SubscribeData(BaseModel):
-    delivery_type: str = Field("email", description="현재는 email만 사용")
-    email: Optional[str] = Field("test@example.com", description="뉴스레터 수신 이메일")
-    send_time: Optional[list[str]] = Field(
-        default_factory=lambda: ["08:00", "21:00"],
-        description="오전/오후 발송 시간 목록",
-    )
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "delivery_type": "email",
-                "email": "test@example.com",
-                "send_time": ["08:00", "21:00"],
-            }
-        }
-    )
-
-
-@app.post(
-    "/subscribe",
-    response_model=SuccessResponse,
-    tags=["구독 설정"],
-    summary="뉴스레터 수신 정보 저장 ✅",
-)
-async def subscribe(
-    data: SubscribeData,
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """onboarding.html에서 수신 방법 저장 — users 테이블 업데이트"""
-    from database import User
-
-    db_user = await _get_or_create_user(db, user)
-
-    db_user.delivery_type = "email"
-    if data.email:
-        # 이메일 중복 체크 — 다른 유저가 이미 사용 중인 이메일인지 확인
-        dup = await db.execute(
-            select(User).where(
-                User.email == data.email,
-                User.google_id != user["user_id"],
-            )
-        )
-        if dup.scalar_one_or_none():
-            raise HTTPException(
-                status_code=409,
-                detail="이미 다른 계정에서 사용 중인 이메일입니다.",
-            )
-        db_user.email = data.email
-    if data.send_time:
-        db_user.send_time = _serialize_send_times(data.send_time)
-
-    await db.commit()
-    print(f"[subscribe] {user['user_id']} → email / send_time={db_user.send_time}")
-    return {"success": True}
+# DEPRECATED (Issue 9): SubscribeData / /subscribe 엔드포인트 제거 — send_time 설정은 PATCH /settings/send_time 사용
 
 # ── 마이페이지: 발송 시간 변경 ────────────────────────────────────────────────
 
 class SendTimeData(BaseModel):
-    send_time: list[str] = Field(
-        default_factory=lambda: ["08:00", "21:00"],
-        description="오전/오후 발송 시간 목록",
+    send_time: str = Field(
+        "21:00",
+        description="발송 시간 (HH:MM 형식, 예: '08:00', '21:00')",
     )
 
     model_config = ConfigDict(
-        json_schema_extra={"example": {"send_time": ["08:00", "21:00"]}}
+        json_schema_extra={"example": {"send_time": "21:00"}}
     )
 
 
@@ -775,25 +737,34 @@ async def update_send_time(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    마이페이지에서 뉴스레터 발송 시간 변경.
+    뉴스레터 발송 시간을 변경합니다.
 
-    INPUT:  { "send_time": "08:00" }  또는  { "send_time": "21:00" }
-    OUTPUT: { "success": true, "send_time": "08:00" }
+    **요청:**
+    ```json
+    { "send_time": "08:00" }
+    ```
 
-    허용값: "08:00" (아침 8시 KST) | "21:00" (저녁 9시 KST, 기본값)
-    변경 즉시 다음 배치부터 반영됩니다.
+    **응답:**
+    ```json
+    { "success": true, "send_time": "08:00" }
+    ```
+
+    - 허용 형식: `HH:MM` (00:00 ~ 23:59)
+    - 변경 즉시 다음 배치부터 반영됩니다.
+    - 권장 값: `"08:00"` (아침), `"21:00"` (저녁, 기본값)
     """
-    serialized_times = _serialize_send_times(data.send_time)
-    validated_times = _parse_send_times(serialized_times)
+    validated = _validate_send_time(data.send_time)
+    import json as _json
+    serialized = _json.dumps([validated], ensure_ascii=False)  # DB: JSON 배열로 저장 (스케줄러 하위 호환)
 
     db_user = await _get_or_create_user(db, user)
 
     prev_time = db_user.send_time
-    db_user.send_time = serialized_times
+    db_user.send_time = serialized
     await db.commit()
 
-    logger.info(f"[send-time] {user['user_id']} {prev_time} → {serialized_times}")
-    return {"success": True, "send_time": validated_times}
+    logger.info(f"[send-time] {user['user_id']} {prev_time} → {serialized}")
+    return {"success": True, "send_time": validated}
 
 
 @app.get(
@@ -812,8 +783,9 @@ async def get_my_settings(
     """
     db_user = await _get_or_create_user(db, user)
 
+    times = _parse_send_times(db_user.send_time)
     return {
-        "send_time":      _parse_send_times(db_user.send_time),
+        "send_time":      times[0] if times else "21:00",
         "is_subscribed":  db_user.is_subscribed,
         "delivery_type":  db_user.delivery_type,
         "email":          db_user.email,
@@ -832,11 +804,24 @@ async def my_profile(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """프로필 전체 조회 — 이메일, 발송 시간, 의도 유형, 관심사 카테고리"""
+    """
+    내 프로필 전체를 반환합니다.
+
+    **응답에 포함되는 내용:**
+    - `email`: 뉴스레터 수신 이메일
+    - `send_time`: 발송 시간 단일 문자열 (예: `"21:00"`)
+    - `initial_intent`: 의도 유형 (`"유희형"` / `"지식형"` / `"구매형"`)
+    - `interest_categories`: 온보딩 시 설정한 관심사 카테고리 배열 (레거시)
+    - `interests`: **하트(♥) 관심 토픽 목록** — `[{"topic": "...", "normalized_topic": "..."}]`
+    - `is_subscribed`: 뉴스레터 수신 동의 여부
+
+    > `interests`가 비어 있으면 뉴스레터가 발송되지 않습니다.
+    """
     import json as _json
 
     db_user = await _get_or_create_user(db, user)
 
+    # interest_categories: 온보딩 시 저장된 JSON 배열
     categories = []
     if db_user.interest_categories:
         try:
@@ -844,21 +829,38 @@ async def my_profile(
         except Exception:
             pass
 
+    # send_time: DB의 JSON 배열에서 첫 번째 값만 반환 (단일 시간)
     times = _parse_send_times(db_user.send_time)
+    single_time = times[0] if times else "21:00"
+
+    # interests: user_interests 테이블의 활성 하트 토픽
+    interest_rows = await db.execute(
+        select(UserInterest)
+        .where(
+            UserInterest.user_id == user["user_id"],
+            UserInterest.is_active == True,  # noqa: E712
+        )
+        .order_by(UserInterest.created_at.asc())
+    )
+    interests = [
+        {"topic": i.category, "normalized_topic": i.normalized_topic}
+        for i in interest_rows.scalars().all()
+    ]
 
     return {
         "email":               db_user.email,
-        "send_time":           times,
+        "send_time":           single_time,
         "initial_intent":      db_user.initial_intent,
         "interest_categories": categories,
+        "interests":           interests,
         "is_subscribed":       db_user.is_subscribed,
         "created_at":          db_user.created_at.isoformat() if db_user.created_at else None,
     }
 
 class ProfileUpdateData(BaseModel):
-    send_time: Optional[list[str]] = Field(
+    send_time: Optional[str] = Field(
         None,
-        description="오전/오후 발송 시간 목록",
+        description="발송 시간 (HH:MM 형식, 예: '08:00', '21:00')",
     )
     interest_categories: Optional[list[str]] = Field(
         None,
@@ -868,7 +870,7 @@ class ProfileUpdateData(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "send_time": ["08:00", "21:00"],
+                "send_time": "21:00",
                 "interest_categories": ["AI", "경제", "테크"],
             }
         }
@@ -888,7 +890,7 @@ async def update_my_profile(
 ):
     """발송 시간 / 관심사 수정.
     관심사 변경 시 user_interests에 신규 카테고리만 추가 (기존 weight 유지).
-    send_time 배열을 수용합니다.
+    send_time은 단일 HH:MM 문자열로 수용 (DB는 JSON 배열로 저장 — 스케줄러 하위 호환).
     """
     import json as _json
     from datetime import datetime, timezone
@@ -896,20 +898,25 @@ async def update_my_profile(
     db_user = await _get_or_create_user(db, user)
 
     if data.send_time is not None:
-        db_user.send_time = _serialize_send_times(data.send_time)
+        validated = _validate_send_time(data.send_time)
+        db_user.send_time = _json.dumps([validated], ensure_ascii=False)
 
     if data.interest_categories is not None:
+        import re as _re
         db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
         for category in data.interest_categories:
+            normalized = _re.sub(r"\s+", " ", category.lower()).strip()
             stmt = (
                 pg_insert(UserInterest)
                 .values(
                     user_id=user["user_id"],
                     category=category,
+                    normalized_topic=normalized,
+                    source="onboarding",
                     weight=1,
                     updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
-                .on_conflict_do_nothing(constraint="uq_user_interest_category")
+                .on_conflict_do_nothing(constraint="uq_user_interest_normalized")
             )
             await db.execute(stmt)
 
@@ -928,24 +935,12 @@ async def my_stats(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """오늘 활동 통계 — 로그 수, 트리거된 토픽, 총 뉴스레터 수, 마지막 발송 시각"""
-    from database import BehaviorLog, Newsletter
-    from datetime import datetime, timezone
+    """오늘 활동 통계 — 로그 수(DEPRECATED→0), 트리거된 토픽(DEPRECATED→[]), 총 뉴스레터 수, 마지막 발송 시각"""
+    # DEPRECATED (Issue 8): BehaviorLog 제거 — 항상 0 반환
+    from database import Newsletter
 
-    today_start = datetime.now(timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0, tzinfo=None
-    )
-
-    log_count_r = await db.execute(
-        select(func.count()).select_from(BehaviorLog).where(
-            BehaviorLog.user_id == user["user_id"],
-            BehaviorLog.logged_at >= today_start,
-        )
-    )
-    today_log_count = log_count_r.scalar()
-
-    today_logs     = await get_today_logs(db, user_id=user["user_id"])
-    triggered_topics = get_triggered_topics(today_logs)
+    today_log_count  = 0
+    triggered_topics = []
 
     total_r = await db.execute(
         select(func.count()).select_from(Newsletter).where(
@@ -1000,145 +995,311 @@ async def my_interests(
     }
 
 
-class ProfileInitData(BaseModel):
-    initial_intent: str = Field("지식형", description="'유희형' | '지식형' | '구매형'")
-    interest_categories: list[str] = Field(
-        default_factory=lambda: ["AI", "경제", "테크"],
-        description="온보딩에서 선택한 관심사 목록",
-    )
+# ── 하트 기반 관심 토픽 관리 (/interests) ────────────────────────────────────
+
+INTEREST_LIMIT = 5  # 관심 토픽 최대 개수
+
+
+class InterestAddRequest(BaseModel):
+    video_id: Optional[str] = Field(None, description="하트를 누른 YouTube video_id")
+    title:    str  = Field(..., description="하트를 누른 영상 제목")
 
     model_config = ConfigDict(
         json_schema_extra={
-            "example": {
-                "initial_intent": "지식형",
-                "interest_categories": ["AI", "경제", "테크"],
-            }
+            "example": {"video_id": "dQw4w9WgXcQ", "title": "갤럭시 S25 울트라 완벽 분석"}
         }
     )
 
 
-@app.post(
-    "/profile/init",
-    response_model=OkResponse,
-    tags=["온보딩"],
-    summary="초기 관심사 프로필 저장 ✅",
+class InterestAddResponse(BaseModel):
+    added:            bool
+    deduped:          bool
+    topic:            str
+    normalized_topic: str
+    count:            int
+    limit:            int
+
+
+@app.get(
+    "/interests",
+    tags=["관심사"],
+    summary="🔑 하트 관심 토픽 목록 조회 ✅",
 )
-async def profile_init(
-    data: ProfileInitData,
+async def get_interests(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    온보딩 Step2 완료 — initial_intent + interest_categories 저장.
-    user_interests 테이블에 weight=1 초기화 (신규 카테고리만).
-    """
-    import json as _json
-    from datetime import datetime, timezone
+    사용자의 활성 관심 토픽 목록을 반환합니다.
 
-    if data.initial_intent not in {"유희형", "지식형", "구매형"}:
-        raise HTTPException(status_code=400, detail="initial_intent는 유희형|지식형|구매형 중 하나여야 합니다.")
-
-    db_user = await _get_or_create_user(db, user)
-
-    db_user.initial_intent      = data.initial_intent
-    db_user.interest_categories = _json.dumps(data.interest_categories, ensure_ascii=False)
-
-    for category in data.interest_categories:
-        stmt = (
-            pg_insert(UserInterest)
-            .values(
-                user_id=user["user_id"],
-                category=category,
-                weight=1,
-                updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            )
-            .on_conflict_do_nothing(constraint="uq_user_interest_category")
-        )
-        await db.execute(stmt)
-
-    await db.commit()
-    logger.info(f"[profile/init] {user['user_id']} intent={data.initial_intent} categories={data.interest_categories}")
-    return {"ok": True}
-
-
-class HistoryAnalyzeRequest(BaseModel):
-    keywords: list[str] = Field(
-        default_factory=lambda: ["생성형 AI", "경제 뉴스", "테크 리뷰"],
-        description="분석할 검색/시청 키워드 목록",
-    )
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "keywords": ["생성형 AI", "경제 뉴스", "테크 리뷰"]
-            }
+    **응답 예시:**
+    ```json
+    {
+      "interests": [
+        {
+          "id": "uuid",
+          "topic": "갤럭시 S25",
+          "normalized_topic": "갤럭시 s25",
+          "video_count": 2,
+          "created_at": "2026-05-19T12:00:00"
         }
+      ],
+      "count": 1,
+      "limit": 5
+    }
+    ```
+
+    - `is_active=False`인 취소된 토픽은 포함되지 않습니다.
+    - `video_count`: 해당 토픽에 연결된 하트 영상 수
+    """
+    rows = await db.execute(
+        select(UserInterest)
+        .where(
+            UserInterest.user_id == user["user_id"],
+            UserInterest.is_active == True,
+        )
+        .order_by(UserInterest.created_at.asc())
     )
+    interests = rows.scalars().all()
+
+    result = []
+    for i in interests:
+        video_count_row = await db.execute(
+            select(func.count()).select_from(UserInterestVideo)
+            .where(UserInterestVideo.user_interest_id == i.id)
+        )
+        video_count = video_count_row.scalar() or 0
+        result.append({
+            "id":               str(i.id),
+            "topic":            i.category,
+            "normalized_topic": i.normalized_topic,
+            "video_count":      video_count,
+            "created_at":       i.created_at.isoformat() if i.created_at else None,
+        })
+
+    return JSONResponse({"interests": result, "count": len(result), "limit": INTEREST_LIMIT})
+
 
 @app.post(
-    "/profile/analyze-history",
-    response_model=HistoryAnalyzeResponse,
-    tags=["온보딩"],
-    summary="검색 기록 기반 관심사 분석 ✅",
+    "/interests",
+    response_model=InterestAddResponse,
+    tags=["관심사"],
+    summary="🔑 하트 관심 토픽 추가 ✅",
 )
-async def analyze_history(
-    body: HistoryAnalyzeRequest,
+async def add_interest(
+    data: InterestAddRequest,
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    온보딩 — 유튜브 검색 기록 키워드를 받아 미리 정의된 관심 카테고리로 매핑.
+    영상에 하트를 눌렀을 때 호출합니다.
+
+    **처리 순서:**
+    1. `title_topic_ai`로 영상 제목 → 관심 토픽명 추출
+    2. `normalized_topic` 기준 중복 판단
+    3. 중복 토픽이면 영상만 연결 (`deduped: true`, 슬롯 소비 없음)
+    4. 신규 토픽이면 5개 제한 확인 후 저장
+
+    **요청 예시:**
+    ```json
+    { "video_id": "dQw4w9WgXcQ", "title": "갤럭시 S25 울트라 완벽 분석" }
+    ```
+
+    **응답 예시 — 신규 추가:**
+    ```json
+    { "added": true, "deduped": false, "topic": "갤럭시 S25", "normalized_topic": "갤럭시 s25", "count": 2, "limit": 5 }
+    ```
+
+    **응답 예시 — 중복 토픽 (영상만 연결):**
+    ```json
+    { "added": false, "deduped": true, "topic": "갤럭시 S25", "normalized_topic": "갤럭시 s25", "count": 2, "limit": 5 }
+    ```
+
+    **409:** 이미 5개 토픽이 있고 신규 토픽을 추가하려 할 때
+
+    # TODO: 하트 관심 토픽 API 연결 (프론트 side_panel.js)
+    # TODO: 관심 토픽 최대 5개 안내 후 마이페이지 이동 (409 응답 시 프론트 처리)
     """
-    import json as _json
-    from agents.intent_ai import classify_intent
-    from gemini_client import call_gemini_async
+    import re as _re
+    from agents.title_topic_ai import extract_topic_from_title
+    from datetime import datetime, timezone
 
-    PRESET_CATEGORIES = [
-        "여행", "테크놀로지", "경제", "디자인", "정치", "과학",
-        "라이프스타일", "뷰티", "철학", "예술", "역사", "기후",
-        "웰니스", "우주", "미식",
-    ]
+    user_id = user["user_id"]
 
-    keywords = [kw.strip() for kw in body.keywords if kw.strip()]
-    if not keywords:
-        return {"categories": [], "intent_type": "지식형"}
+    # ── Step 1: 제목에서 토픽 추출 ────────────────────────────────────────────
+    topic_result     = await extract_topic_from_title(data.title)
+    topic            = topic_result["topic"]
+    normalized_topic = topic_result["normalized_topic"]
 
-    keywords = keywords[:100]
-
-    prompt = f"""다음은 사용자의 최근 1개월 유튜브 검색 기록입니다.
-
-검색 기록:
-{chr(10).join(f"- {kw}" for kw in keywords)}
-
-아래 카테고리 목록 중에서 이 검색 기록과 관련된 것만 골라주세요.
-
-카테고리 목록:
-{", ".join(PRESET_CATEGORIES)}
-
-규칙:
-1. 반드시 위 목록에 있는 카테고리만 선택하세요 (임의로 만들지 마세요)
-2. 관련성이 높은 순으로 최대 5개까지만 선택하세요
-3. 반드시 JSON 배열 형식으로만 응답하세요
-
-응답 예시: ["테크놀로지", "경제", "과학"]"""
-
-    try:
-        text = await call_gemini_async(prompt, temperature=0.1, json_mode=True)
-        import re as _re
-        match = _re.search(r"\[.*?\]", text, _re.DOTALL)
-        raw = _json.loads(match.group()) if match else []
-        categories = [c for c in raw if c in PRESET_CATEGORIES]
-    except Exception as e:
-        logger.error(f"[analyze-history] Gemini 오류: {e}")
-        categories = []
-
-    intent_result = await classify_intent(keywords[:10], [])
-    intent_type = intent_result.get("intent_type", "지식형")
-
-    logger.info(
-        f"[analyze-history] user={user['user_id']} "
-        f"keywords={len(keywords)} → categories={categories}, intent={intent_type}"
+    # ── Step 2: 기존 관심사 중복 판단 (normalized_topic 기준) ─────────────────
+    existing_row = await db.execute(
+        select(UserInterest).where(
+            UserInterest.user_id         == user_id,
+            UserInterest.normalized_topic == normalized_topic,
+        )
     )
-    return {"categories": categories, "intent_type": intent_type}
+    existing = existing_row.scalar_one_or_none()
+
+    if existing:
+        # 비활성 상태였으면 다시 활성화
+        if not existing.is_active:
+            existing.is_active = True
+            await db.commit()
+
+        # 영상 reference 연결 (중복 video_id는 무시)
+        if data.video_id:
+            await _link_video(db, existing.id, data.video_id, data.title)
+
+        active_count = await _active_interest_count(db, user_id)
+        logger.info(f"[interests] 중복 토픽 — 영상만 연결: user={user_id} topic={topic}")
+        return {
+            "added":            False,
+            "deduped":          True,
+            "topic":            existing.category,
+            "normalized_topic": existing.normalized_topic,
+            "count":            active_count,
+            "limit":            INTEREST_LIMIT,
+        }
+
+    # ── Step 3: 신규 토픽 — 5개 제한 검사 ────────────────────────────────────
+    active_count = await _active_interest_count(db, user_id)
+    if active_count >= INTEREST_LIMIT:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": f"관심 토픽은 최대 {INTEREST_LIMIT}개까지 저장할 수 있습니다.",
+                "count":   active_count,
+                "limit":   INTEREST_LIMIT,
+            },
+        )
+
+    # ── Step 4: 신규 관심 토픽 저장 ──────────────────────────────────────────
+    new_interest = UserInterest(
+        user_id          = user_id,
+        category         = topic,
+        normalized_topic = normalized_topic,
+        source           = "manual",
+        weight           = 1,
+        is_active        = True,
+        last_seen_at     = datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    db.add(new_interest)
+    await db.flush()   # id 확보
+
+    if data.video_id:
+        await _link_video(db, new_interest.id, data.video_id, data.title)
+    await db.commit()
+
+    active_count += 1
+    logger.info(f"[interests] 신규 토픽 추가: user={user_id} topic={topic} count={active_count}")
+    return {
+        "added":            True,
+        "deduped":          False,
+        "topic":            topic,
+        "normalized_topic": normalized_topic,
+        "count":            active_count,
+        "limit":            INTEREST_LIMIT,
+    }
+
+
+@app.delete(
+    "/interests/{topic}",
+    tags=["관심사"],
+    summary="🔑 관심 토픽 취소 ✅",
+)
+async def delete_interest(
+    topic: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    관심 토픽을 취소합니다 (soft delete — `is_active=False`).
+
+    - `{topic}` 파라미터: 취소할 토픽명 (예: `갤럭시 S25`)
+    - 대소문자·공백 정규화 후 `normalized_topic` 기준으로 조회합니다.
+    - 연결된 영상(`user_interest_videos`)은 삭제되지 않고 유지됩니다.
+    - 다시 하트를 누르면 같은 슬롯이 재활성화됩니다.
+
+    **404:** 해당 토픽이 없거나 이미 취소된 경우
+    """
+    import re as _re
+    normalized = _re.sub(r"\s+", " ", topic.lower()).strip()
+
+    row = await db.execute(
+        select(UserInterest).where(
+            UserInterest.user_id          == user["user_id"],
+            UserInterest.normalized_topic == normalized,
+            UserInterest.is_active        == True,
+        )
+    )
+    interest = row.scalar_one_or_none()
+    if not interest:
+        raise HTTPException(status_code=404, detail="해당 관심 토픽을 찾을 수 없습니다.")
+
+    interest.is_active = False
+    await db.commit()
+
+    logger.info(f"[interests] 토픽 취소: user={user['user_id']} topic={topic}")
+    return JSONResponse({"ok": True, "topic": interest.category, "normalized_topic": normalized})
+
+
+# ── /interests 헬퍼 ────────────────────────────────────────────────────────────
+
+async def _active_interest_count(db: AsyncSession, user_id: str) -> int:
+    """활성 관심 토픽 수 반환."""
+    result = await db.execute(
+        select(func.count()).select_from(UserInterest).where(
+            UserInterest.user_id  == user_id,
+            UserInterest.is_active == True,
+        )
+    )
+    return result.scalar() or 0
+
+
+async def _link_video(
+    db: AsyncSession,
+    user_interest_id,
+    video_id: str,
+    title: str,
+) -> None:
+    """관심 토픽에 영상 연결 — 중복 video_id는 무시."""
+    from sqlalchemy.dialects.postgresql import insert as pg_insert_local
+    stmt = (
+        pg_insert_local(UserInterestVideo)
+        .values(
+            user_interest_id=user_interest_id,
+            video_id=video_id,
+            title=title,
+        )
+        .on_conflict_do_nothing(constraint="uq_interest_video")
+    )
+    await db.execute(stmt)
+
+
+@app.get(
+    "/interests/unsubscribe-confirm",
+    tags=["관심사"],
+    summary="메일 내 관심 토픽 취소 확인 진입점 (Issue 5)",
+    response_class=RedirectResponse,
+)
+async def interest_unsubscribe_confirm(
+    topic: str = Query(..., description="취소할 관심 토픽"),
+):
+    """
+    뉴스레터 메일의 관심 토픽 취소 링크 클릭 시 진입.
+    즉시 삭제하지 않고 마이페이지로 이동시켜 확인 팝업을 띄운다.
+
+    # TODO: 관심 토픽 취소 확인 팝업 표시 (프론트 mypage.html)
+    # TODO: 메일 링크 위변조 방지 토큰 검증 추가 (Issue 5)
+    """
+    redirect_url = f"{FRONTEND_URL}/mypage.html?unsubscribe_topic={topic}"
+    return RedirectResponse(url=redirect_url)
+
+
+# DEPRECATED (Issue 9): /profile/init 엔드포인트 제거 — 온보딩 플로우 제거
+
+
+# DEPRECATED (Issue 9): /profile/analyze-history 엔드포인트 제거 — 온보딩 플로우 제거
 
 
 @app.delete(
@@ -1217,7 +1378,7 @@ async def withdraw(
 ):
     """
     회원 탈퇴 — 사용자 계정 및 관련 데이터 삭제.
-    users, user_interests, behavior_logs, newsletters 모두 제거.
+    users, user_interests(→ user_interest_videos CASCADE), behavior_logs, newsletters 모두 제거.
     """
     from database import User, UserInterest, BehaviorLog, Newsletter
     from sqlalchemy import delete as sql_delete
@@ -1309,13 +1470,19 @@ def search(
     "/newsletter/history",
     response_model=NewsletterHistoryResponse,
     tags=["뉴스레터"],
-    summary="뉴스레터 히스토리 조회 ✅",
+    summary="🔑 뉴스레터 히스토리 조회 ✅",
 )
 async def newsletter_history(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """내 뉴스레터 히스토리 조회 (dashboard.html에서 사용)"""
+    """
+    내 뉴스레터 발송 히스토리를 반환합니다 (최근 20개).
+
+    **응답 주요 필드:**
+    - `delivery_status`: `"sent"` / `"failed"` / `"generated"`
+    - `content_json`: newsletter_ai 전체 출력 JSON (토픽·요약·출처 포함)
+    """
     result = await db.execute(
         select(Newsletter)
         .where(Newsletter.user_id == user["user_id"])
@@ -1341,59 +1508,48 @@ async def newsletter_history(
 @app.post(
     "/newsletter/send-now",
     tags=["뉴스레터"],
-    summary="즉시 발송 테스트 ✅ (행동 로그 없으면 관심사 기반 fallback 자동 적용)",
+    summary="🔑 즉시 발송 테스트 ✅",
 )
 async def send_now(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """즉시 발송 테스트용 — 스케줄러와 동일한 fallback 순위 적용.
-    1순위: 오늘 행동 로그 기반 triggered_topics
-    2순위: user_interests 상위 토픽
-    3순위: users.interest_categories (온보딩 관심사)
+    """
+    스케줄러를 기다리지 않고 즉시 뉴스레터를 생성·발송합니다. **테스트용으로 자주 사용하세요.**
+
+    **발송 토픽:** 하트 관심 토픽 (`user_interests.is_active=True`, 최신 순)
+
+    **400:** 하트한 관심 토픽이 없을 때 — 마이페이지에서 관심사를 먼저 추가하세요
+
+    **주의:** Gemini API를 실제로 호출하므로 무료 티어 한도 소모됩니다.
     """
     import json as _json
-    from database import Newsletter as NewsletterModel, User, UserInterest
+    from database import Newsletter as NewsletterModel, UserInterest
 
     user_id = user["user_id"]
 
-    # 1순위: 오늘 행동 로그 기반
-    today_logs = await get_today_logs(db, user_id=user_id)
-    topics = get_triggered_topics(today_logs)
-    skip_clustering = False
-
-    if not topics:
-        skip_clustering = True
-        # 2순위: user_interests 상위 토픽
-        interest_result = await db.execute(
-            select(UserInterest.category)
-            .where(UserInterest.user_id == user_id)
-            .order_by(UserInterest.weight.desc())
-            .limit(10)
+    # 하트 관심 토픽 (is_active=True, 최신 순) — 유일한 발송 기준
+    interest_result = await db.execute(
+        select(UserInterest.category)
+        .where(
+            UserInterest.user_id == user_id,
+            UserInterest.is_active == True,
         )
-        topics = [row[0] for row in interest_result.all()]
-
-    if not topics:
-        # 3순위: 온보딩 관심사 (interest_categories)
-        user_result = await db.execute(select(User).where(User.google_id == user_id))
-        db_user = user_result.scalar_one_or_none()
-        if db_user and db_user.interest_categories:
-            try:
-                cats = _json.loads(db_user.interest_categories)
-                topics = cats if isinstance(cats, list) else []
-            except Exception:
-                topics = []
+        .order_by(UserInterest.created_at.desc())
+        .limit(10)
+    )
+    topics = [row[0] for row in interest_result.all()]
 
     if not topics:
         raise HTTPException(
             status_code=400,
-            detail="사용 가능한 토픽 없음 — 유튜브 검색 후 다시 시도하거나 온보딩에서 관심사를 설정하세요",
+            detail="하트한 관심 토픽 없음 — 마이페이지에서 관심사를 먼저 추가하세요",
         )
 
     newsletter = await run_pipeline(
         user_id=user_id,
         raw_keywords=topics,
-        skip_clustering=skip_clustering,
+        skip_clustering=True,  # 하트 토픽은 이미 정제됨
     )
 
     record = NewsletterModel(
@@ -1408,6 +1564,7 @@ async def send_now(
 
     # 이메일 발송
     from mailer import send_email as _send_email
+    from database import User
     user_result = await db.execute(select(User).where(User.google_id == user_id))
     db_user = user_result.scalar_one_or_none()
     email_result = _send_email(
@@ -1419,9 +1576,7 @@ async def send_now(
     record.delivery_status = "sent" if email_result.get("success") else "failed"
     await db.commit()
 
-    # 관심사 weight 누적 (스케줄러와 동일 로직)
-    from scheduler import _update_user_interests
-    await _update_user_interests(db, user_id, topics)
+    # Issue 8: _update_user_interests DEPRECATED 제거 — weight 누적 없음
 
     return JSONResponse({
         **newsletter,
@@ -1436,14 +1591,26 @@ async def send_now(
     "/analyze_search",
     response_model=AnalyzeSearchResponse,
     tags=["AI 분석"],
-    summary="검색어 즉석 분석 (Pipeline A) ✅",
+    summary="🔑 검색어 즉석 분석 (Pipeline A) ✅",
 )
 async def analyze_search(
     keyword: str = Query(..., min_length=1),
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """검색어 기반 즉석 분석 — popup/search_dashboard에서 호출."""
+    """
+    검색어에 대한 YouTube 영상 분석 결과를 즉시 반환합니다 (Pipeline A).
+
+    **Swagger 테스트 방법:**
+    - `keyword` 파라미터에 검색어 입력 (예: `갤럭시 S25`, `파이썬 강의`)
+    - Execute 클릭 → 영상 분석, 공통사실, 쟁점, 추천 영상 목록 반환
+
+    **캐시 동작:**
+    - 동일 `{user_id}:{keyword}` 조합은 캐시에서 즉시 반환 (Gemini 재호출 없음)
+    - 캐시 히트 시 응답에 `"cached": true` 포함
+
+    **소요 시간:** 최초 분석 10~30초 / 캐시 히트 즉시
+    """
     from pipeA_orchestrator import run_pipeline_a
 
     user_id = user["user_id"]
@@ -1479,6 +1646,161 @@ async def analyze_search(
         _search_analysis_cache[cache_key] = result
 
     return JSONResponse(result)
+
+
+# ── 영상 진입 분석 (현재 영상 요약 + 제목 기반 인사이트) ────────────────────────
+
+class AnalyzeVideoRequest(BaseModel):
+    video_id: str = Field(..., description="현재 보고 있는 YouTube video_id")
+    title: str    = Field(..., description="현재 영상 제목")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "video_id": "dQw4w9WgXcQ",
+                "title":    "갤럭시 S25 울트라 완벽 분석 리뷰",
+            }
+        }
+    )
+
+
+class AnalyzeVideoResponse(BaseModel):
+    video_id:          str
+    extracted_topic:   str
+    normalized_topic:  str
+    video_summary:     str
+    summary_lines:     list[str]
+    recommended_videos: list[Any]
+    sources:           list[Any]
+
+
+@app.post(
+    "/analyze_video",
+    response_model=AnalyzeVideoResponse,
+    tags=["AI 분석"],
+    summary="🔑 영상 진입 분석 — 현재 영상 요약 + 제목 기반 인사이트 ✅",
+)
+async def analyze_video(
+    data: AnalyzeVideoRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    사용자가 YouTube 영상 진입 시 호출합니다.
+
+    **처리 순서:**
+    1. 영상 제목 → `title_topic_ai`로 대표 토픽 추출
+    2. 영상 자막 기반 단일 요약 생성
+    3. 추출 토픽으로 Pipeline A 실행 → 추천 영상 + 인사이트 반환
+
+    **요청 예시:**
+    ```json
+    { "video_id": "dQw4w9WgXcQ", "title": "갤럭시 S25 울트라 완벽 분석 리뷰" }
+    ```
+
+    **응답 주요 필드:**
+    - `extracted_topic`: 제목에서 추출한 관심 토픽명
+    - `video_summary`: 현재 영상 핵심 요약 (1~3줄)
+    - `recommended_videos`: 같은 토픽 관련 추천 영상 목록
+
+    # TODO: 현재 영상 기반 분석 API 연결 (프론트 side_panel.js)
+    """
+    from pipeA_orchestrator import run_pipeline_a
+    from agents.title_topic_ai import extract_topic_from_title
+
+    video_id = data.video_id
+    title    = data.title
+    user_id  = user["user_id"]
+
+    # ── Step 1: 제목 기반 토픽 추출 ──────────────────────────────────────────
+    topic_result      = await extract_topic_from_title(title)
+    extracted_topic   = topic_result["topic"]
+    normalized_topic  = topic_result["normalized_topic"]
+    logger.info(f"[analyze_video] topic='{extracted_topic}' video_id={video_id}")
+
+    # ── Step 2: 현재 영상 자막 단일 요약 ─────────────────────────────────────
+    video_summary = await _summarize_single_video(video_id, title)
+
+    # ── Step 3: 토픽 기반 Pipeline A (추천 영상 + 인사이트) ──────────────────
+    cache_key = f"{user_id}:video:{normalized_topic}"
+    if cache_key in _search_analysis_cache:
+        pipeline_result = _search_analysis_cache[cache_key]
+    else:
+        interest_result = await db.execute(
+            select(UserInterest.category)
+            .where(UserInterest.user_id == user_id)
+            .order_by(UserInterest.weight.desc())
+            .limit(10)
+        )
+        user_categories = [row[0] for row in interest_result.all()]
+
+        try:
+            pipeline_result = await run_pipeline_a(
+                keyword=extracted_topic,
+                subscribed_channel_ids=[],
+                user_categories=user_categories,
+                clicked_channel_ids=[],
+            )
+        except ValueError:
+            pipeline_result = {
+                "summary_lines": [],
+                "recommended_videos": [],
+                "sources": [],
+            }
+        _search_analysis_cache[cache_key] = pipeline_result
+
+    return JSONResponse({
+        "video_id":          video_id,
+        "extracted_topic":   extracted_topic,
+        "normalized_topic":  normalized_topic,
+        "video_summary":     video_summary,
+        "summary_lines":     pipeline_result.get("summary_lines", []),
+        "recommended_videos": pipeline_result.get("recommended_videos", []),
+        "sources":           pipeline_result.get("sources", []),
+    })
+
+
+async def _summarize_single_video(video_id: str, title: str) -> str:
+    """현재 영상 자막 기반 단일 요약 (2~3문장). 자막 없으면 제목 기반 fallback."""
+    cache_key = f"video_summary:{video_id}"
+    if cache_key in _search_analysis_cache:
+        return _search_analysis_cache[cache_key]
+
+    try:
+        transcript_text = await asyncio.to_thread(
+            _collect_transcript_for_summary, video_id
+        )
+        if not transcript_text:
+            raise ValueError("자막 없음")
+
+        prompt = (
+            f"다음은 YouTube 영상 '{title}'의 자막입니다.\n"
+            f"이 영상의 핵심 내용을 한국어로 2~3문장으로 요약하세요.\n"
+            f"요약문만 출력하고 다른 설명은 생략하세요.\n\n"
+            f"자막:\n{transcript_text[:8000]}"
+        )
+        summary = await call_gemini_async(prompt, temperature=0.2)
+        summary = summary.strip()
+    except Exception as e:
+        logger.warning(f"[analyze_video] 단일 요약 실패 ({video_id}): {e}")
+        summary = f"'{title}' 영상에 대한 요약을 생성할 수 없습니다."
+
+    _search_analysis_cache[cache_key] = summary
+    return summary
+
+
+def _collect_transcript_for_summary(video_id: str) -> Optional[str]:
+    """자막 수집 동기 함수 — asyncio.to_thread 용."""
+    from preprocessing import clean_transcript
+    raw = get_transcript(video_id)
+    if not raw:
+        return None
+    entries = format_transcript_with_timestamps(raw)
+    if not entries:
+        return None
+    full_text = " ".join(e["text"] for e in entries)
+    cleaned = clean_transcript(full_text)
+    return cleaned[:15_000] if cleaned else None
 
 
 # ── 단일 영상 AI 분석 ─────────────────────────────────────────────────────────
@@ -1677,19 +1999,29 @@ async def admin_run_pipeline(
     admin=Depends(get_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """특정 유저 파이프라인 즉시 실행 (google_id 기준)"""
+    """특정 유저 파이프라인 즉시 실행 (google_id 기준). 하트 관심 토픽 기반."""
     import json
-    from database import Newsletter
+    from database import Newsletter, UserInterest
 
-    logs      = await get_today_logs(db, user_id=user_id)
-    triggered = get_triggered_topics(logs)
+    # Issue 8: BehaviorLog 제거 — 하트 관심 토픽(is_active=True)만 사용
+    interest_r = await db.execute(
+        select(UserInterest.category)
+        .where(
+            UserInterest.user_id == user_id,
+            UserInterest.is_active == True,
+        )
+        .order_by(UserInterest.created_at.desc())
+        .limit(10)
+    )
+    triggered = [row[0] for row in interest_r.all()]
 
     if not triggered:
-        raise HTTPException(status_code=404, detail="트리거된 주제 없음")
+        raise HTTPException(status_code=404, detail="활성 관심 토픽 없음 — 유저가 하트한 토픽이 없습니다")
 
     newsletter = await run_pipeline(
         user_id=user_id,
         raw_keywords=triggered,
+        skip_clustering=True,
     )
 
     record = Newsletter(

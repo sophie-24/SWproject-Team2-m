@@ -264,8 +264,10 @@
 
       let keywords = [];
 
+      // TODO: [Issue #38] GET_HISTORY + /profile/analyze-history 블록 제거 필요
+      // history 권한 제거로 GET_HISTORY는 항상 빈 응답 → keywords는 항상 [] → 아래 fetch 블록 미실행
+      // tryGetHistory(), for 루프, keywords 관련 fetch 블록 전체 삭제할 것
       if (canUseExt) {
-        // 설치된 익스텐션 ID 찾기 (여러 개 순서대로 시도)
         const tryGetHistory = (id) => new Promise(resolve => {
           const t = setTimeout(() => resolve(null), 3000);
           try {

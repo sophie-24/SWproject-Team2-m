@@ -5,8 +5,98 @@
 
 let currentKeyword = "";
 let currentJwt = "";
+let currentVideoId = "";   // 하트 추가 시 사용할 대표 video_id
+let heartedTopic = "";     // 현재 하트된 토픽명 (DELETE 시 사용)
 
 // ── 유틸 ──────────────────────────────────────────────────────────────────────
+
+function showToast(msg) {
+  var t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(function () { t.classList.remove("show"); }, 2800);
+}
+
+function setHeartState(isHearted) {
+  var btn = document.getElementById("btn-heart");
+  if (!btn) return;
+  btn.classList.toggle("hearted", isHearted);
+}
+
+async function checkHeartState(keyword) {
+  if (!currentJwt || !keyword) return;
+  try {
+    var res = await fetch(API_BASE + "/interests", {
+      headers: { "Authorization": "Bearer " + currentJwt }
+    });
+    if (!res.ok) return;
+    var data = await res.json();
+    var interests = data.interests || [];
+    var kw = keyword.toLowerCase().replace(/\s+/g, " ").trim();
+    var matched = interests.find(function (i) {
+      return (i.normalized_topic || "").toLowerCase().replace(/\s+/g, " ").trim() === kw
+        || (i.topic || i.category || "").toLowerCase().replace(/\s+/g, " ").trim() === kw;
+    });
+    if (matched) {
+      heartedTopic = matched.topic || matched.category || keyword;
+      setHeartState(true);
+    } else {
+      heartedTopic = "";
+      setHeartState(false);
+    }
+  } catch (e) {}
+}
+
+async function toggleHeart() {
+  if (!currentJwt) { showToast("로그인 후 이용할 수 있습니다."); return; }
+  var btn = document.getElementById("btn-heart");
+  var isHearted = btn && btn.classList.contains("hearted");
+
+  if (isHearted) {
+    // 하트 해제
+    var topic = heartedTopic || currentKeyword;
+    try {
+      var res = await fetch(API_BASE + "/interests/" + encodeURIComponent(topic), {
+        method: "DELETE",
+        headers: { "Authorization": "Bearer " + currentJwt }
+      });
+      if (res.ok) {
+        heartedTopic = "";
+        setHeartState(false);
+        showToast("관심 토픽에서 제거됐어요. 더 이상 메일을 받지 않아요.");
+      } else {
+        showToast("오류가 발생했어요. 다시 시도해주세요.");
+      }
+    } catch (e) { showToast("서버에 연결할 수 없어요."); }
+  } else {
+    // 하트 추가
+    try {
+      var payload = { title: currentKeyword };
+      if (currentVideoId) payload.video_id = currentVideoId;
+      var res = await fetch(API_BASE + "/interests", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + currentJwt, "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.status === 409) {
+        showToast("관심 토픽은 최대 5개까지 저장할 수 있어요.");
+        return;
+      }
+      if (res.ok) {
+        var data = await res.json();
+        heartedTopic = data.topic || currentKeyword;
+        setHeartState(true);
+        showToast("'" + heartedTopic + "' 관련 뉴스레터를 보내드릴게요! 💌");
+      } else {
+        var errBody = await res.json().catch(function () { return {}; });
+        var errMsg = (errBody.detail && typeof errBody.detail === "string") ? errBody.detail : ("서버 오류 " + res.status);
+        showToast(errMsg);
+        console.error("[heart] POST /interests 실패:", res.status, errBody);
+      }
+    } catch (e) { showToast("서버에 연결할 수 없어요."); }
+  }
+}
 
 function esc(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -79,6 +169,15 @@ function renderResults(data) {
   var cached       = data.cached || false;
 
   document.getElementById("kw-title-s").textContent = keyword;
+
+  // 대표 video_id 저장 (하트 추가 시 사용 — 광고 없는 첫 번째 영상 우선)
+  var repVideo = videos.find(function (v) { return !v.ad_detected && v.video_id; }) || videos[0];
+  currentVideoId = (repVideo && repVideo.video_id) || "";
+
+  // 하트 상태 초기화 후 확인
+  setHeartState(false);
+  heartedTopic = "";
+  checkHeartState(keyword);
 
   /* 캐시 히트 안내 배너 */
   var cacheNotice = "";
@@ -177,9 +276,12 @@ async function analyze(keyword, jwt) {
       headers: { "Authorization": "Bearer " + jwt }
     });
     if (res.status === 401) {
-      document.getElementById("err-msg").textContent = "세션이 만료됐습니다.";
-      document.getElementById("err-sub").textContent = "팝업에서 다시 로그인해주세요.";
-      showScreen("screen-error"); return;
+      /* JWT 만료 → storage 정리 후 로그인 화면으로 자동 전환
+         재로그인 완료 시 btn-login 핸들러가 현재 탭 키워드로 분석을 자동 재시작함 */
+      chrome.storage.local.remove(["jwt", "loggedIn"]);
+      currentJwt = "";
+      showScreen("screen-login");
+      return;
     }
     if (!res.ok) {
       var err = await res.json().catch(function () { return {}; });
@@ -200,6 +302,8 @@ async function analyze(keyword, jwt) {
 
 // ── 버튼 이벤트 ───────────────────────────────────────────────────────────────
 
+document.getElementById("btn-heart").addEventListener("click", toggleHeart);
+
 document.getElementById("btn-retry").addEventListener("click", function () {
   if (currentKeyword && currentJwt) analyze(currentKeyword, currentJwt);
 });
@@ -207,12 +311,8 @@ document.getElementById("btn-refresh").addEventListener("click", function () {
   if (currentKeyword && currentJwt) analyze(currentKeyword, currentJwt);
 });
 document.getElementById("btn-login").addEventListener("click", function () {
-  /* 팝업 창으로 OAuth 진행 → window.opener 존재 → app.js가 자동 닫기 + SET_TOKEN 전송 */
-  var authWin = window.open(
-    API_BASE + "/auth/login",
-    "tubify_auth",
-    "width=520,height=660,left=300,top=80,toolbar=no,menubar=no,scrollbars=yes"
-  );
+  /* 일반 탭으로 열어야 chrome.tabs.onUpdated fallback이 확실히 동작함 */
+  chrome.tabs.create({ url: API_BASE + "/auth/login" });
 
   /* JWT가 storage에 저장될 때까지 1초마다 확인 */
   var poll = setInterval(async function () {
@@ -222,7 +322,6 @@ document.getElementById("btn-login").addEventListener("click", function () {
     if (!stored.jwt) return;
 
     clearInterval(poll);
-    try { authWin && authWin.close(); } catch (e) {}
 
     currentJwt = stored.jwt;
 
@@ -261,7 +360,7 @@ document.getElementById("btn-login").addEventListener("click", function () {
   var pendingKeyword = stored.pendingKeyword;
 
   if (pendingKeyword) chrome.storage.local.remove("pendingKeyword");
-  if (!jwt || !loggedIn) { showScreen("screen-login"); return; }
+  if (!jwt) { showScreen("screen-login"); return; }
   currentJwt = jwt;
 
   /* 키워드 우선순위: pendingKeyword(storage) → 현재 탭 URL */
@@ -278,6 +377,11 @@ document.getElementById("btn-login").addEventListener("click", function () {
       if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
         keyword = u.searchParams.get("search_query") || "";
       }
+      // TODO: 현재 영상 기반 분석 API 연결
+      // YouTube 영상 진입 페이지(/watch?v=...) 감지 시 POST /analyze_video 호출
+      // 요청: { video_id: u.searchParams.get("v"), title: tab.title }
+      // 응답: { video_summary, extracted_topic, summary_lines, recommended_videos, sources }
+      // 현재는 /results 페이지 진입 시 /analyze_search 흐름만 동작함
     } catch (e) { }
   }
 
@@ -288,12 +392,40 @@ document.getElementById("btn-login").addEventListener("click", function () {
   }
 })();
 
-// ── 플로팅 버튼 클릭 시 이미 열린 패널에서 키워드 감지 ───────────────────────
-// pendingKeyword가 storage에 저장되는 순간 자동으로 분석 트리거
+// ── storage 변화 감지 — 로그인 완료 + 플로팅 버튼 키워드 ────────────────────
 chrome.storage.onChanged.addListener(function (changes, area) {
-  if (area !== "local" || !changes.pendingKeyword) return;
-  var keyword = changes.pendingKeyword.newValue;
-  if (!keyword || !currentJwt) return;
-  chrome.storage.local.remove("pendingKeyword");
-  analyze(keyword.trim(), currentJwt);
+  if (area !== "local") return;
+
+  // 로그인 완료 감지 — polling 없이 즉시 반응
+  if (changes.jwt && changes.jwt.newValue && !currentJwt) {
+    var jwt = changes.jwt.newValue;
+    currentJwt = jwt;
+    chrome.storage.local.get(["pendingKeyword"], function (stored) {
+      var keyword = stored.pendingKeyword || "";
+      if (stored.pendingKeyword) chrome.storage.local.remove("pendingKeyword");
+      if (keyword.trim()) {
+        analyze(keyword.trim(), jwt);
+      } else {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+          var tab = tabs[0];
+          try {
+            var u = new URL(tab && tab.url);
+            if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
+              keyword = u.searchParams.get("search_query") || "";
+            }
+          } catch (e) {}
+          if (keyword.trim()) analyze(keyword.trim(), jwt);
+          else showScreen("screen-empty");
+        });
+      }
+    });
+  }
+
+  // 검색 키워드 변화 감지
+  if (changes.pendingKeyword) {
+    var keyword = changes.pendingKeyword.newValue;
+    if (!keyword || !currentJwt) return;
+    chrome.storage.local.remove("pendingKeyword");
+    analyze(keyword.trim(), currentJwt);
+  }
 });

@@ -47,7 +47,7 @@ async def save_behavior(
         .where(BehaviorLog.logged_at >= kst_midnight)
     )
     count = result.scalar()
-    return {"saved": True, "count": count}
+    # return {"saved":True, "count": count}
 
 
 async def get_today_logs(db: AsyncSession, user_id: str) -> list[dict]:

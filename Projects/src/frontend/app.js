@@ -1,6 +1,6 @@
 const API = "";
 /* chrome://extensions/ 에서 Tubify 익스텐션 ID를 복사해 여기에 붙여넣기 */
-const EXTENSION_IDS = ["haagaoipcidfnhojkjdiajieiejocckk", "caaoacncggbohojcejagaijcpoigcpga"];
+const EXTENSION_IDS = ["haagaoipcidfnhojkjdiajieiejocckk", "caaoacncggbohojcejagaijcpoigcpga", "diejhmjjkedgamfnbgiopeghbkmhejjl"];
 
 window.onload = () => {
   const params = new URLSearchParams(location.search);

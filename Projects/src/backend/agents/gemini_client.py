@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-_MODEL  = "gemini-2.5-flash-lite"
+_MODEL  = "gemini-3.1-flash-lite"
 
 
 def call_gemini(

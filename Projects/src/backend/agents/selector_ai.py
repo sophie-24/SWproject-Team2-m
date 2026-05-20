@@ -20,10 +20,9 @@ import re
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-from googleapiclient.discovery import build
 from dotenv import load_dotenv
 
-from youtube_search import search_videos
+from youtube_search import search_videos, _get_api_client
 
 load_dotenv()
 from logger import get_logger
@@ -127,7 +126,7 @@ def _get_subscriber_counts(channel_ids: List[str]) -> Dict[str, int]:
     if not channel_ids or not YOUTUBE_API_KEY:
         return {}
 
-    youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+    youtube = _get_api_client()
     response = (
         youtube.channels()
         .list(part="statistics", id=",".join(channel_ids))
@@ -147,7 +146,7 @@ def select_top_videos(
     subscribed_channel_ids: List[str] = None,
     user_categories: List[str] = None,
     clicked_channel_ids: List[str] = None,
-    max_fetch: int = 10,
+    max_fetch: int = 15,
     top_n: int = 5,
 ) -> List[Dict[str, Any]]:
     """
@@ -164,7 +163,7 @@ def select_top_videos(
         subscribed_channel_ids: 사용자 구독 채널 ID 목록 (ω₂)
         user_categories:        사용자 관심사 카테고리 목록 — 조건 매칭용 (ω₃)
         clicked_channel_ids:    유저가 이전에 시청한 채널 ID 목록 — 클릭 여부용 (ω₄)
-        max_fetch:              YouTube API에서 가져올 후보 영상 수 (기본 10)
+        max_fetch:              YouTube API에서 가져올 후보 영상 수 (기본 15 — 광고 필터 후 5개 확보 여유)
         top_n:                  최종 선정 영상 수 (기본 5)
 
     Returns:
@@ -189,7 +188,15 @@ def select_top_videos(
         if _parse_duration_seconds(v.get("duration", "")) > 60
     ]
 
-    # 3. 중복 제거 (video_id 기준)
+    # 3. 유료 광고 사전 제거 — hasPaidProductPlacement=True인 영상 제외
+    # (None은 미확인으로 통과, True만 확실히 제거 → analyzer_ai 자막 수집·Gemini 토큰 절약)
+    before_ad_filter = len(candidates)
+    candidates = [v for v in candidates if v.get("has_paid_placement") is not True]
+    removed = before_ad_filter - len(candidates)
+    if removed:
+        logger.info(f"[selector] 유료 광고 사전 제거: {removed}개 제외")
+
+    # 5. 중복 제거 (video_id 기준)
     seen: set = set()
     unique_candidates = []
     for v in candidates:
@@ -201,23 +208,23 @@ def select_top_videos(
     if not candidates:
         return []
 
-    # 4. 구독자 수 일괄 조회 (채널 신뢰도용 — analyzer_ai에서 credibility 계산 시 사용)
+    # 6. 구독자 수 일괄 조회 (채널 신뢰도용 — analyzer_ai에서 credibility 계산 시 사용)
     channel_ids = [v["channel_id"] for v in candidates if v.get("channel_id")]
     subscriber_counts = _get_subscriber_counts(list(set(channel_ids)))
 
-    # 5. ViewRate = 조회수 / 업로드 후 경과 시간(시간 단위)
+    # 7. ViewRate = 조회수 / 업로드 후 경과 시간(시간 단위)
     raw_view_rates = []
     for v in candidates:
         view_count  = v.get("view_count", 0)
         hours_since = _hours_since_upload(v.get("published_at", ""))
         raw_view_rates.append(view_count / hours_since)
 
-    # 6. ViewRate 정규화 (max 기준)
+    # 8. ViewRate 정규화 (max 기준)
     max_vr = max(raw_view_rates) if raw_view_rates else 1.0
     if max_vr == 0:
         max_vr = 1.0
 
-    # 7. 스코어 계산: pre_score = norm_view_rate × personalization
+    # 9. 스코어 계산: pre_score = norm_view_rate × personalization
     scored = []
     for v, raw_vr in zip(candidates, raw_view_rates):
         norm_view_rate = raw_vr / max_vr
@@ -254,11 +261,11 @@ def select_top_videos(
             "score":             round(pre_score, 6),
         })
 
-    # 7. 점수 내림차순 정렬 후 상위 top_n개 선정
+    # 10. 점수 내림차순 정렬 후 상위 top_n개 선정
     scored.sort(key=lambda x: x["score"], reverse=True)
 
     logger.info(
         f"[selector] '{topic}' — 후보 {len(candidates)}개 → 상위 {top_n}개 선정"
-        f" (ViewRate×개인화 공식)"
+        f" (유료광고 사전제거 {removed}개, ViewRate×개인화 공식)"
     )
     return scored[:top_n]

@@ -22,7 +22,7 @@ load_dotenv()
 _logger = logging.getLogger(__name__)
 
 _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-_MODEL  = "gemini-2.5-flash"
+_MODEL  = "gemini-3.1-flash-lite"
 
 # 재시도 대상 HTTP 상태코드 — Rate Limit(429), Server Error(500/503)
 _RETRYABLE_STATUS = {429, 500, 503}
