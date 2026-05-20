@@ -7,7 +7,7 @@
   <title>Tubify</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
     * {
       box-sizing: border-box;
@@ -30,7 +30,7 @@
       position: sticky;
       top: 0;
       z-index: 10;
-      background: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid #f2f4f6;
@@ -38,7 +38,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px 0 16px;
+      padding: 0 20px 1px 16px;
       flex-shrink: 0;
     }
 
@@ -60,15 +60,15 @@
     }
 
     .header-logo-box svg {
-      width: 14px;
-      height: 14px;
+      width: 13.5px;
+      height: 13.5px;
       fill: #fff;
     }
 
     .header-brand-text {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
     }
 
     .header-title {
@@ -153,9 +153,7 @@
       transition: background 0.15s, border-color 0.15s;
     }
 
-    .tab-btn:hover {
-      background: rgba(0, 0, 0, 0.04);
-    }
+    .tab-btn:hover { background: rgba(0, 0, 0, 0.04); }
 
     .tab-btn.active {
       border-right-color: red;
@@ -170,14 +168,8 @@
       transition: color 0.15s;
     }
 
-    .tab-icon svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    .tab-btn.active .tab-icon {
-      color: red;
-    }
+    .tab-icon svg { width: 18px; height: 18px; }
+    .tab-btn.active .tab-icon { color: red; }
 
     .tab-label {
       font-size: 7px;
@@ -189,17 +181,8 @@
       transition: color 0.15s;
     }
 
-    .tab-btn.active .tab-label {
-      color: red;
-    }
-
-    .tab-nav-spacer {
-      flex: 1;
-    }
-
-    .tab-btn-settings {
-      margin-top: auto;
-    }
+    .tab-btn.active .tab-label { color: red; }
+    .tab-nav-spacer { flex: 1; }
 
     /* ── 콘텐츠 영역 ── */
     .content-wrap {
@@ -209,73 +192,113 @@
       background: #fff;
     }
 
-    .content-wrap::-webkit-scrollbar {
-      width: 4px;
-    }
-
-    .content-wrap::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .content-wrap::-webkit-scrollbar-thumb {
-      background: #e6e8ea;
-      border-radius: 2px;
-    }
+    .content-wrap::-webkit-scrollbar { width: 4px; }
+    .content-wrap::-webkit-scrollbar-track { background: transparent; }
+    .content-wrap::-webkit-scrollbar-thumb { background: #e6e8ea; border-radius: 2px; }
 
     .tab-panel {
       display: none;
       padding: 20px 16px;
     }
 
-    .tab-panel.active {
-      display: block;
+    .tab-panel.active { display: block; }
+
+    /* ── 단일 영상 요약 섹션 ── */
+    .video-summary-section {
+      margin-bottom: 4px;
+    }
+
+    .video-sum-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .video-sum-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #191c1e;
+      letter-spacing: -0.55px;
+      line-height: 1.25;
+      flex: 1;
+      word-break: keep-all;
+    }
+
+    /* ── 관련 영상 분석 구분선 ── */
+    .related-section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 22px 0 16px;
+    }
+
+    .related-divider-line {
+      flex: 1;
+      height: 1px;
+      background: #e6e8ea;
+    }
+
+    .related-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     /* ── 키워드 타이틀 ── */
     .keyword-title {
-      font-size: 36px;
-      font-weight: 700;
+      font-size: 24px;
+      font-weight: 900;
       color: #191c1e;
-      letter-spacing: -0.9px;
-      line-height: 1.2;
+      letter-spacing: -0.6px;
+      line-height: 1.25;
       margin-bottom: 8px;
+      word-break: keep-all;
+      flex: 1;
     }
 
     .keyword-underline {
-      width: 40px;
+      width: 48px;
       height: 4px;
       background: red;
       border-radius: 9999px;
       margin-bottom: 20px;
     }
 
+    .keyword-title-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
     /* ── 섹션 카드 ── */
     .section-block {
       background: #f2f4f6;
       border-radius: 12px;
-      padding: 16px 16px 16px 20px;
+      padding: 18px 18px 18px 22px;
       margin-bottom: 12px;
       border-left: 4px solid transparent;
     }
 
-    .section-block.border-red {
-      border-left-color: red;
-    }
-
-    .section-block.border-gray {
-      border-left-color: #515f74;
-    }
+    .section-block.border-red { border-left-color: red; }
+    .section-block.border-gray { border-left-color: #515f74; }
+    .section-block.border-yellow { border-left-color: #f59e0b; }
 
     .section-header {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .section-icon-box {
-      width: 20px;
-      height: 20px;
+      width: 15px;
+      height: 15px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -283,16 +306,24 @@
       flex-shrink: 0;
     }
 
-    .icon-red   { color: red; }
-    .icon-blue  { color: #515f74; }
-    .icon-gray  { color: #515f74; }
+    .section-icon-box svg { width: 15px; height: 15px; }
+
+    .icon-red    { color: red; }
+    .icon-blue   { color: #515f74; }
+    .icon-gray   { color: #515f74; }
     .icon-yellow { color: #f59e0b; }
 
     .section-title-text {
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 700;
       color: #191c1e;
       line-height: 1.4;
+    }
+
+    .section-body-text {
+      font-size: 13px;
+      color: #603e39;
+      line-height: 1.65;
     }
 
     /* ── 불릿 리스트 ── */
@@ -335,7 +366,7 @@
       line-height: 1.65;
     }
 
-    /* ── 소스 섹션 헤더 ── */
+    /* ── 소스 섹션 ── */
     .source-header {
       display: flex;
       align-items: center;
@@ -363,18 +394,11 @@
       text-transform: uppercase;
     }
 
-    .view-all-btn:hover {
-      color: #191c1e;
-    }
+    .view-all-btn:hover { color: #191c1e; }
 
     /* ── 비디오 카드 ── */
-    .video-card {
-      margin-bottom: 16px;
-    }
-
-    .video-card:last-child {
-      margin-bottom: 0;
-    }
+    .video-card { margin-bottom: 16px; }
+    .video-card:last-child { margin-bottom: 0; }
 
     .video-card-inner {
       display: flex;
@@ -410,10 +434,7 @@
       flex-shrink: 0;
     }
 
-    .video-info {
-      flex: 1;
-      min-width: 0;
-    }
+    .video-info { flex: 1; min-width: 0; }
 
     .video-title-text {
       font-size: 12px;
@@ -430,9 +451,7 @@
       text-decoration: none;
     }
 
-    .video-title-text:hover {
-      color: red;
-    }
+    .video-title-text:hover { color: red; }
 
     .video-subtitle {
       font-size: 11px;
@@ -471,6 +490,7 @@
     .badge-ad   { background: #fee2e2; color: #dc2626; }
     .badge-noad { background: #dcfce7; color: #16a34a; }
     .badge-cred { background: #eff6ff; color: #2563eb; }
+    .badge-ad-score { background: #fff7ed; color: #ea580c; }
 
     /* ── 로딩 ── */
     @keyframes spin {
@@ -482,12 +502,10 @@
       50%       { opacity: 1;   transform: scale(1); }
     }
 
-    .loading-container {
-      padding: 28px 20px 20px;
-    }
+    .loading-container { padding: 28px 20px 20px; }
 
     .loading-kw {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 700;
       color: #191c1e;
       letter-spacing: -0.5px;
@@ -505,12 +523,7 @@
       gap: 6px;
     }
 
-    .loading-dots {
-      display: flex;
-      gap: 3px;
-      align-items: center;
-    }
-
+    .loading-dots { display: flex; gap: 3px; align-items: center; }
     .loading-dots span {
       width: 4px;
       height: 4px;
@@ -519,15 +532,10 @@
       display: inline-block;
       animation: pulse-dot 1.2s ease-in-out infinite;
     }
-
     .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
     .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
-    .step-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
+    .step-list { display: flex; flex-direction: column; gap: 8px; }
 
     .step-item {
       display: flex;
@@ -540,15 +548,8 @@
       transition: background 0.3s, border-color 0.3s;
     }
 
-    .step-item.active {
-      background: #fff8f8;
-      border-color: rgba(255, 0, 0, 0.12);
-    }
-
-    .step-item.done {
-      background: #f0fdf4;
-      border-color: rgba(22, 163, 74, 0.15);
-    }
+    .step-item.active { background: #fff8f8; border-color: rgba(255, 0, 0, 0.12); }
+    .step-item.done   { background: #f0fdf4; border-color: rgba(22, 163, 74, 0.15); }
 
     .step-indicator {
       width: 36px;
@@ -565,11 +566,7 @@
     .step-item.active .step-indicator { background: rgba(255,0,0,0.08); }
     .step-item.done  .step-indicator  { background: rgba(22,163,74,0.12); }
 
-    .step-num {
-      font-size: 13px;
-      font-weight: 700;
-      color: #b0b8c4;
-    }
+    .step-num { font-size: 13px; font-weight: 700; color: #b0b8c4; }
 
     .step-ring {
       width: 18px;
@@ -650,18 +647,8 @@
 
     .btn-retry:hover { background: #fff5f5; }
 
-    .error-msg {
-      color: #dc2626;
-      font-size: 13px;
-      line-height: 1.6;
-      font-weight: 600;
-    }
-
-    .error-sub {
-      color: #515f74;
-      font-size: 12px;
-      margin-top: 4px;
-    }
+    .error-msg { color: #dc2626; font-size: 13px; line-height: 1.6; font-weight: 600; }
+    .error-sub { color: #515f74; font-size: 12px; margin-top: 4px; }
 
     .hidden { display: none !important; }
 
@@ -676,25 +663,7 @@
       color: #515f74;
     }
 
-    /* ── 카테고리 뱃지 ── */
-    .category-badge {
-      display: inline-block;
-      margin-bottom: 14px;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 9999px;
-    }
-
-    /* ── 인사이트 내 소스 프리뷰 ── */
     /* ── 하트 버튼 ── */
-    .keyword-title-row {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
     .btn-heart {
       background: none;
       border: none;
@@ -705,28 +674,21 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      margin-top: 6px;
+      margin-top: 4px;
       transition: transform 0.15s;
     }
 
-    .btn-heart:hover { transform: scale(1.15); }
+    .btn-heart:hover  { transform: scale(1.15); }
     .btn-heart:active { transform: scale(0.9); }
 
     .btn-heart svg {
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       transition: fill 0.2s, stroke 0.2s;
     }
 
-    .btn-heart.hearted svg {
-      fill: red;
-      stroke: red;
-    }
-
-    .btn-heart:not(.hearted) svg {
-      fill: none;
-      stroke: #aaa;
-    }
+    .btn-heart.hearted svg { fill: red; stroke: red; }
+    .btn-heart:not(.hearted) svg { fill: none; stroke: #aaa; }
 
     /* ── 토스트 ── */
     .toast {
@@ -754,9 +716,8 @@
       transform: translateX(-50%) translateY(0);
     }
 
-    .sources-in-insights {
-      margin-top: 8px;
-    }
+    /* ── 소스 프리뷰 ── */
+    .sources-in-insights { margin-top: 8px; }
 
     .source-card-compact {
       display: flex;
@@ -765,14 +726,9 @@
       margin-bottom: 16px;
     }
 
-    .source-card-compact:last-child {
-      margin-bottom: 0;
-    }
+    .source-card-compact:last-child { margin-bottom: 0; }
 
-    .source-thumb-compact {
-      width: 96px;
-      flex-shrink: 0;
-    }
+    .source-thumb-compact { width: 96px; flex-shrink: 0; }
 
     .source-thumb-compact img {
       width: 96px;
@@ -795,10 +751,7 @@
       font-size: 16px;
     }
 
-    .source-info-compact {
-      flex: 1;
-      min-width: 0;
-    }
+    .source-info-compact { flex: 1; min-width: 0; }
 
     .source-title-compact {
       font-size: 12px;
@@ -832,7 +785,6 @@
   <div class="header">
     <div class="header-brand">
       <div class="header-logo-box">
-        <!-- 신문/요약 아이콘 -->
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <rect x="3" y="3" width="18" height="3" rx="1"/>
           <rect x="3" y="9" width="11" height="2" rx="1"/>
@@ -846,7 +798,6 @@
       </div>
     </div>
     <div class="header-actions">
-      <!-- 새로고침 -->
       <button class="icon-btn" id="btn-refresh" title="새로고침">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -866,7 +817,7 @@
   <!-- 유튜브에서 검색 유도 -->
   <div id="screen-empty" class="state-screen hidden">
     <span class="icon">🔍</span>
-    유튜브에서 검색하면<br>AI 분석이 시작됩니다.
+    유튜브에서 영상을 보거나<br>검색하면 AI 분석이 시작됩니다.
   </div>
 
   <!-- 로딩 -->
@@ -883,22 +834,22 @@
         <div class="step-item" id="s1">
           <div class="step-indicator" id="s1-icon"><span class="step-num">1</span></div>
           <div class="step-content">
-            <div class="step-label">영상 검색</div>
-            <div class="step-desc">관련 유튜브 영상 수집 중</div>
+            <div class="step-label" id="s1-label">영상 검색</div>
+            <div class="step-desc" id="s1-desc">관련 유튜브 영상 수집 중</div>
           </div>
         </div>
         <div class="step-item" id="s2">
           <div class="step-indicator" id="s2-icon"><span class="step-num">2</span></div>
           <div class="step-content">
-            <div class="step-label">자막 분석</div>
-            <div class="step-desc">각 영상의 자막 처리 중</div>
+            <div class="step-label" id="s2-label">자막 분석</div>
+            <div class="step-desc" id="s2-desc">각 영상의 자막 처리 중</div>
           </div>
         </div>
         <div class="step-item" id="s3">
           <div class="step-indicator" id="s3-icon"><span class="step-num">3</span></div>
           <div class="step-content">
-            <div class="step-label">AI 교차 분석</div>
-            <div class="step-desc">영상 간 핵심 내용 비교 중</div>
+            <div class="step-label" id="s3-label">AI 교차 분석</div>
+            <div class="step-desc" id="s3-desc">영상 간 핵심 내용 비교 중</div>
           </div>
         </div>
       </div>
@@ -921,24 +872,29 @@
       <button class="tab-btn active" data-tab="summary" title="인사이트">
         <span class="tab-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
           </svg>
         </span>
-        <span class="tab-label">INSIGHTS</span>
+        <span class="tab-label">SUMMARY</span>
       </button>
       <button class="tab-btn" data-tab="sources" title="소스">
         <span class="tab-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
           </svg>
         </span>
         <span class="tab-label">SOURCES</span>
       </button>
       <div class="tab-nav-spacer"></div>
-      <button class="tab-btn tab-btn-settings" title="설정" id="btn-settings">
+      <button class="tab-btn" title="설정" id="btn-settings">
         <span class="tab-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
         </span>
         <span class="tab-label">SETTINGS</span>
@@ -950,7 +906,30 @@
 
       <!-- 인사이트 탭 -->
       <div id="tab-summary" class="tab-panel active">
-        <div class="keyword-title-row">
+
+        <!-- ① 단일 영상 요약 (watch 페이지에서만 표시) -->
+        <div class="video-summary-section hidden" id="video-summary-section">
+          <div class="video-sum-title-row">
+            <h2 class="video-sum-title" id="video-sum-title">영상 제목</h2>
+            <button class="btn-heart" id="btn-heart-video" title="관심 토픽으로 저장">
+              <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="keyword-underline"></div>
+          <div id="video-analysis-content"></div>
+
+          <!-- 구분선 -->
+          <div class="related-section-header">
+            <div class="related-divider-line"></div>
+            <span class="related-section-label">관련 영상 분석</span>
+            <div class="related-divider-line"></div>
+          </div>
+        </div>
+
+        <!-- ② 키워드 분석 제목 (search 페이지에서만 표시) -->
+        <div id="kw-header-row" class="keyword-title-row">
           <div class="keyword-title" id="kw-title-s">-</div>
           <button class="btn-heart" id="btn-heart" title="관심 토픽으로 저장">
             <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -958,7 +937,9 @@
             </svg>
           </button>
         </div>
-        <div class="keyword-underline"></div>
+        <div class="keyword-underline" id="kw-underline"></div>
+
+        <!-- ③ 공통 분석 결과 -->
         <div id="summary-sections"></div>
         <div id="controversy-section"></div>
         <div id="sources-in-insights" class="sources-in-insights hidden">
