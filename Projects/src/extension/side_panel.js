@@ -1,12 +1,13 @@
 // side_panel.js — Tubify 사이드패널 스크립트
-// API 주소는 config.js의 API_BASE를 사용합니다 (side_panel.html에서 config.js 선행 로드됨)
+// API 주소는 config.js의 API_BASE를 사용합니다
 
 // ── 상태 변수 ──────────────────────────────────────────────────────────────────
 
 let currentKeyword = "";
 let currentJwt = "";
-let currentVideoId = "";   // 하트 추가 시 사용할 대표 video_id
-let heartedTopic = "";     // 현재 하트된 토픽명 (DELETE 시 사용)
+let currentVideoId = "";
+let heartedTopic = "";
+let currentMode = "search"; // "search" | "watch"
 
 // ── 유틸 ──────────────────────────────────────────────────────────────────────
 
@@ -19,9 +20,9 @@ function showToast(msg) {
 }
 
 function setHeartState(isHearted) {
-  var btn = document.getElementById("btn-heart");
-  if (!btn) return;
-  btn.classList.toggle("hearted", isHearted);
+  document.querySelectorAll(".btn-heart").forEach(function (btn) {
+    btn.classList.toggle("hearted", isHearted);
+  });
 }
 
 async function checkHeartState(keyword) {
@@ -50,11 +51,9 @@ async function checkHeartState(keyword) {
 
 async function toggleHeart() {
   if (!currentJwt) { showToast("로그인 후 이용할 수 있습니다."); return; }
-  var btn = document.getElementById("btn-heart");
-  var isHearted = btn && btn.classList.contains("hearted");
+  var isHearted = document.querySelectorAll(".btn-heart.hearted").length > 0;
 
   if (isHearted) {
-    // 하트 해제
     var topic = heartedTopic || currentKeyword;
     try {
       var res = await fetch(API_BASE + "/interests/" + encodeURIComponent(topic), {
@@ -70,7 +69,6 @@ async function toggleHeart() {
       }
     } catch (e) { showToast("서버에 연결할 수 없어요."); }
   } else {
-    // 하트 추가
     try {
       var payload = { title: currentKeyword };
       if (currentVideoId) payload.video_id = currentVideoId;
@@ -92,7 +90,6 @@ async function toggleHeart() {
         var errBody = await res.json().catch(function () { return {}; });
         var errMsg = (errBody.detail && typeof errBody.detail === "string") ? errBody.detail : ("서버 오류 " + res.status);
         showToast(errMsg);
-        console.error("[heart] POST /interests 실패:", res.status, errBody);
       }
     } catch (e) { showToast("서버에 연결할 수 없어요."); }
   }
@@ -141,89 +138,205 @@ document.querySelectorAll(".tab-btn[data-tab]").forEach(function (btn) {
   });
 });
 
-/* 설정 버튼 — 대시보드로 이동 */
 var btnSettings = document.getElementById("btn-settings");
 if (btnSettings) {
   btnSettings.addEventListener("click", function () {
-    chrome.tabs.create({ url: API_BASE + "/dashboard.html" });
+    chrome.tabs.create({ url: API_BASE + "/mypage.html" });
   });
 }
 
-/* VIEW ALL — SOURCES 탭으로 전환 */
 document.addEventListener("click", function (e) {
-  if (e.target && e.target.id === "btn-view-all") {
-    switchTab("sources");
-  }
+  if (e.target && e.target.id === "btn-view-all") switchTab("sources");
 });
+
+// ── 단일 영상 요약 파싱 ──────────────────────────────────────────────────────
+
+function parseAnalysisToSections(text) {
+  if (!text) return [];
+  text = text.trim();
+
+  // 문단 분리
+  var chunks = text.split(/\n\s*\n/).map(function(c) { return c.trim(); }).filter(Boolean);
+
+  if (chunks.length === 0) return [{ title: "AI 요약", body: text }];
+  if (chunks.length === 1) return [{ title: "AI 요약", body: text }];
+
+  return chunks.slice(0, 4).map(function (chunk, i) {
+    var lines = chunk.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+    var first = (lines[0] || '').replace(/^[#*•\-\d.]+\s*/, '').replace(/\*+/g, '').trim();
+
+    if (first.length <= 50 && lines.length > 1) {
+      return { title: first, body: lines.slice(1).join(' ') };
+    }
+    return { title: "포인트 " + (i + 1), body: chunk };
+  });
+}
+
+var SECTION_ICONS = [
+  // ⚡ 번개
+  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+  // 🔍 분석
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  // 📋 메모
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+  // 💡 아이디어
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>'
+];
+
+// ── 단일 영상 요약 렌더링 ──────────────────────────────────────────────────────
+
+function renderVideoSummary(videoTitle, aiData) {
+  // SUMMARY 탭 헤더 설정
+  document.getElementById("kw-title-s").textContent = videoTitle;
+  document.getElementById("kw-header-row").style.display = "";
+  document.getElementById("kw-underline").style.display = "";
+
+  var html = "";
+
+  if (aiData) {
+    var adScore = aiData.ad_score || 0;
+    if (adScore > 5) {
+      html += '<div class="cache-notice" style="background:#fff7ed;border-color:#fed7aa;color:#ea580c;margin-bottom:12px;">⚠️ 광고 의심 점수: ' + adScore + '점</div>';
+    }
+
+    var cards = [];
+
+    // summary 문자열 → 첫 번째 카드
+    var summaryText = (aiData.summary || "").trim();
+    if (summaryText && summaryText !== "자막 없음" && summaryText !== "분석 실패") {
+      cards.push({ title: "영상 요약", body: summaryText, icon: 0 });
+    }
+
+    // key_claims 배열 → 카드 추가 (최대 2개)
+    var claims = Array.isArray(aiData.key_claims) ? aiData.key_claims : [];
+    if (claims.length > 0) {
+      var claimBullets = claims.slice(0, 5).map(function(c) { return '<li>' + esc(c) + '</li>'; }).join('');
+      cards.push({ title: "핵심 주장", bodyHtml: '<ul class="bullet-list">' + claimBullets + '</ul>', icon: 1 });
+    }
+
+    // 신뢰도 점수 → 세 번째 카드
+    if (typeof aiData.credibility_score === "number") {
+      var pct = Math.round(aiData.credibility_score * 100);
+      var credLabel = pct >= 70 ? "높음" : pct >= 40 ? "보통" : "낮음";
+      var credColor = pct >= 70 ? "#16a34a" : pct >= 40 ? "#d97706" : "#dc2626";
+      cards.push({
+        title: "신뢰도",
+        bodyHtml: '<div style="display:flex;align-items:center;gap:8px;">'
+          + '<div style="flex:1;height:6px;background:#e6e8ea;border-radius:3px;overflow:hidden;">'
+          + '<div style="width:' + pct + '%;height:100%;background:' + credColor + ';border-radius:3px;"></div>'
+          + '</div>'
+          + '<span style="font-size:12px;font-weight:700;color:' + credColor + ';">' + pct + '% ' + credLabel + '</span>'
+          + '</div>',
+        icon: 2
+      });
+    }
+
+    if (cards.length > 0) {
+      cards.forEach(function(card) {
+        var bodyContent = card.bodyHtml
+          ? card.bodyHtml
+          : '<p class="section-body-text">' + esc(card.body || "") + '</p>';
+        html += '<div class="section-block border-red">'
+          + '<div class="section-header">'
+          + '<div class="section-icon-box icon-red">' + SECTION_ICONS[card.icon] + '</div>'
+          + '<div class="section-title-text">' + esc(card.title) + '</div>'
+          + '</div>'
+          + bodyContent
+          + '</div>';
+      });
+    } else {
+      html = '<div style="color:#515f74;font-size:13px;line-height:1.65;">자막 정보가 없어 분석할 수 없습니다.</div>';
+    }
+  } else {
+    html = '<div style="color:#515f74;font-size:13px;line-height:1.65;">영상 분석을 가져올 수 없습니다.</div>';
+  }
+
+  document.getElementById("summary-content").innerHTML = html;
+}
 
 // ── 결과 렌더링 ───────────────────────────────────────────────────────────────
 
-function renderResults(data) {
+function renderResults(data, watchMode) {
   var keyword      = data.keyword || currentKeyword;
   var videos       = data.recommended_videos || data.videos || [];
   var commonFacts  = data.common_facts || [];
   var controversies = data.controversies || [];
   var summaryLines = data.summary_lines || [];
-  var conclusion   = data.common_conclusion || "";
   var category     = data.category || "";
   var cached       = data.cached || false;
 
-  document.getElementById("kw-title-s").textContent = keyword;
+  var SUMMARY_TITLE = { "정보탐색형": "핵심 인사이트", "유희탐색형": "화제 포인트", "구매탐색형": "장점 요약" };
+  var FACTS_TITLE   = { "정보탐색형": "전문가 분석", "유희탐색형": "반응 및 의견", "구매탐색형": "전문가 평가" };
 
-  // 대표 video_id 저장 (하트 추가 시 사용 — 광고 없는 첫 번째 영상 우선)
-  var repVideo = videos.find(function (v) { return !v.ad_detected && v.video_id; }) || videos[0];
-  currentVideoId = (repVideo && repVideo.video_id) || "";
-
-  // 하트 상태 초기화 후 확인
-  setHeartState(false);
-  heartedTopic = "";
-  checkHeartState(keyword);
-
-  /* 캐시 히트 안내 배너 */
-  var cacheNotice = "";
-  if (cached) {
-    cacheNotice = '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>';
+  // SUMMARY 탭 버튼: watch=보임, search=숨김
+  var summaryTabBtn = document.querySelector('[data-tab="summary"]');
+  if (summaryTabBtn) summaryTabBtn.style.display = watchMode ? "" : "none";
+  // INSIGHTS 내 검색 헤더: watch=숨김, search=보임 (search 모드에서 따로 설정)
+  if (watchMode) {
+    document.getElementById("insights-kw-header").style.display = "none";
+    document.getElementById("insights-kw-underline").style.display = "none";
   }
 
-  var SUMMARY_TITLE = {
-    "정보탐색형": "핵심 인사이트",
-    "유희탐색형": "화제 포인트",
-    "구매탐색형": "장점 요약",
-  };
-  var FACTS_TITLE = {
-    "정보탐색형": "전문가 분석",
-    "유희탐색형": "반응 및 의견",
-    "구매탐색형": "전문가 평가",
-  };
+  if (watchMode) {
+    // watch 모드: SUMMARY 탭은 renderVideoSummary가 처리 → 여기선 INSIGHTS 탭만 채움
+    var insightsHTML = cached ? '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>' : "";
+    if (summaryLines.length) {
+      var bullets = summaryLines.map(function (l) {
+        return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
+      }).join("");
+      insightsHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">' + SECTION_ICONS[0] + '</div><div class="section-title-text">' + (SUMMARY_TITLE[category] || "주요 요약") + '</div></div><div class="bullet-list">' + bullets + '</div></div>';
+    }
+    if (commonFacts.length) {
+      var factBullets = commonFacts.map(function (f) {
+        return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
+      }).join("");
+      insightsHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">' + SECTION_ICONS[1] + '</div><div class="section-title-text">' + (FACTS_TITLE[category] || "공통 사실") + '</div></div><div class="bullet-list">' + factBullets + '</div></div>';
+    }
+    document.getElementById("insights-sections").innerHTML = insightsHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">관련 영상 분석 정보가 없습니다.</div>';
+  } else {
+    // search 모드: INSIGHTS 탭에 내용, SUMMARY 탭은 비움
+    document.getElementById("kw-title-insights").textContent = keyword;
+    document.getElementById("insights-kw-header").style.display = "";
+    document.getElementById("insights-kw-underline").style.display = "";
+    // SUMMARY 탭 헤더/내용 숨김
+    document.getElementById("kw-header-row").style.display = "none";
+    document.getElementById("kw-underline").style.display = "none";
+    document.getElementById("summary-content").innerHTML = "";
 
-  var summaryHTML = cacheNotice;
-  if (summaryLines.length) {
-    var bullets = summaryLines.map(function (l) {
-      return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
-    }).join("");
-    var summaryTitle = SUMMARY_TITLE[category] || "주요 요약";
-    summaryHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">⚡</div><div class="section-title-text">' + summaryTitle + '</div></div><div class="bullet-list">' + bullets + '</div></div>';
-  }
-  if (commonFacts.length) {
-    var factBullets = commonFacts.map(function (f) {
-      return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
-    }).join("");
-    var factsTitle = FACTS_TITLE[category] || "공통 사실";
-    summaryHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">📊</div><div class="section-title-text">' + factsTitle + '</div></div><div class="bullet-list">' + factBullets + '</div></div>';
-  }
-  document.getElementById("summary-sections").innerHTML = summaryHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">요약 정보가 없습니다.</div>';
+    var repVideo = videos.find(function (v) { return !v.ad_detected && v.video_id; }) || videos[0];
+    currentVideoId = (repVideo && repVideo.video_id) || "";
+    setHeartState(false);
+    heartedTopic = "";
+    checkHeartState(keyword);
 
-  /* 쟁점 섹션 (INSIGHTS 탭 내) */
+    var insightsHTML = cached ? '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>' : "";
+    if (summaryLines.length) {
+      var sBullets = summaryLines.map(function (l) {
+        return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
+      }).join("");
+      insightsHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">' + SECTION_ICONS[0] + '</div><div class="section-title-text">' + (SUMMARY_TITLE[category] || "주요 요약") + '</div></div><div class="bullet-list">' + sBullets + '</div></div>';
+    }
+    if (commonFacts.length) {
+      var fBullets = commonFacts.map(function (f) {
+        return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
+      }).join("");
+      insightsHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">' + SECTION_ICONS[1] + '</div><div class="section-title-text">' + (FACTS_TITLE[category] || "공통 사실") + '</div></div><div class="bullet-list">' + fBullets + '</div></div>';
+    }
+    document.getElementById("insights-sections").innerHTML = insightsHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">요약 정보가 없습니다.</div>';
+
+    // INSIGHTS 탭으로 자동 전환
+    switchTab("insights");
+  }
+
   var controversyHTML = "";
   if (controversies.length) {
     var cBullets = controversies.map(function (c) {
       return '<div class="bullet-item"><span class="bullet-dot dot-yellow"></span><span>' + esc(c) + '</span></div>';
     }).join("");
-    controversyHTML = '<div class="section-block" style="border-left-color:#f59e0b"><div class="section-header"><div class="section-icon-box icon-yellow">⚡</div><div class="section-title-text">주요 쟁점</div></div><div class="bullet-list">' + cBullets + '</div></div>';
+    controversyHTML = '<div class="section-block border-yellow"><div class="section-header"><div class="section-icon-box icon-yellow">' + SECTION_ICONS[2] + '</div><div class="section-title-text">주요 쟁점</div></div><div class="bullet-list">' + cBullets + '</div></div>';
   }
   document.getElementById("controversy-section").innerHTML = controversyHTML;
 
-  /* 소스 프리뷰 (INSIGHTS 탭 하단, 최대 3개) */
   function buildVideoCard(v, compact) {
     var vid = v.video_id || v.id || "";
     var url = "https://youtube.com/watch?v=" + esc(vid);
@@ -247,7 +360,7 @@ function renderResults(data) {
 
   if (videos.length) {
     document.getElementById("sources-in-insights").classList.remove("hidden");
-    document.getElementById("sources-preview").innerHTML = videos.slice(0, 3).map(function(v) { return buildVideoCard(v, true); }).join("");
+    document.getElementById("sources-preview").innerHTML = videos.map(function(v) { return buildVideoCard(v, true); }).join("");
     document.getElementById("sources-list").innerHTML = videos.map(function(v) { return buildVideoCard(v, false); }).join("");
   } else {
     document.getElementById("sources-in-insights").classList.add("hidden");
@@ -257,15 +370,27 @@ function renderResults(data) {
   showScreen("screen-results");
 }
 
-// ── 분석 요청 ─────────────────────────────────────────────────────────────────
+// ── 키워드 검색 분석 ──────────────────────────────────────────────────────────
 
 async function analyze(keyword, jwt) {
   currentKeyword = keyword;
   currentJwt = jwt;
+  currentMode = "search";
+
   var loadingKw = document.getElementById("loading-kw");
   if (loadingKw) loadingKw.textContent = keyword;
+
+  // 로딩 스텝 레이블 (검색 모드)
+  setStepLabel(1, "영상 검색", "관련 유튜브 영상 수집 중");
+  setStepLabel(2, "자막 분석", "각 영상의 자막 처리 중");
+  setStepLabel(3, "AI 교차 분석", "영상 간 핵심 내용 비교 중");
+
   showScreen("screen-loading");
   setStep(1, "active"); setStep(2, ""); setStep(3, "");
+
+  // search 모드 진입: summary-content 초기화
+  document.getElementById("summary-content").innerHTML = "";
+
   try {
     await new Promise(function (r) { setTimeout(r, 500); });
     setStep(1, "done"); setStep(2, "active");
@@ -276,8 +401,6 @@ async function analyze(keyword, jwt) {
       headers: { "Authorization": "Bearer " + jwt }
     });
     if (res.status === 401) {
-      /* JWT 만료 → storage 정리 후 로그인 화면으로 자동 전환
-         재로그인 완료 시 btn-login 핸들러가 현재 탭 키워드로 분석을 자동 재시작함 */
       chrome.storage.local.remove(["jwt", "loggedIn"]);
       currentJwt = "";
       showScreen("screen-login");
@@ -292,7 +415,7 @@ async function analyze(keyword, jwt) {
     var data = await res.json();
     setStep(3, "done");
     await new Promise(function (r) { setTimeout(r, 300); });
-    renderResults(data);
+    renderResults(data, false);
   } catch (e) {
     document.getElementById("err-msg").textContent = "백엔드에 연결할 수 없습니다.";
     document.getElementById("err-sub").textContent = "서버가 실행 중인지 확인하세요.";
@@ -300,52 +423,163 @@ async function analyze(keyword, jwt) {
   }
 }
 
+// ── 단일 영상 분석 (watch 페이지) ─────────────────────────────────────────────
+
+async function analyzeWatch(videoId, videoTitle, jwt) {
+  currentJwt = jwt;
+  currentVideoId = videoId;
+  currentMode = "watch";
+
+  // 제목에서 키워드 추출 (YouTube 탭 제목 suffix 제거)
+  var keyword = videoTitle.replace(/\s*[-|]\s*YouTube\s*$/, '').trim();
+  currentKeyword = keyword;
+
+  var loadingKw = document.getElementById("loading-kw");
+  if (loadingKw) loadingKw.textContent = videoTitle;
+
+  setStepLabel(1, "영상 요약", "현재 영상 자막 분석 중");
+  setStepLabel(2, "관련 영상 검색", "주제 관련 영상 수집 중");
+  setStepLabel(3, "AI 교차 분석", "영상 간 핵심 내용 비교 중");
+
+  showScreen("screen-loading");
+  setStep(1, "active"); setStep(2, ""); setStep(3, "");
+
+  try {
+    // /analyze_video 단일 호출 (영상 요약 + 관련 영상 인사이트 통합)
+    setStep(1, "active");
+    var res = await fetch(API_BASE + "/analyze_video", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + jwt,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ video_id: videoId, title: videoTitle })
+    });
+
+    if (res.status === 401) {
+      chrome.storage.local.remove(["jwt", "loggedIn"]);
+      currentJwt = "";
+      showScreen("screen-login");
+      return;
+    }
+    if (!res.ok) {
+      var err = await res.json().catch(function () { return {}; });
+      document.getElementById("err-msg").textContent = err.detail || ("서버 오류 " + res.status);
+      document.getElementById("err-sub").textContent = "잠시 후 다시 시도해주세요.";
+      showScreen("screen-error");
+      return;
+    }
+
+    var data = await res.json();
+    setStep(1, "done"); setStep(2, "active");
+    await new Promise(function (r) { setTimeout(r, 300); });
+    setStep(2, "done"); setStep(3, "active");
+    await new Promise(function (r) { setTimeout(r, 300); });
+    setStep(3, "done");
+    await new Promise(function (r) { setTimeout(r, 200); });
+
+    // 키워드: extracted_topic 우선, 없으면 제목
+    currentKeyword = data.extracted_topic || keyword;
+    setHeartState(false);
+    heartedTopic = "";
+    checkHeartState(currentKeyword);
+
+    // SUMMARY 탭: 단일 영상 요약
+    renderVideoSummary(videoTitle, { summary: data.video_summary });
+
+    // INSIGHTS + SOURCES 탭
+    renderResults({
+      keyword:             currentKeyword,
+      summary_lines:       data.summary_lines || [],
+      common_facts:        data.common_facts || [],
+      controversies:       data.controversies || [],
+      recommended_videos:  data.recommended_videos || data.sources || [],
+      category:            data.category || "",
+      cached:              data.cached || false,
+    }, true);
+
+    switchTab("summary");
+
+  } catch (e) {
+    document.getElementById("err-msg").textContent = "백엔드에 연결할 수 없습니다.";
+    document.getElementById("err-sub").textContent = "서버가 실행 중인지 확인하세요.";
+    showScreen("screen-error");
+  }
+}
+
+function setStepLabel(n, label, desc) {
+  var lEl = document.getElementById("s" + n + "-label");
+  var dEl = document.getElementById("s" + n + "-desc");
+  if (lEl) lEl.textContent = label;
+  if (dEl) dEl.textContent = desc;
+}
+
 // ── 버튼 이벤트 ───────────────────────────────────────────────────────────────
 
-document.getElementById("btn-heart").addEventListener("click", toggleHeart);
+document.addEventListener("click", function (e) {
+  if (e.target.closest(".btn-heart")) toggleHeart();
+});
 
 document.getElementById("btn-retry").addEventListener("click", function () {
-  if (currentKeyword && currentJwt) analyze(currentKeyword, currentJwt);
+  if (currentMode === "watch" && currentVideoId) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      var tab = tabs && tabs[0];
+      var title = (tab && tab.title) || currentKeyword;
+      analyzeWatch(currentVideoId, title, currentJwt);
+    });
+  } else if (currentKeyword && currentJwt) {
+    analyze(currentKeyword, currentJwt);
+  }
 });
+
 document.getElementById("btn-refresh").addEventListener("click", function () {
-  if (currentKeyword && currentJwt) analyze(currentKeyword, currentJwt);
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    var tab = tabs && tabs[0];
+    if (!tab || !currentJwt) return;
+    try {
+      var u = new URL(tab.url);
+      if (u.hostname.includes("youtube.com") && u.pathname === "/watch") {
+        var vid = u.searchParams.get("v");
+        if (vid) { analyzeWatch(vid, tab.title, currentJwt); return; }
+      }
+      if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
+        var kw = u.searchParams.get("search_query") || "";
+        if (kw) { analyze(kw, currentJwt); return; }
+      }
+    } catch (e) {}
+    if (currentKeyword) analyze(currentKeyword, currentJwt);
+  });
 });
+
 document.getElementById("btn-login").addEventListener("click", function () {
-  /* 일반 탭으로 열어야 chrome.tabs.onUpdated fallback이 확실히 동작함 */
   chrome.tabs.create({ url: API_BASE + "/auth/login" });
 
-  /* JWT가 storage에 저장될 때까지 1초마다 확인 */
   var poll = setInterval(async function () {
     var stored = await new Promise(function (r) {
       chrome.storage.local.get(["jwt", "loggedIn"], r);
     });
     if (!stored.jwt) return;
-
     clearInterval(poll);
-
     currentJwt = stored.jwt;
 
-    /* 로그인 완료 후 현재 탭 키워드로 바로 분석 시작 */
     var tabs = await new Promise(function (r) {
       chrome.tabs.query({ active: true, currentWindow: true }, r);
     });
     var tab = tabs[0];
-    var keyword = "";
     try {
       var u = new URL(tab && tab.url);
+      if (u.hostname.includes("youtube.com") && u.pathname === "/watch") {
+        var vid = u.searchParams.get("v");
+        if (vid) { analyzeWatch(vid, tab.title, stored.jwt); return; }
+      }
       if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
-        keyword = u.searchParams.get("search_query") || "";
+        var kw = u.searchParams.get("search_query") || "";
+        if (kw) { analyze(kw.trim(), stored.jwt); return; }
       }
     } catch (e) {}
-
-    if (keyword.trim()) {
-      analyze(keyword.trim(), stored.jwt);
-    } else {
-      showScreen("screen-empty");
-    }
+    showScreen("screen-empty");
   }, 1000);
 
-  /* 60초 후 polling 자동 종료 */
   setTimeout(function () { clearInterval(poll); }, 60000);
 });
 
@@ -356,34 +590,37 @@ document.getElementById("btn-login").addEventListener("click", function () {
     chrome.storage.local.get(["jwt", "loggedIn", "pendingKeyword"], r);
   });
   var jwt            = stored.jwt;
-  var loggedIn       = stored.loggedIn;
   var pendingKeyword = stored.pendingKeyword;
 
   if (pendingKeyword) chrome.storage.local.remove("pendingKeyword");
   if (!jwt) { showScreen("screen-login"); return; }
   currentJwt = jwt;
 
-  /* 키워드 우선순위: pendingKeyword(storage) → 현재 탭 URL */
   var keyword = pendingKeyword || "";
 
-  if (!keyword) {
-    var tabs = await new Promise(function (r) {
-      chrome.tabs.query({ active: true, currentWindow: true }, r);
-    });
-    var tab = tabs[0];
-    try {
-      var u = new URL(tab && tab.url);
-      /* YouTube 검색 결과 페이지: /results?search_query=... */
-      if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
-        keyword = u.searchParams.get("search_query") || "";
+  var tabs = await new Promise(function (r) {
+    chrome.tabs.query({ active: true, currentWindow: true }, r);
+  });
+  var tab = tabs[0];
+
+  try {
+    var u = new URL(tab && tab.url);
+
+    // YouTube 영상 시청 중
+    if (u.hostname.includes("youtube.com") && u.pathname === "/watch") {
+      var videoId = u.searchParams.get("v");
+      var videoTitle = (tab.title || "").replace(/\s*[-|]\s*YouTube\s*$/, '').trim() || "영상 분석";
+      if (videoId) {
+        analyzeWatch(videoId, videoTitle, jwt);
+        return;
       }
-      // TODO: 현재 영상 기반 분석 API 연결
-      // YouTube 영상 진입 페이지(/watch?v=...) 감지 시 POST /analyze_video 호출
-      // 요청: { video_id: u.searchParams.get("v"), title: tab.title }
-      // 응답: { video_summary, extracted_topic, summary_lines, recommended_videos, sources }
-      // 현재는 /results 페이지 진입 시 /analyze_search 흐름만 동작함
-    } catch (e) { }
-  }
+    }
+
+    // YouTube 검색 결과 페이지
+    if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
+      keyword = u.searchParams.get("search_query") || keyword;
+    }
+  } catch (e) {}
 
   if (!keyword.trim()) {
     showScreen("screen-empty");
@@ -392,11 +629,10 @@ document.getElementById("btn-login").addEventListener("click", function () {
   }
 })();
 
-// ── storage 변화 감지 — 로그인 완료 + 플로팅 버튼 키워드 ────────────────────
+// ── storage 변화 감지 ──────────────────────────────────────────────────────────
 chrome.storage.onChanged.addListener(function (changes, area) {
   if (area !== "local") return;
 
-  // 로그인 완료 감지 — polling 없이 즉시 반응
   if (changes.jwt && changes.jwt.newValue && !currentJwt) {
     var jwt = changes.jwt.newValue;
     currentJwt = jwt;
@@ -410,6 +646,10 @@ chrome.storage.onChanged.addListener(function (changes, area) {
           var tab = tabs[0];
           try {
             var u = new URL(tab && tab.url);
+            if (u.hostname.includes("youtube.com") && u.pathname === "/watch") {
+              var vid = u.searchParams.get("v");
+              if (vid) { analyzeWatch(vid, tab.title, jwt); return; }
+            }
             if (u.hostname.includes("youtube.com") && u.pathname === "/results") {
               keyword = u.searchParams.get("search_query") || "";
             }
@@ -421,7 +661,6 @@ chrome.storage.onChanged.addListener(function (changes, area) {
     });
   }
 
-  // 검색 키워드 변화 감지
   if (changes.pendingKeyword) {
     var keyword = changes.pendingKeyword.newValue;
     if (!keyword || !currentJwt) return;

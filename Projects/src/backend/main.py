@@ -35,6 +35,7 @@ EXTENSION_ID = os.getenv("EXTENSION_ID", "")
 # (HTML 템플릿에서 const EXTENSION_ID = "__EXTENSION_ID__" 형태로 이미 따옴표로 감싸져 있음)
 _ext_ids = [x.strip() for x in EXTENSION_ID.split(",") if x.strip()]
 EXTENSION_IDS_JS = _ext_ids[0] if _ext_ids else ""
+EXTENSION_STORE_URL = os.getenv("EXTENSION_STORE_URL", "")
 
 
 @asynccontextmanager
@@ -368,6 +369,14 @@ def onboarding():
     html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
     return HTMLResponse(content=html)
 
+@app.get("/extension-guide.html", tags=["프론트엔드"], summary="크롬 익스텐션 설치 안내 페이지 제공 ✅", response_class=HTMLResponse)
+def extension_guide():
+    with open(os.path.join(FRONTEND_DIR, "extension-guide.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
+    html = html.replace("__EXTENSION_STORE_URL__", EXTENSION_STORE_URL)
+    return HTMLResponse(content=html)
+
 @app.get("/dashboard.html", tags=["프론트엔드"], summary="대시보드 페이지 제공 ✅", response_class=FileResponse)
 def dashboard():
     return FileResponse(os.path.join(FRONTEND_DIR, "dashboard.html"))
@@ -380,13 +389,6 @@ def search_dashboard():
 def mypage():
     return FileResponse(os.path.join(FRONTEND_DIR, "mypage.html"))
 
-# TODO (Issue 9): /loading.html 엔드포인트 제거 — 신규 유저 리다이렉트가 /onboarding.html로 변경됨 (프론트 loading.html 삭제 후 제거)
-@app.get("/loading.html", tags=["프론트엔드"], summary="로딩 페이지 제공 (DEPRECATED)", response_class=HTMLResponse, deprecated=True)
-def loading():
-    with open(os.path.join(FRONTEND_DIR, "loading.html"), "r", encoding="utf-8") as f:
-        html = f.read()
-    html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
-    return HTMLResponse(content=html)
 
 @app.get("/privacy.html", tags=["프론트엔드"], summary="개인정보 처리방침 페이지 제공 ✅", response_class=FileResponse)
 def privacy():
@@ -500,10 +502,9 @@ async def callback(
     if is_ext:
         redirect_url = f"{FRONTEND_URL}/auth/extension-done?token={jwt_token}"
     else:
-        # 신규 유저 → send_time 설정 화면, 기존 유저 → 메인(index.html)
-        # TODO: 신규 유저 리다이렉트 URL을 send_time 설정 모달 페이지로 교체 (프론트 준비되면)
+        # 신규 유저 → 크롬 익스텐션 설치 안내, 기존 유저 → 마이페이지
         if is_new_user:
-            redirect_url = f"{FRONTEND_URL}/onboarding.html?token={jwt_token}"
+            redirect_url = f"{FRONTEND_URL}/extension-guide.html?token={jwt_token}"
         else:
             redirect_url = f"{FRONTEND_URL}?token={jwt_token}"
 

@@ -27,10 +27,12 @@ chrome.runtime.onMessageExternal.addListener(
 
 // ── OAuth 콜백 URL 감시 → JWT 자동 저장 (SET_TOKEN 실패 fallback) ────────────
 // app.js의 EXTENSION_ID가 실제 ID와 다를 경우 SET_TOKEN이 전달되지 않을 수 있다.
-// chrome.tabs.onUpdated로 localhost:8000/?token=... URL을 직접 감지해 JWT를 저장한다.
+// chrome.tabs.onUpdated로 백엔드 URL의 token=... 파라미터를 직접 감지해 JWT를 저장한다.
+const BACKEND_ORIGIN = "https://port-0-swproject-team2-m-mpdo8rl036709628.sel3.cloudtype.app";
+
 function handleTabUrl(url) {
   if (!url) return;
-  if (!url.startsWith("http://localhost:8000/") && !url.startsWith("http://127.0.0.1:8000/") && !url.startsWith(API_BASE + "/")) return;
+  if (!url.startsWith(BACKEND_ORIGIN + "/")) return;
   try {
     const token = new URL(url).searchParams.get("token");
     if (!token) return;

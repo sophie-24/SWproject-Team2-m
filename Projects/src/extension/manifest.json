@@ -21,15 +21,11 @@
 
   "externally_connectable": {
     "matches": [
-      "http://localhost:8000/*",
-      "http://127.0.0.1:8000/*",
       "https://port-0-swproject-team2-m-mpdo8rl036709628.sel3.cloudtype.app/*"
     ]
   },
 
   "host_permissions": [
-    "http://localhost:8000/*",
-    "http://127.0.0.1:8000/*",
     "https://www.youtube.com/*",
     "https://port-0-swproject-team2-m-mpdo8rl036709628.sel3.cloudtype.app/*"
   ],

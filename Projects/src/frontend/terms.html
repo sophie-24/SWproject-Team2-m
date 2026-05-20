@@ -6,7 +6,7 @@
   <title>이용약관 — Tubify</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&family=Manrope:wght@700&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -18,7 +18,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 80px;
+      gap: 128px;
     }
 
     /* ── Nav ── */
@@ -30,9 +30,8 @@
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       z-index: 100;
-      flex-shrink: 0;
+      border-bottom: 1px solid rgba(235, 235, 235, 0.4);
     }
-
     .nav-inner {
       max-width: 1280px;
       margin: 0 auto;
@@ -42,92 +41,86 @@
       align-items: center;
       justify-content: space-between;
     }
-
     .nav-logo {
       font-size: 24px;
       font-weight: 800;
       color: red;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.48px;
       text-decoration: none;
+      line-height: 1;
     }
-
     .nav-links {
       display: flex;
       gap: 32px;
       align-items: center;
     }
-
     .nav-link {
       font-size: 18px;
       font-weight: 500;
       color: #191c1e;
       text-decoration: none;
+      letter-spacing: -0.45px;
     }
-
+    .nav-link.active {
+      font-weight: 600;
+      color: #bc0100;
+      border-bottom: 2px solid #bc0100;
+      padding-bottom: 2px;
+    }
     .nav-btn {
-      padding: 8px 24px;
       background: #e6e8ea;
       border: none;
       border-radius: 8px;
+      padding: 8px 24px;
       font-size: 16px;
       font-weight: 700;
       color: #0f172a;
       cursor: pointer;
       font-family: inherit;
     }
+    .nav-btn:hover { background: #d1d5db; }
 
-    .nav-btn:hover { background: #d4d6d8; }
-
-    /* ── Main ── */
-    main {
-      width: 100%;
-      max-width: 768px;
-      padding: 0 16px;
+    /* ── Main Content ── */
+    .main {
       display: flex;
       flex-direction: column;
       gap: 64px;
+      width: 100%;
+      max-width: 768px;
+      padding: 0 24px;
     }
 
-    /* ── Header Section ── */
-    .header-section {
+    /* ── Header ── */
+    .hero {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 16px;
-      padding-top: 48px;
     }
-
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4px 12px;
+    .hero-badge {
       background: #d5e3fc;
       border-radius: 9999px;
+      padding: 4px 12px;
       font-size: 12px;
       font-weight: 600;
       color: #57657a;
       letter-spacing: 1.2px;
       text-transform: uppercase;
     }
-
-    .header-title {
+    .hero-title {
       font-size: 48px;
       font-weight: 700;
       color: #191c1e;
       text-align: center;
-      letter-spacing: -0.025em;
+      letter-spacing: -1.2px;
       line-height: 1;
     }
-
-    .header-date {
+    .hero-date {
       font-size: 16px;
       color: #515f74;
-      text-align: center;
       padding: 8px 0 16px;
     }
-
-    .header-accent {
+    .hero-bar {
       width: 80px;
       height: 4px;
       background: #bc0100;
@@ -148,73 +141,60 @@
       flex-direction: column;
       gap: 24px;
     }
-
     .section-heading {
       display: flex;
       align-items: center;
       gap: 12px;
     }
-
     .section-num {
+      font-family: "Manrope", sans-serif;
       font-size: 24px;
       font-weight: 700;
       color: #bc0100;
       line-height: 1.33;
-      font-variant-numeric: tabular-nums;
-      flex-shrink: 0;
     }
-
-    .section-title {
+    .section-heading h2 {
       font-size: 24px;
       font-weight: 700;
       color: #191c1e;
       line-height: 1.33;
     }
-
     .section-body {
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
-
-    .section-text {
+    .section-body p {
       font-size: 16px;
       color: #515f74;
       line-height: 1.625;
     }
 
-    /* ── Definition List (제2조) ── */
+    /* ── Definition List ── */
     .def-list {
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
-
     .def-item {
       border-left: 2px solid #e6e8ea;
       padding-left: 18px;
+    }
+    .def-item p {
       font-size: 16px;
       line-height: 1.625;
-    }
-
-    .def-term {
-      font-weight: 700;
       color: #191c1e;
     }
+    .def-item p strong { font-weight: 700; color: #191c1e; }
+    .def-item p span { font-weight: 400; color: #515f74; }
 
-    .def-desc {
-      font-weight: 400;
-      color: #515f74;
-    }
-
-    /* ── Bullet List (제3조) ── */
+    /* ── Bullet List ── */
     .bullet-list {
       display: flex;
       flex-direction: column;
       gap: 8px;
       padding-left: 20px;
     }
-
     .bullet-list li {
       font-size: 16px;
       color: #515f74;
@@ -222,91 +202,88 @@
       list-style: disc;
     }
 
-    /* ── Highlight Box (제5조) ── */
+    /* ── Highlight Box ── */
     .highlight-box {
       background: #f2f4f6;
       border-left: 4px solid #bc0100;
       border-radius: 8px;
       padding: 24px 24px 24px 28px;
+    }
+    .highlight-box p {
       font-size: 16px;
-      font-weight: 350;
       color: #515f74;
       line-height: 1.625;
+      font-weight: 300;
     }
 
     /* ── Footer ── */
     footer {
       width: 100%;
-      border-top: 1px solid #e2e8f0;
-      padding: 48px 24px;
+      border-top: 1px solid rgba(244, 244, 245, 0.3);
+      padding: 48px 32px;
       margin-top: auto;
     }
-
     .footer-inner {
       max-width: 1280px;
       margin: 0 auto;
       display: flex;
-      gap: 32px;
       align-items: center;
+      gap: 32px;
     }
-
     .footer-logo {
       font-size: 18px;
       font-weight: 700;
       color: red;
-      flex-shrink: 0;
+      text-decoration: none;
     }
-
     .footer-links {
       display: flex;
       gap: 32px;
     }
-
     .footer-links a {
       font-size: 14px;
       color: #71717a;
       text-decoration: none;
     }
-
     .footer-links a:hover { color: #191c1e; }
-
     .footer-copy {
       margin-left: auto;
       font-size: 14px;
       color: #71717a;
-      white-space: nowrap;
     }
 
-    @media (max-width: 640px) {
-      .header-title { font-size: 36px; }
-      .section-num, .section-title { font-size: 20px; }
-      .footer-inner { flex-wrap: wrap; }
-      .footer-copy { margin-left: 0; }
+    @media (max-width: 768px) {
+      body { gap: 64px; }
+      .hero-title { font-size: 36px; }
+      .section-num, .section-heading h2 { font-size: 20px; }
+      .footer-copy { display: none; }
     }
   </style>
 </head>
 <body>
 
+  <!-- Nav -->
   <nav>
     <div class="nav-inner">
-      <a href="/intro.html" class="nav-logo" id="nav-logo">Tubify</a>
-      <div class="nav-links" id="nav-auth-links" style="display:none">
-        <a href="/" class="nav-link">홈</a>
-        <a href="/dashboard.html" class="nav-link">마이페이지</a>
+      <a href="/intro.html" class="nav-logo">Tubify</a>
+      <div class="nav-links">
+        <a href="/intro.html" class="nav-link active">홈</a>
+        <a href="/mypage.html" class="nav-link">마이페이지</a>
       </div>
-      <button class="nav-btn" id="nav-auth-btn" onclick="handleAuthBtn()">로그인</button>
+      <button class="nav-btn" id="nav-logout-btn" onclick="navLogout()">로그아웃</button>
     </div>
   </nav>
 
-  <main>
+  <!-- Main -->
+  <main class="main">
 
-    <!-- Header -->
-    <section class="header-section">
-      <span class="header-badge">TERMS OF SERVICE</span>
-      <h1 class="header-title">이용약관</h1>
-      <p class="header-date">최종 수정일: 2024년 5월 6일</p>
-      <div class="header-accent"></div>
-    </section>
+    <!-- Hero Header -->
+    <div class="hero">
+      <span class="hero-badge">TERMS OF SERVICE</span>
+      <h1 class="hero-title">이용약관</h1>
+      <div class="hero-date">최종 수정일: 2024년 5월 6일</div>
+      <div class="hero-bar"></div>
+    </div>
 
     <!-- Sections -->
     <div class="content-grid">
@@ -315,26 +292,30 @@
       <div class="section">
         <div class="section-heading">
           <span class="section-num">01.</span>
-          <span class="section-title">제1조 (목적)</span>
+          <h2>제1조 (목적)</h2>
         </div>
-        <p class="section-text">이 약관은 Tubify(이하 "회사"라 합니다)가 운영하는 웹사이트 및 애플리케이션(이하 "서비스"라 합니다)에서 제공하는 인터넷 관련 서비스 및 도구를 이용함에 있어 "회사"와 "회원"의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</p>
+        <div class="section-body">
+          <p>이 약관은 Tubify(이하 "회사"라 합니다)가 운영하는 웹사이트 및 애플리케이션(이하 "서비스"라 합니다)에서 제공하는 인터넷 관련 서비스 및 도구를 이용함에 있어 "회사"와 "회원"의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</p>
+        </div>
       </div>
 
       <!-- 제2조 -->
       <div class="section">
         <div class="section-heading">
           <span class="section-num">02.</span>
-          <span class="section-title">제2조 (용어의 정의)</span>
+          <h2>제2조 (용어의 정의)</h2>
         </div>
-        <div class="def-list">
-          <div class="def-item">
-            <span class="def-term">1. 서비스: </span><span class="def-desc">"회사"가 단말기(PC, 휴대형단말기 등의 각종 유무선 장치를 포함)와 상관없이 "회원"에게 제공하는 동영상 요약 및 큐레이션 서비스를 의미합니다.</span>
-          </div>
-          <div class="def-item">
-            <span class="def-term">2. 회원: </span><span class="def-desc">"회사"의 "서비스"에 접속하여 이 약관에 따라 "회사"와 이용계약을 체결하고 "회사"가 제공하는 "서비스"를 이용하는 고객을 말합니다.</span>
-          </div>
-          <div class="def-item">
-            <span class="def-term">3. 아이디(ID): </span><span class="def-desc">"회원"의 식별과 "서비스" 이용을 위하여 "회원"이 정하고 "회사"가 승인하는 문자와 숫자의 조합 또는 소셜 계정 정보를 의미합니다.</span>
+        <div class="section-body">
+          <div class="def-list">
+            <div class="def-item">
+              <p><strong>1. 서비스:</strong> <span>"회사"가 단말기(PC, 휴대형단말기 등의 각종 유무선 장치를 포함)와 상관없이 "회원"에게 제공하는 동영상 요약 및 큐레이션 서비스를 의미합니다.</span></p>
+            </div>
+            <div class="def-item">
+              <p><strong>2. 회원:</strong> <span>"회사"의 "서비스"에 접속하여 이 약관에 따라 "회사"와 이용계약을 체결하고 "회사"가 제공하는 "서비스"를 이용하는 고객을 말합니다.</span></p>
+            </div>
+            <div class="def-item">
+              <p><strong>3. 아이디(ID):</strong> <span>"회원"의 식별과 "서비스" 이용을 위하여 "회원"이 정하고 "회사"가 승인하는 문자와 숫자의 조합 또는 소셜 계정 정보를 의미합니다.</span></p>
+            </div>
           </div>
         </div>
       </div>
@@ -343,17 +324,17 @@
       <div class="section">
         <div class="section-heading">
           <span class="section-num">03.</span>
-          <span class="section-title">제3조 (서비스의 제공 및 변경)</span>
+          <h2>제3조 (서비스의 제공 및 변경)</h2>
         </div>
         <div class="section-body">
-          <p class="section-text">"회사"는 "회원"에게 아래와 같은 서비스를 제공합니다.</p>
+          <p>"회사"는 "회원"에게 아래와 같은 서비스를 제공합니다.</p>
           <ul class="bullet-list">
             <li>YouTube 등 외부 플랫폼 영상의 텍스트 요약 서비스</li>
             <li>AI 알고리즘을 활용한 맞춤형 콘텐츠 큐레이션</li>
             <li>실시간 트렌드 분석 및 인사이트 리포트</li>
             <li>기타 "회사"가 추가 개발하거나 다른 회사와의 제휴계약 등을 통해 "회원"에게 제공하는 일체의 서비스</li>
           </ul>
-          <p class="section-text">"회사"는 상당한 이유가 있는 경우에 운영상, 기술상의 필요에 따라 제공하고 있는 전부 또는 일부 "서비스"를 변경할 수 있습니다.</p>
+          <p>"회사"는 상당한 이유가 있는 경우에 운영상, 기술상의 필요에 따라 제공하고 있는 전부 또는 일부 "서비스"를 변경할 수 있습니다.</p>
         </div>
       </div>
 
@@ -361,29 +342,34 @@
       <div class="section">
         <div class="section-heading">
           <span class="section-num">04.</span>
-          <span class="section-title">제4조 (서비스의 중단)</span>
+          <h2>제4조 (서비스의 중단)</h2>
         </div>
-        <p class="section-text">"회사"는 컴퓨터 등 정보통신설비의 보수점검, 교체 및 고장, 통신두절 또는 운영상 상당한 이유가 있는 경우 "서비스"의 제공을 일시적으로 중단할 수 있습니다. 이 경우 "회사"는 사전에 "서비스" 초기 화면에 공지합니다.</p>
+        <div class="section-body">
+          <p>"회사"는 컴퓨터 등 정보통신설비의 보수점검, 교체 및 고장, 통신두절 또는 운영상 상당한 이유가 있는 경우 "서비스"의 제공을 일시적으로 중단할 수 있습니다. 이 경우 "회사"는 사전에 "서비스" 초기 화면에 공지합니다.</p>
+        </div>
       </div>
 
       <!-- 제5조 -->
       <div class="section">
         <div class="section-heading">
           <span class="section-num">05.</span>
-          <span class="section-title">제5조 (회원가입)</span>
+          <h2>제5조 (회원가입)</h2>
         </div>
         <div class="section-body">
-          <p class="section-text">이용자는 "회사"가 정한 가입 양식에 따라 회원정보를 기입한 후 이 약관에 동의한다는 의사표시를 함으로서 회원가입을 신청합니다.</p>
-          <div class="highlight-box">"회원"은 등록사항에 변경이 있는 경우, 즉시 전자우편 또는 기타 방법으로 "회사"에 대하여 그 변경사항을 알려야 합니다.</div>
+          <p>이용자는 "회사"가 정한 가입 양식에 따라 회원정보를 기입한 후 이 약관에 동의한다는 의사표시를 함으로서 회원가입을 신청합니다.</p>
+          <div class="highlight-box">
+            <p>"회원"은 등록사항에 변경이 있는 경우, 즉시 전자우편 또는 기타 방법으로 "회사"에 대하여 그 변경사항을 알려야 합니다.</p>
+          </div>
         </div>
       </div>
 
     </div>
   </main>
 
+  <!-- Footer -->
   <footer>
     <div class="footer-inner">
-      <span class="footer-logo">Tubify</span>
+      <a href="/intro.html" class="footer-logo">Tubify</a>
       <div class="footer-links">
         <a href="/privacy.html">개인정보처리방침</a>
         <a href="/terms.html">이용약관</a>
@@ -393,20 +379,20 @@
   </footer>
 
   <script>
-    const token = localStorage.getItem("access_token");
-    document.getElementById("nav-logo").href = token ? "/home.html" : "/intro.html";
-    if (token) {
-      document.getElementById("nav-auth-links").style.display = "flex";
-      document.getElementById("nav-auth-btn").textContent = "로그아웃";
+    function navLogout() {
+      localStorage.removeItem("access_token");
+      sessionStorage.removeItem("loggedIn");
+      location.href = "/intro.html";
     }
 
-    function handleAuthBtn() {
-      if (localStorage.getItem("access_token")) {
-        localStorage.removeItem("access_token");
-        sessionStorage.removeItem("loggedIn");
+    window.addEventListener("DOMContentLoaded", () => {
+      const hasToken = localStorage.getItem("access_token");
+      const btn = document.getElementById("nav-logout-btn");
+      if (!hasToken) {
+        btn.textContent = "로그인";
+        btn.onclick = () => { location.href = "/"; };
       }
-      window.location.href = "/";
-    }
+    });
   </script>
 </body>
 </html>

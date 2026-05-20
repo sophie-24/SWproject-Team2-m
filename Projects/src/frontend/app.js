@@ -18,7 +18,7 @@ window.onload = () => {
     }
     // 익스텐션 팝업이 window.open()으로 열었을 경우 자동 닫기
     if (window.opener !== null) { setTimeout(() => window.close(), 400); return; }
-    window.location.href = "/intro.html";
+    window.location.href = "/mypage.html";
     return;
   }
 
