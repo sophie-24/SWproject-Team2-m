@@ -66,7 +66,7 @@ def call_gemini(
         temperature: 생성 다양성 (0.0 ~ 1.0, 기본 0.3)
         json_mode:   True이면 response_mime_type="application/json" 적용.
                      Gemini가 마크다운 코드블록 없이 순수 JSON만 반환하도록 강제한다.
-                     JSON 구조화 응답이 필요한 에이전트(cluster_ai 등)에서만 사용.
+                     JSON 구조화 응답이 필요한 에이전트(title_topic_ai 등)에서만 사용.
 
     Returns:
         Gemini 응답 텍스트
