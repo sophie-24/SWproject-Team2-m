@@ -31,9 +31,10 @@ FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "../frontend")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8000")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "admin1234")
 EXTENSION_ID = os.getenv("EXTENSION_ID", "")
-# JS 배열 문자열로 변환 (쉼표 구분 다중 ID 지원)
+# HTML 내 "__EXTENSION_ID__" 플레이스홀더 치환용 — 따옴표 없이 raw ID만 삽입
+# (HTML 템플릿에서 const EXTENSION_ID = "__EXTENSION_ID__" 형태로 이미 따옴표로 감싸져 있음)
 _ext_ids = [x.strip() for x in EXTENSION_ID.split(",") if x.strip()]
-EXTENSION_IDS_JS = "[" + ",".join(f'"{i}"' for i in _ext_ids) + "]"
+EXTENSION_IDS_JS = _ext_ids[0] if _ext_ids else ""
 
 
 @asynccontextmanager
