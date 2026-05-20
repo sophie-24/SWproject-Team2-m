@@ -186,11 +186,10 @@ var SECTION_ICONS = [
 // ── 단일 영상 요약 렌더링 ──────────────────────────────────────────────────────
 
 function renderVideoSummary(videoTitle, aiData) {
-  var section = document.getElementById("video-summary-section");
-  var titleEl = document.getElementById("video-sum-title");
-  if (!section || !titleEl) return;
-
-  titleEl.textContent = videoTitle;
+  // SUMMARY 탭 헤더 설정
+  document.getElementById("kw-title-s").textContent = videoTitle;
+  document.getElementById("kw-header-row").style.display = "";
+  document.getElementById("kw-underline").style.display = "";
 
   var html = "";
 
@@ -200,26 +199,59 @@ function renderVideoSummary(videoTitle, aiData) {
       html += '<div class="cache-notice" style="background:#fff7ed;border-color:#fed7aa;color:#ea580c;margin-bottom:12px;">⚠️ 광고 의심 점수: ' + adScore + '점</div>';
     }
 
-    var sections = parseAnalysisToSections(aiData.final_analysis || "");
-    if (sections.length > 0) {
-      sections.forEach(function (s, i) {
+    var cards = [];
+
+    // summary 문자열 → 첫 번째 카드
+    var summaryText = (aiData.summary || "").trim();
+    if (summaryText && summaryText !== "자막 없음" && summaryText !== "분석 실패") {
+      cards.push({ title: "영상 요약", body: summaryText, icon: 0 });
+    }
+
+    // key_claims 배열 → 카드 추가 (최대 2개)
+    var claims = Array.isArray(aiData.key_claims) ? aiData.key_claims : [];
+    if (claims.length > 0) {
+      var claimBullets = claims.slice(0, 5).map(function(c) { return '<li>' + esc(c) + '</li>'; }).join('');
+      cards.push({ title: "핵심 주장", bodyHtml: '<ul class="bullet-list">' + claimBullets + '</ul>', icon: 1 });
+    }
+
+    // 신뢰도 점수 → 세 번째 카드
+    if (typeof aiData.credibility_score === "number") {
+      var pct = Math.round(aiData.credibility_score * 100);
+      var credLabel = pct >= 70 ? "높음" : pct >= 40 ? "보통" : "낮음";
+      var credColor = pct >= 70 ? "#16a34a" : pct >= 40 ? "#d97706" : "#dc2626";
+      cards.push({
+        title: "신뢰도",
+        bodyHtml: '<div style="display:flex;align-items:center;gap:8px;">'
+          + '<div style="flex:1;height:6px;background:#e6e8ea;border-radius:3px;overflow:hidden;">'
+          + '<div style="width:' + pct + '%;height:100%;background:' + credColor + ';border-radius:3px;"></div>'
+          + '</div>'
+          + '<span style="font-size:12px;font-weight:700;color:' + credColor + ';">' + pct + '% ' + credLabel + '</span>'
+          + '</div>',
+        icon: 2
+      });
+    }
+
+    if (cards.length > 0) {
+      cards.forEach(function(card) {
+        var bodyContent = card.bodyHtml
+          ? card.bodyHtml
+          : '<p class="section-body-text">' + esc(card.body || "") + '</p>';
         html += '<div class="section-block border-red">'
           + '<div class="section-header">'
-          + '<div class="section-icon-box icon-red">' + (SECTION_ICONS[i] || SECTION_ICONS[0]) + '</div>'
-          + '<div class="section-title-text">' + esc(s.title) + '</div>'
+          + '<div class="section-icon-box icon-red">' + SECTION_ICONS[card.icon] + '</div>'
+          + '<div class="section-title-text">' + esc(card.title) + '</div>'
           + '</div>'
-          + '<p class="section-body-text">' + esc(s.body) + '</p>'
+          + bodyContent
           + '</div>';
       });
     } else {
-      html = '<div style="color:#515f74;font-size:13px;line-height:1.65;">분석 결과가 없습니다.</div>';
+      html = '<div style="color:#515f74;font-size:13px;line-height:1.65;">자막 정보가 없어 분석할 수 없습니다.</div>';
     }
   } else {
     html = '<div style="color:#515f74;font-size:13px;line-height:1.65;">영상 분석을 가져올 수 없습니다.</div>';
   }
 
-  document.getElementById("video-analysis-content").innerHTML = html;
-  section.classList.remove("hidden");
+  document.getElementById("summary-content").innerHTML = html;
 }
 
 // ── 결과 렌더링 ───────────────────────────────────────────────────────────────
@@ -233,44 +265,68 @@ function renderResults(data, watchMode) {
   var category     = data.category || "";
   var cached       = data.cached || false;
 
-  // watch 모드: 키워드 제목행 숨김, 단일 영상 섹션이 제목 역할
-  var kwHeaderRow = document.getElementById("kw-header-row");
-  var kwUnderline = document.getElementById("kw-underline");
-  if (watchMode) {
-    if (kwHeaderRow) kwHeaderRow.style.display = "none";
-    if (kwUnderline) kwUnderline.style.display = "none";
-  } else {
-    if (kwHeaderRow) kwHeaderRow.style.display = "";
-    if (kwUnderline) kwUnderline.style.display = "";
-    document.getElementById("kw-title-s").textContent = keyword;
-
-    // 대표 video_id
-    var repVideo = videos.find(function (v) { return !v.ad_detected && v.video_id; }) || videos[0];
-    currentVideoId = (repVideo && repVideo.video_id) || "";
-
-    setHeartState(false);
-    heartedTopic = "";
-    checkHeartState(keyword);
-  }
-
   var SUMMARY_TITLE = { "정보탐색형": "핵심 인사이트", "유희탐색형": "화제 포인트", "구매탐색형": "장점 요약" };
   var FACTS_TITLE   = { "정보탐색형": "전문가 분석", "유희탐색형": "반응 및 의견", "구매탐색형": "전문가 평가" };
 
-  var summaryHTML = cached ? '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>' : "";
+  // SUMMARY 탭 버튼: watch=보임, search=숨김
+  var summaryTabBtn = document.querySelector('[data-tab="summary"]');
+  if (summaryTabBtn) summaryTabBtn.style.display = watchMode ? "" : "none";
+  // INSIGHTS 내 검색 헤더: watch=숨김, search=보임 (search 모드에서 따로 설정)
+  if (watchMode) {
+    document.getElementById("insights-kw-header").style.display = "none";
+    document.getElementById("insights-kw-underline").style.display = "none";
+  }
 
-  if (summaryLines.length) {
-    var bullets = summaryLines.map(function (l) {
-      return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
-    }).join("");
-    summaryHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">' + SECTION_ICONS[0] + '</div><div class="section-title-text">' + (SUMMARY_TITLE[category] || "주요 요약") + '</div></div><div class="bullet-list">' + bullets + '</div></div>';
+  if (watchMode) {
+    // watch 모드: SUMMARY 탭은 renderVideoSummary가 처리 → 여기선 INSIGHTS 탭만 채움
+    var insightsHTML = cached ? '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>' : "";
+    if (summaryLines.length) {
+      var bullets = summaryLines.map(function (l) {
+        return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
+      }).join("");
+      insightsHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">' + SECTION_ICONS[0] + '</div><div class="section-title-text">' + (SUMMARY_TITLE[category] || "주요 요약") + '</div></div><div class="bullet-list">' + bullets + '</div></div>';
+    }
+    if (commonFacts.length) {
+      var factBullets = commonFacts.map(function (f) {
+        return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
+      }).join("");
+      insightsHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">' + SECTION_ICONS[1] + '</div><div class="section-title-text">' + (FACTS_TITLE[category] || "공통 사실") + '</div></div><div class="bullet-list">' + factBullets + '</div></div>';
+    }
+    document.getElementById("insights-sections").innerHTML = insightsHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">관련 영상 분석 정보가 없습니다.</div>';
+  } else {
+    // search 모드: INSIGHTS 탭에 내용, SUMMARY 탭은 비움
+    document.getElementById("kw-title-insights").textContent = keyword;
+    document.getElementById("insights-kw-header").style.display = "";
+    document.getElementById("insights-kw-underline").style.display = "";
+    // SUMMARY 탭 헤더/내용 숨김
+    document.getElementById("kw-header-row").style.display = "none";
+    document.getElementById("kw-underline").style.display = "none";
+    document.getElementById("summary-content").innerHTML = "";
+
+    var repVideo = videos.find(function (v) { return !v.ad_detected && v.video_id; }) || videos[0];
+    currentVideoId = (repVideo && repVideo.video_id) || "";
+    setHeartState(false);
+    heartedTopic = "";
+    checkHeartState(keyword);
+
+    var insightsHTML = cached ? '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>' : "";
+    if (summaryLines.length) {
+      var sBullets = summaryLines.map(function (l) {
+        return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
+      }).join("");
+      insightsHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">' + SECTION_ICONS[0] + '</div><div class="section-title-text">' + (SUMMARY_TITLE[category] || "주요 요약") + '</div></div><div class="bullet-list">' + sBullets + '</div></div>';
+    }
+    if (commonFacts.length) {
+      var fBullets = commonFacts.map(function (f) {
+        return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
+      }).join("");
+      insightsHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">' + SECTION_ICONS[1] + '</div><div class="section-title-text">' + (FACTS_TITLE[category] || "공통 사실") + '</div></div><div class="bullet-list">' + fBullets + '</div></div>';
+    }
+    document.getElementById("insights-sections").innerHTML = insightsHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">요약 정보가 없습니다.</div>';
+
+    // INSIGHTS 탭으로 자동 전환
+    switchTab("insights");
   }
-  if (commonFacts.length) {
-    var factBullets = commonFacts.map(function (f) {
-      return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
-    }).join("");
-    summaryHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">' + SECTION_ICONS[1] + '</div><div class="section-title-text">' + (FACTS_TITLE[category] || "공통 사실") + '</div></div><div class="bullet-list">' + factBullets + '</div></div>';
-  }
-  document.getElementById("summary-sections").innerHTML = summaryHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">요약 정보가 없습니다.</div>';
 
   var controversyHTML = "";
   if (controversies.length) {
@@ -304,7 +360,7 @@ function renderResults(data, watchMode) {
 
   if (videos.length) {
     document.getElementById("sources-in-insights").classList.remove("hidden");
-    document.getElementById("sources-preview").innerHTML = videos.slice(0, 3).map(function(v) { return buildVideoCard(v, true); }).join("");
+    document.getElementById("sources-preview").innerHTML = videos.map(function(v) { return buildVideoCard(v, true); }).join("");
     document.getElementById("sources-list").innerHTML = videos.map(function(v) { return buildVideoCard(v, false); }).join("");
   } else {
     document.getElementById("sources-in-insights").classList.add("hidden");
@@ -332,9 +388,8 @@ async function analyze(keyword, jwt) {
   showScreen("screen-loading");
   setStep(1, "active"); setStep(2, ""); setStep(3, "");
 
-  // 단일 영상 섹션 숨김
-  var videoSection = document.getElementById("video-summary-section");
-  if (videoSection) videoSection.classList.add("hidden");
+  // search 모드 진입: summary-content 초기화
+  document.getElementById("summary-content").innerHTML = "";
 
   try {
     await new Promise(function (r) { setTimeout(r, 500); });
@@ -444,11 +499,16 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
       renderResults(kwData, true);
     } else {
       // 관련 영상 없이 단순 화면 전환
-      document.getElementById("summary-sections").innerHTML = '<div style="color:#515f74;font-size:13px;padding:8px 0;">관련 영상 분석 결과가 없습니다.</div>';
+      var summaryTabBtn2 = document.querySelector('[data-tab="summary"]');
+      if (summaryTabBtn2) summaryTabBtn2.style.display = "";
+      document.getElementById("insights-kw-header").style.display = "none";
+      document.getElementById("insights-kw-underline").style.display = "none";
+      document.getElementById("insights-sections").innerHTML = '<div style="color:#515f74;font-size:13px;padding:8px 0;">관련 영상 분석 결과가 없습니다.</div>';
       document.getElementById("controversy-section").innerHTML = "";
       document.getElementById("sources-in-insights").classList.add("hidden");
       showScreen("screen-results");
     }
+    switchTab("summary");
 
   } catch (e) {
     document.getElementById("err-msg").textContent = "백엔드에 연결할 수 없습니다.";
@@ -466,8 +526,8 @@ function setStepLabel(n, label, desc) {
 
 // ── 버튼 이벤트 ───────────────────────────────────────────────────────────────
 
-document.querySelectorAll(".btn-heart").forEach(function (btn) {
-  btn.addEventListener("click", toggleHeart);
+document.addEventListener("click", function (e) {
+  if (e.target.closest(".btn-heart")) toggleHeart();
 });
 
 document.getElementById("btn-retry").addEventListener("click", function () {

@@ -187,21 +187,20 @@
     }
 
     .interest-tag-remove {
-      display: none;
       background: none;
       border: none;
       cursor: pointer;
       padding: 0;
-      color: #bc0100;
-      font-size: 14px;
+      color: #94a3b8;
+      font-size: 13px;
       font-weight: 700;
       line-height: 1;
       font-family: inherit;
-    }
-
-    .edit-mode .interest-tag-remove {
       display: inline-flex;
+      align-items: center;
+      transition: color 0.15s;
     }
+    .interest-tag-remove:hover { color: #bc0100; }
 
     .interest-tags-empty {
       font-size: 14px;
@@ -209,58 +208,16 @@
       margin-bottom: 32px;
     }
 
-    /* ── Search Bar (edit mode) ── */
-    .interest-search-wrap {
-      display: none;
-      position: relative;
-      max-width: 576px;
-      margin-bottom: 16px;
-    }
-
-    .edit-mode .interest-search-wrap {
-      display: block;
-    }
-
-    .interest-search-icon {
-      position: absolute;
-      left: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 17px;
-      height: 17px;
-      pointer-events: none;
-    }
-
-    .interest-search-input {
-      width: 100%;
-      background: #f2f4f6;
-      border: none;
-      border-radius: 12px;
-      padding: 14px 16px 14px 44px;
-      font-size: 16px;
-      font-weight: 400;
-      color: #191c1e;
-      font-family: inherit;
-      outline: none;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    }
-
-    .interest-search-input::placeholder { color: rgba(81, 95, 116, 0.82); }
-
-    .interest-search-input:focus {
-      outline: 2px solid #bc0100;
-      outline-offset: -2px;
-    }
-
     /* ── Buttons ── */
     .btn-edit-interest {
       display: inline-flex;
       align-items: center;
+      gap: 6px;
       background: #bc0100;
       border: none;
       border-radius: 8px;
-      padding: 12px 48px;
-      font-size: 16px;
+      padding: 12px 32px;
+      font-size: 15px;
       font-weight: 700;
       color: #fff;
       cursor: pointer;
@@ -269,8 +226,128 @@
       align-self: flex-start;
       margin-top: 10px;
     }
-
     .btn-edit-interest:hover { opacity: 0.9; }
+
+    /* ── 관심사 수정 모달 ── */
+    .modal-interest-body {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .modal-interest-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #191c1e;
+      letter-spacing: -0.02em;
+    }
+    .modal-interest-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      min-height: 44px;
+    }
+    .modal-interest-tag {
+      background: rgba(188,1,0,0.07);
+      border: 1.5px solid rgba(188,1,0,0.18);
+      border-radius: 9999px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #bc0100;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .modal-interest-tag button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      color: #bc0100;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      opacity: 0.6;
+    }
+    .modal-interest-tag button:hover { opacity: 1; }
+    .modal-interest-empty {
+      font-size: 13px;
+      color: #94a3b8;
+      padding: 4px 0;
+    }
+    .modal-interest-input-wrap {
+      display: flex;
+      gap: 8px;
+    }
+    .modal-interest-input {
+      flex: 1;
+      background: #f2f4f6;
+      border: 1.5px solid transparent;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-weight: 400;
+      color: #191c1e;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .modal-interest-input::placeholder { color: #94a3b8; }
+    .modal-interest-input:focus { border-color: #bc0100; background: #fff; }
+    .modal-interest-add-btn {
+      background: #bc0100;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .modal-interest-add-btn:hover { opacity: 0.9; }
+    .modal-interest-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .modal-interest-hint {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 6px;
+      padding-left: 2px;
+    }
+    .modal-interest-footer {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      padding-top: 8px;
+      border-top: 1px solid #f2f4f6;
+    }
+    .btn-modal-cancel {
+      padding: 12px 24px;
+      background: #f2f4f6;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #515f74;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-modal-cancel:hover { background: #e6e8ea; }
+    .btn-modal-save {
+      padding: 12px 28px;
+      background: #bc0100;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-modal-save:hover { opacity: 0.9; }
+    .btn-modal-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .schedule-desc {
       font-size: 14px;
@@ -637,17 +714,10 @@
           <span class="interest-tags-empty">관심사를 불러오는 중...</span>
         </div>
 
-        <div class="interest-search-wrap">
-          <img class="interest-search-icon" src="/static/images/icon_search.svg" alt="" />
-          <input
-            class="interest-search-input"
-            id="interest-search"
-            type="text"
-            placeholder="키워드 검색 (예: AI 기술, 노트북 ...)"
-          />
-        </div>
-
-        <button class="btn-edit-interest" id="btn-edit-interest" onclick="toggleEditMode()">관심사 수정</button>
+        <button class="btn-edit-interest" id="btn-edit-interest" onclick="openInterestModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          관심사 수정
+        </button>
       </div>
 
       <!-- Delivery Schedule -->
@@ -712,6 +782,35 @@
       <div class="modal-footer">
         <button class="btn-modal-cancel" onclick="closeModal('modal-schedule')">취소</button>
         <button class="btn-modal-save" onclick="saveSchedule()">저장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 관심사 수정 모달 ══ -->
+  <div class="modal-overlay" id="modal-interest" onclick="handleOverlayClick(event, 'modal-interest')">
+    <div class="modal" style="max-width:480px;border-radius:20px;padding:32px;">
+      <div class="modal-interest-body">
+        <div class="modal-interest-title">관심 토픽 수정</div>
+        <div class="modal-interest-tags" id="modal-interest-tags">
+          <span class="modal-interest-empty">아직 추가된 관심사가 없어요.</span>
+        </div>
+        <div>
+          <div class="modal-interest-input-wrap">
+            <input
+              class="modal-interest-input"
+              id="modal-interest-input"
+              type="text"
+              placeholder="토픽 입력 (예: AI, 경제, 테크...)"
+              maxlength="30"
+            />
+            <button class="modal-interest-add-btn" id="modal-interest-add-btn" onclick="modalAddInterest()">추가</button>
+          </div>
+          <div class="modal-interest-hint" id="modal-interest-hint">최대 5개까지 추가할 수 있습니다.</div>
+        </div>
+        <div class="modal-interest-footer">
+          <button class="btn-modal-cancel" onclick="closeModal('modal-interest')">취소</button>
+          <button class="btn-modal-save" id="modal-interest-save" onclick="saveInterestModal()">저장</button>
+        </div>
       </div>
     </div>
   </div>
@@ -825,78 +924,113 @@
         return;
       }
       el.innerHTML = currentInterests.map(i => `
-        <span class="interest-tag">
-          ${escHtml(i.topic)}
-          <button class="interest-tag-remove" onclick="removeInterest('${escHtml(i.topic)}')" title="삭제">✕</button>
-        </span>
+        <span class="interest-tag">${escHtml(i.topic)}</span>
       `).join("");
     }
 
-    // ── 편집 모드 토글 ───────────────────────────────────────────────────────────
-    function toggleEditMode() {
-      editMode = !editMode;
-      const section = document.getElementById("interest-section");
-      if (editMode) {
-        section.classList.add("edit-mode");
-        document.getElementById("interest-search").value = "";
+    // ── 관심사 수정 모달 ──────────────────────────────────────────────────────────
+    let modalPendingInterests = []; // 모달 내 임시 상태
+
+    function openInterestModal() {
+      modalPendingInterests = currentInterests.map(i => i.topic);
+      renderModalTags();
+      document.getElementById("modal-interest-input").value = "";
+      updateModalHint();
+      openModal("modal-interest");
+      setTimeout(() => document.getElementById("modal-interest-input").focus(), 100);
+    }
+
+    function renderModalTags() {
+      const wrap = document.getElementById("modal-interest-tags");
+      if (modalPendingInterests.length === 0) {
+        wrap.innerHTML = `<span class="modal-interest-empty">아직 추가된 관심사가 없어요.</span>`;
+        return;
+      }
+      wrap.innerHTML = modalPendingInterests.map(t =>
+        `<span class="modal-interest-tag">
+          ${escHtml(t)}
+          <button onclick="modalRemoveTag('${escHtml(t)}')" title="삭제">✕</button>
+        </span>`
+      ).join("");
+    }
+
+    function updateModalHint() {
+      const n = modalPendingInterests.length;
+      const hint = document.getElementById("modal-interest-hint");
+      const addBtn = document.getElementById("modal-interest-add-btn");
+      if (n >= 5) {
+        hint.textContent = "최대 5개까지 추가할 수 있습니다.";
+        hint.style.color = "#bc0100";
+        addBtn.disabled = true;
       } else {
-        section.classList.remove("edit-mode");
+        hint.textContent = `${n}/5개 추가됨`;
+        hint.style.color = "#94a3b8";
+        addBtn.disabled = false;
       }
     }
 
-    // ── 관심사 삭제 ──────────────────────────────────────────────────────────────
-    async function removeInterest(topic) {
+    function modalRemoveTag(topic) {
+      modalPendingInterests = modalPendingInterests.filter(t => t !== topic);
+      renderModalTags();
+      updateModalHint();
+    }
+
+    function modalAddInterest() {
+      const input = document.getElementById("modal-interest-input");
+      const keyword = input.value.trim();
+      if (!keyword) return;
+      if (modalPendingInterests.length >= 5) return;
+      if (modalPendingInterests.includes(keyword)) {
+        input.value = "";
+        return;
+      }
+      modalPendingInterests.push(keyword);
+      input.value = "";
+      renderModalTags();
+      updateModalHint();
+      input.focus();
+    }
+
+    async function saveInterestModal() {
+      const saveBtn = document.getElementById("modal-interest-save");
+      saveBtn.disabled = true;
+      saveBtn.textContent = "저장 중...";
       const jwt = localStorage.getItem("access_token");
+
+      const toAdd    = modalPendingInterests.filter(t => !currentInterests.find(i => i.topic === t));
+      const toRemove = currentInterests.map(i => i.topic).filter(t => !modalPendingInterests.includes(t));
+
       try {
-        const res = await fetch(`${API}/interests/${encodeURIComponent(topic)}`, {
-          method: "DELETE",
-          headers: { "Authorization": `Bearer ${jwt}` }
-        });
-        if (res.ok) {
-          currentInterests = currentInterests.filter(i => i.topic !== topic);
-          renderTags();
+        // 삭제
+        for (const topic of toRemove) {
+          await fetch(`${API}/interests/${encodeURIComponent(topic)}`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${jwt}` }
+          });
         }
+        // 추가
+        for (const topic of toAdd) {
+          await fetch(`${API}/interests`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${jwt}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ title: topic, video_id: "" })
+          });
+        }
+        await loadInterests();
+        closeModal("modal-interest");
       } catch (e) {
-        console.warn("[mypage] 관심사 삭제 실패:", e);
+        console.warn("[mypage] 관심사 저장 실패:", e);
+        alert("저장 중 오류가 발생했습니다.");
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "저장";
       }
     }
 
-    // ── 관심사 추가 (키워드 검색 Enter) ─────────────────────────────────────────
+    // Enter 키로 추가
     document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById("interest-search").addEventListener("keydown", async (e) => {
-        if (e.key !== "Enter") return;
-        const keyword = e.target.value.trim();
-        if (!keyword) return;
-
-        if (currentInterests.length >= 5) {
-          openModal("modal-limit");
-          return;
-        }
-
-        const jwt = localStorage.getItem("access_token");
-        try {
-          const res = await fetch(`${API}/interests`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${jwt}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ title: keyword, video_id: "" })
-          });
-
-          if (res.status === 409) {
-            openModal("modal-limit");
-            return;
-          }
-
-          if (res.ok) {
-            const data = await res.json();
-            e.target.value = "";
-            await loadInterests();
-          }
-        } catch (err) {
-          console.warn("[mypage] 관심사 추가 실패:", err);
-        }
+      document.getElementById("modal-interest-input").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); modalAddInterest(); }
       });
     });
 
@@ -906,8 +1040,8 @@
       const sendTime = document.getElementById("input-send-time").value;
 
       try {
-        const res = await fetch(`${API}/my/send-time`, {
-          method: "PATCH",
+        const res = await fetch(`${API}/my/profile`, {
+          method: "PUT",
           headers: {
             "Authorization": `Bearer ${jwt}`,
             "Content-Type": "application/json"
@@ -962,7 +1096,7 @@
 
     document.addEventListener("keydown", e => {
       if (e.key === "Escape") {
-        ["modal-schedule", "modal-limit", "modal-withdraw"].forEach(closeModal);
+        ["modal-schedule", "modal-limit", "modal-withdraw", "modal-interest"].forEach(closeModal);
       }
     });
 

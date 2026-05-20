@@ -869,7 +869,7 @@
 
     <!-- 사이드 탭 네비 -->
     <div class="tab-nav">
-      <button class="tab-btn active" data-tab="summary" title="인사이트">
+      <button class="tab-btn active" data-tab="summary" title="서머리">
         <span class="tab-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -879,6 +879,15 @@
           </svg>
         </span>
         <span class="tab-label">SUMMARY</span>
+      </button>
+      <button class="tab-btn" data-tab="insights" title="인사이트">
+        <span class="tab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </span>
+        <span class="tab-label">INSIGHTS</span>
       </button>
       <button class="tab-btn" data-tab="sources" title="소스">
         <span class="tab-icon">
@@ -904,31 +913,9 @@
     <!-- 콘텐츠 -->
     <div class="content-wrap">
 
-      <!-- 인사이트 탭 -->
+      <!-- SUMMARY 탭 -->
       <div id="tab-summary" class="tab-panel active">
-
-        <!-- ① 단일 영상 요약 (watch 페이지에서만 표시) -->
-        <div class="video-summary-section hidden" id="video-summary-section">
-          <div class="video-sum-title-row">
-            <h2 class="video-sum-title" id="video-sum-title">영상 제목</h2>
-            <button class="btn-heart" id="btn-heart-video" title="관심 토픽으로 저장">
-              <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-              </svg>
-            </button>
-          </div>
-          <div class="keyword-underline"></div>
-          <div id="video-analysis-content"></div>
-
-          <!-- 구분선 -->
-          <div class="related-section-header">
-            <div class="related-divider-line"></div>
-            <span class="related-section-label">관련 영상 분석</span>
-            <div class="related-divider-line"></div>
-          </div>
-        </div>
-
-        <!-- ② 키워드 분석 제목 (search 페이지에서만 표시) -->
+        <!-- 제목 + 하트 -->
         <div id="kw-header-row" class="keyword-title-row">
           <div class="keyword-title" id="kw-title-s">-</div>
           <button class="btn-heart" id="btn-heart" title="관심 토픽으로 저장">
@@ -938,9 +925,23 @@
           </button>
         </div>
         <div class="keyword-underline" id="kw-underline"></div>
+        <!-- 분석 카드: watch 모드 → 단일 영상 AI 분석, search 모드 → 키워드 요약 -->
+        <div id="summary-content"></div>
+      </div>
 
-        <!-- ③ 공통 분석 결과 -->
-        <div id="summary-sections"></div>
+      <!-- INSIGHTS 탭 -->
+      <div id="tab-insights" class="tab-panel">
+        <!-- search 모드 키워드 헤더 (watch 모드에서는 숨김) -->
+        <div id="insights-kw-header" class="keyword-title-row" style="display:none;">
+          <div class="keyword-title" id="kw-title-insights">-</div>
+          <button class="btn-heart" id="btn-heart-insights" title="관심 토픽으로 저장">
+            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </button>
+        </div>
+        <div id="insights-kw-underline" class="keyword-underline" style="display:none;margin-bottom:20px;"></div>
+        <div id="insights-sections"></div>
         <div id="controversy-section"></div>
         <div id="sources-in-insights" class="sources-in-insights hidden">
           <div class="source-header">
@@ -951,7 +952,7 @@
         </div>
       </div>
 
-      <!-- 소스 탭 -->
+      <!-- SOURCES 탭 -->
       <div id="tab-sources" class="tab-panel">
         <div class="source-header">
           <span class="source-title-text">주요 소스</span>

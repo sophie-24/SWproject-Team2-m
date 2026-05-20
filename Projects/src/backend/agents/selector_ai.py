@@ -146,7 +146,7 @@ def select_top_videos(
     subscribed_channel_ids: List[str] = None,
     user_categories: List[str] = None,
     clicked_channel_ids: List[str] = None,
-    max_fetch: int = 15,
+    max_fetch: int = 25,
     top_n: int = 5,
 ) -> List[Dict[str, Any]]:
     """
@@ -163,7 +163,7 @@ def select_top_videos(
         subscribed_channel_ids: 사용자 구독 채널 ID 목록 (ω₂)
         user_categories:        사용자 관심사 카테고리 목록 — 조건 매칭용 (ω₃)
         clicked_channel_ids:    유저가 이전에 시청한 채널 ID 목록 — 클릭 여부용 (ω₄)
-        max_fetch:              YouTube API에서 가져올 후보 영상 수 (기본 15 — 광고 필터 후 5개 확보 여유)
+        max_fetch:              YouTube API에서 가져올 후보 영상 수 (기본 25 — 광고/쇼츠 필터 후 5개 확보 여유)
         top_n:                  최종 선정 영상 수 (기본 5)
 
     Returns:

@@ -6,7 +6,7 @@
   <title>Tubify — 유튜브 시청을 지식으로</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -21,12 +21,12 @@
     nav {
       position: fixed;
       top: 0; left: 0; right: 0;
-      background: rgba(247, 249, 251, 0.8);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      background: rgba(247, 249, 251, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       z-index: 100;
+      border-bottom: 1px solid rgba(235, 235, 235, 0.5);
     }
-
     .nav-inner {
       max-width: 1280px;
       margin: 0 auto;
@@ -36,7 +36,6 @@
       align-items: center;
       justify-content: space-between;
     }
-
     .nav-logo {
       font-size: 24px;
       font-weight: 800;
@@ -44,28 +43,24 @@
       letter-spacing: -0.02em;
       text-decoration: none;
     }
-
     .nav-links {
       display: flex;
       gap: 32px;
       align-items: center;
     }
-
     .nav-link {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 500;
       color: #191c1e;
       text-decoration: none;
       letter-spacing: -0.025em;
     }
-
     .nav-link.active {
       font-weight: 600;
       color: #bc0100;
       border-bottom: 2px solid #bc0100;
       padding-bottom: 2px;
     }
-
     .nav-btn {
       padding: 8px 24px;
       background: #e6e8ea;
@@ -79,7 +74,6 @@
       text-decoration: none;
       display: inline-block;
     }
-
     .nav-btn:hover { background: #d4d6d8; }
 
     /* ── Hero ── */
@@ -94,12 +88,9 @@
       position: relative;
       overflow: hidden;
     }
-
     .hero-blur {
       position: absolute;
-      top: 50%;
-      left: -2%;
-      right: 0;
+      top: 50%; left: -2%; right: 0;
       height: 1667px;
       transform: translateY(-50%);
       background: rgba(255, 0, 0, 0.03);
@@ -107,28 +98,6 @@
       filter: blur(60px);
       pointer-events: none;
     }
-
-    /* Decorative floating elements */
-    .hero-float-mail {
-      position: absolute;
-      top: calc(80px + 85px);
-      left: calc(50% - 420px);
-      width: 80px;
-      height: 80px;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .hero-float-doc {
-      position: absolute;
-      top: calc(80px + 303px);
-      right: calc(50% - 480px);
-      width: 60px;
-      height: 75px;
-      pointer-events: none;
-      z-index: 1;
-    }
-
     .hero-inner {
       max-width: 1280px;
       width: 100%;
@@ -139,251 +108,406 @@
       position: relative;
       z-index: 2;
     }
-
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(188, 1, 0, 0.08);
+      border: 1px solid rgba(188, 1, 0, 0.15);
+      border-radius: 9999px;
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #bc0100;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+    .hero-badge-dot {
+      width: 6px;
+      height: 6px;
+      background: #bc0100;
+      border-radius: 50%;
+    }
     .hero-title {
       font-size: 72px;
       font-weight: 800;
       color: #191c1e;
       letter-spacing: -0.025em;
-      line-height: 1;
-      margin-bottom: 32px;
+      line-height: 1.05;
+      margin-bottom: 28px;
     }
-
     .hero-title .accent { color: #bc0100; }
-
     .hero-subtitle {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 400;
       color: #515f74;
-      line-height: 1.33;
-      max-width: 528px;
+      line-height: 1.65;
+      max-width: 560px;
       margin-bottom: 48px;
     }
-
+    .hero-cta-group {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
     .hero-cta {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
+      gap: 8px;
       padding: 16px 32px;
       background: linear-gradient(135deg, #bc0100 0%, #eb0000 100%);
       border: none;
-      border-radius: 12.8px;
-      font-size: 18px;
-      font-weight: 500;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 600;
       color: white;
       cursor: pointer;
       font-family: inherit;
       text-decoration: none;
-      letter-spacing: -0.01em;
-      transition: opacity 0.2s;
+      transition: opacity 0.2s, transform 0.2s;
     }
-
-    .hero-cta:hover { opacity: 0.9; }
-
-    /* ── Feature 1: Extension ── */
-    .feature-extension {
-      background: rgba(242, 244, 246, 0.33);
-      padding: 80px 0 128px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .feature-extension-inner {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 0 32px;
-      display: flex;
-      flex-direction: column;
+    .hero-cta:hover { opacity: 0.9; transform: translateY(-1px); }
+    .hero-cta-secondary {
+      display: inline-flex;
       align-items: center;
-      position: relative;
-      z-index: 1;
+      gap: 6px;
+      padding: 16px 28px;
+      background: white;
+      border: 1.5px solid #e6e8ea;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 600;
+      color: #191c1e;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      transition: border-color 0.2s;
     }
-
-    .screenshot-wrap {
-      position: relative;
+    .hero-cta-secondary:hover { border-color: #bc0100; color: #bc0100; }
+    .hero-preview {
+      margin-top: 72px;
       width: 100%;
       max-width: 1056px;
-      margin-bottom: 80px;
+      position: relative;
     }
-
-    .feature-screenshot {
+    .hero-preview-img {
       width: 100%;
-      border-radius: 50px;
-      box-shadow: 15px 20px 4px rgba(25, 28, 30, 0.06);
+      border-radius: 24px;
+      box-shadow: 0 24px 64px rgba(25, 28, 30, 0.12);
       display: block;
     }
 
-    .feature-fab {
-      position: absolute;
-      right: 48px;
-      bottom: -28px;
-      width: 56px;
-      height: 56px;
-      background: red;
-      border-radius: 9999px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 16px rgba(255, 0, 0, 0.35);
-    }
-
-    .feature-fab img {
-      width: 20px;
-      height: 20px;
-      object-fit: contain;
-    }
-
-    .feature-ellipse {
-      position: absolute;
-      width: 1062px;
-      height: 960px;
-      left: 50%;
-      transform: translateX(-30%);
-      top: 120px;
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.6;
-    }
-
-    .feature-badge {
+    /* ── 공통 섹션 헤더 ── */
+    .section-label {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 6px 16px;
+      padding: 5px 14px;
       border-radius: 9999px;
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      margin-bottom: 24px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
     }
+    .section-label.gray { background: #d5e3fc; color: #57657a; }
+    .section-label.red  { background: rgba(188,1,0,0.08); color: #bc0100; }
+    .section-label.blue { background: #0071e8; color: white; }
+    .section-label.dark { background: #e6e8ea; color: #515f74; }
 
-    .feature-badge.gray {
-      background: #d5e3fc;
-      color: #57657a;
-    }
-
-    .feature-badge.blue {
-      background: #0071e8;
-      color: white;
-    }
-
-    .feature-heading {
+    .section-heading {
       font-size: 48px;
       font-weight: 800;
       color: #191c1e;
+      line-height: 1.2;
       text-align: center;
-      line-height: 1.35;
-      margin-bottom: 24px;
+      letter-spacing: -0.02em;
     }
-
-    .feature-desc {
-      font-size: 20px;
+    .section-desc {
+      font-size: 18px;
       color: #515f74;
       text-align: center;
-      line-height: 1.46;
-      max-width: 629px;
-      margin-bottom: 40px;
+      line-height: 1.65;
+      max-width: 600px;
     }
 
-    .feature-list {
+    /* ── How it works ── */
+    .how-section {
+      padding: 160px 32px;
+      background: white;
+    }
+    .how-inner {
+      max-width: 1280px;
+      margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 24px;
       align-items: center;
+      gap: 96px;
     }
-
-    .feature-item {
+    .how-header {
       display: flex;
-      align-items: flex-start;
+      flex-direction: column;
+      align-items: center;
       gap: 16px;
-      text-align: left;
     }
-
-    .feature-item-icon {
-      width: 20px;
-      height: 24px;
-      flex-shrink: 0;
-      margin-top: 2px;
-      object-fit: contain;
+    .how-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      width: 100%;
+      max-width: 960px;
+      position: relative;
     }
-
-    .feature-item-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #191c1e;
-      margin-bottom: 2px;
+    .how-steps::before {
+      content: '';
+      position: absolute;
+      top: 28px;
+      left: calc(16.67% + 16px);
+      right: calc(16.67% + 16px);
+      height: 2px;
+      background: repeating-linear-gradient(90deg, #e6e8ea 0, #e6e8ea 6px, transparent 6px, transparent 14px);
     }
-
-    .feature-item-desc {
-      font-size: 16px;
-      color: #515f74;
-    }
-
-    /* ── Feature Sections (SNAP SUMMARY / DAILY MAIL) ── */
-    .feature-section {
-      padding: 128px 32px;
+    .how-step {
       display: flex;
       flex-direction: column;
       align-items: center;
+      gap: 20px;
+      padding: 0 24px;
+      text-align: center;
+    }
+    .how-step-num {
+      width: 56px;
+      height: 56px;
+      border-radius: 9999px;
+      background: #f7f9fb;
+      border: 2px solid #e6e8ea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Manrope", sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      color: #bc0100;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .how-step-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #191c1e;
+      letter-spacing: -0.02em;
+    }
+    .how-step-desc {
+      font-size: 14px;
+      color: #515f74;
+      line-height: 1.6;
     }
 
+    /* ── Extension Feature ── */
+    .ext-section {
+      padding: 160px 32px;
+      background: #f7f9fb;
+    }
+    .ext-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 80px;
+    }
+    .ext-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .ext-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      width: 100%;
+      max-width: 880px;
+    }
+    .ext-tab-card {
+      background: white;
+      border-radius: 20px;
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 2px 12px rgba(25, 28, 30, 0.06);
+      border: 1.5px solid transparent;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .ext-tab-card:hover {
+      border-color: rgba(188, 1, 0, 0.15);
+      box-shadow: 0 4px 24px rgba(25, 28, 30, 0.1);
+    }
+    .ext-tab-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(188, 1, 0, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #bc0100;
+    }
+    .ext-tab-icon svg { width: 22px; height: 22px; }
+    .ext-tab-label {
+      font-family: "Manrope", sans-serif;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: #bc0100;
+      text-transform: uppercase;
+    }
+    .ext-tab-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #191c1e;
+      letter-spacing: -0.02em;
+    }
+    .ext-tab-desc {
+      font-size: 14px;
+      color: #515f74;
+      line-height: 1.65;
+    }
+    .ext-screenshot-wrap {
+      width: 100%;
+      max-width: 1000px;
+      position: relative;
+    }
+    .ext-screenshot {
+      width: 100%;
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(25, 28, 30, 0.1);
+      display: block;
+    }
+
+    /* ── Feature sections (SNAP / MAIL) ── */
+    .feature-section {
+      padding: 160px 32px;
+    }
+    .feature-section.alt { background: white; }
     .feature-section-inner {
       max-width: 1280px;
-      width: 100%;
+      margin: 0 auto;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 94px;
+      gap: 80px;
     }
-
     .feature-section-text {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 44px;
+      gap: 20px;
     }
-
-    .feature-section-heading {
-      font-size: 48px;
-      font-weight: 800;
-      color: #191c1e;
-      text-align: center;
-      line-height: 1.35;
-    }
-
-    .feature-section-desc {
-      font-size: 18px;
-      color: #515f74;
-      text-align: center;
-      line-height: 1.55;
-      max-width: 672px;
-    }
-
     .feature-img-portrait {
-      width: 829px;
+      width: 720px;
       max-width: 100%;
-      border-radius: 54px;
+      border-radius: 28px;
       overflow: hidden;
-      display: block;
+      box-shadow: 0 20px 60px rgba(25, 28, 30, 0.1);
     }
-
-    .feature-img-portrait img {
-      width: 100%;
-      display: block;
-    }
-
+    .feature-img-portrait img { width: 100%; display: block; }
     .feature-img-landscape {
-      width: 1049px;
+      width: 960px;
       max-width: 100%;
-      border-radius: 54px;
+      border-radius: 28px;
       overflow: hidden;
-      display: block;
+      box-shadow: 0 20px 60px rgba(25, 28, 30, 0.1);
     }
+    .feature-img-landscape img { width: 100%; display: block; }
 
-    .feature-img-landscape img {
-      width: 100%;
-      display: block;
+    /* ── 설치 가이드 ── */
+    .install-section {
+      padding: 160px 32px;
+      background: #f7f9fb;
     }
+    .install-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 80px;
+    }
+    .install-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .install-header .section-heading { color: #191c1e; }
+    .install-header .section-desc { color: #515f74; }
+    .install-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      width: 100%;
+    }
+    .install-step {
+      background: white;
+      border: 1.5px solid #e6e8ea;
+      border-radius: 20px;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .install-step-num {
+      font-family: "Manrope", sans-serif;
+      font-size: 36px;
+      font-weight: 800;
+      color: rgba(188, 1, 0, 0.4);
+      line-height: 1;
+    }
+    .install-step-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #191c1e;
+      letter-spacing: -0.02em;
+    }
+    .install-step-desc {
+      font-size: 13px;
+      color: #515f74;
+      line-height: 1.65;
+    }
+    .install-step-tag {
+      display: inline-block;
+      background: rgba(188, 1, 0, 0.08);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #bc0100;
+      letter-spacing: 0.5px;
+    }
+    .install-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 36px;
+      background: linear-gradient(135deg, #bc0100 0%, #eb0000 100%);
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 600;
+      color: white;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .install-cta:hover { opacity: 0.9; transform: translateY(-1px); }
+    .install-cta svg { width: 20px; height: 20px; }
 
     /* ── Final CTA ── */
     .cta-section {
@@ -391,41 +515,42 @@
       display: flex;
       justify-content: center;
     }
-
     .cta-card {
-      max-width: 1024px;
+      max-width: 960px;
       width: 100%;
-      background: linear-gradient(141deg, rgba(188, 1, 0, 0.85) 0%, rgba(235, 0, 0, 0.85) 100%);
+      background: linear-gradient(141deg, rgba(188, 1, 0, 0.9) 0%, rgba(235, 0, 0, 0.9) 100%);
       border-radius: 24px;
       padding: 80px;
       text-align: center;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 20px 40px rgba(25, 28, 30, 0.06);
+      box-shadow: 0 20px 60px rgba(188, 1, 0, 0.2);
     }
-
     .cta-card::before {
       content: '';
       position: absolute;
-      top: -128px;
-      right: -128px;
-      width: 256px;
-      height: 256px;
-      background: rgba(255, 255, 255, 0.1);
+      top: -80px; right: -80px;
+      width: 240px; height: 240px;
+      background: rgba(255, 255, 255, 0.08);
       border-radius: 9999px;
       filter: blur(40px);
       pointer-events: none;
     }
-
     .cta-title {
-      font-size: 48px;
+      font-size: 42px;
       font-weight: 800;
       color: white;
-      line-height: 1.35;
-      margin-bottom: 32px;
+      line-height: 1.3;
+      margin-bottom: 12px;
+      position: relative;
+      letter-spacing: -0.02em;
+    }
+    .cta-subtitle {
+      font-size: 17px;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 40px;
       position: relative;
     }
-
     .cta-btn {
       display: inline-flex;
       align-items: center;
@@ -433,25 +558,23 @@
       padding: 18px 40px;
       background: white;
       border: none;
-      border-radius: 12.8px;
-      font-size: 18px;
-      font-weight: 500;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 700;
       color: #bc0100;
       cursor: pointer;
       font-family: inherit;
       text-decoration: none;
       position: relative;
-      transition: opacity 0.2s;
+      transition: opacity 0.2s, transform 0.2s;
     }
-
-    .cta-btn:hover { opacity: 0.9; }
+    .cta-btn:hover { opacity: 0.95; transform: translateY(-1px); }
 
     /* ── Footer ── */
     footer {
       border-top: 1px solid #e2e8f0;
       padding: 48px 24px;
     }
-
     .footer-inner {
       max-width: 1280px;
       margin: 0 auto;
@@ -459,44 +582,28 @@
       gap: 32px;
       align-items: center;
     }
-
-    .footer-logo {
-      font-size: 18px;
-      font-weight: 700;
-      color: red;
-      flex-shrink: 0;
-    }
-
-    .footer-links {
-      display: flex;
-      gap: 32px;
-    }
-
-    .footer-links a {
-      font-size: 14px;
-      color: #71717a;
-      text-decoration: none;
-    }
-
+    .footer-logo { font-size: 18px; font-weight: 700; color: red; flex-shrink: 0; text-decoration: none; }
+    .footer-links { display: flex; gap: 32px; }
+    .footer-links a { font-size: 14px; color: #71717a; text-decoration: none; }
     .footer-links a:hover { color: #191c1e; }
+    .footer-copy { margin-left: auto; font-size: 14px; color: #71717a; white-space: nowrap; }
 
-    .footer-copy {
-      margin-left: auto;
-      font-size: 14px;
-      color: #71717a;
-      white-space: nowrap;
+    /* ── 반응형 ── */
+    @media (max-width: 1024px) {
+      .install-steps { grid-template-columns: repeat(2, 1fr); }
     }
-
     @media (max-width: 768px) {
       .hero-title { font-size: 44px; }
-      .hero-subtitle { font-size: 18px; }
-      .feature-heading { font-size: 32px; }
-      .feature-section-heading { font-size: 32px; }
-      .cta-title { font-size: 32px; }
-      .cta-card { padding: 48px 32px; }
+      .section-heading { font-size: 32px; }
+      .how-steps { grid-template-columns: 1fr; }
+      .how-steps::before { display: none; }
+      .ext-tabs { grid-template-columns: 1fr; max-width: 400px; }
+      .install-steps { grid-template-columns: 1fr; max-width: 400px; }
+      .cta-card { padding: 48px 28px; }
+      .cta-title { font-size: 28px; }
+      .hero-cta-group { flex-direction: column; }
       .footer-inner { flex-wrap: wrap; }
       .footer-copy { margin-left: 0; }
-      .hero-float-mail, .hero-float-doc { display: none; }
     }
   </style>
 </head>
@@ -514,114 +621,209 @@
     </div>
   </nav>
 
-  <!-- Decorative hero elements -->
-  <img class="hero-float-mail" src="/static/images/hero_float_mail.svg" alt="" aria-hidden="true" />
-  <img class="hero-float-doc" src="/static/images/hero_float_doc.svg" alt="" aria-hidden="true" />
-
   <!-- Hero -->
   <section class="hero">
     <div class="hero-blur"></div>
     <div class="hero-inner">
       <h1 class="hero-title">
-        유튜브 시청을<br>
-        <span class="accent">지식</span>으로 바꿉니다.
+        유튜브, 이제<br>
+        <span class="accent">분석하며</span> 봅니다.
       </h1>
       <p class="hero-subtitle">
-        수많은 영상 속에서 당신에게 꼭 필요한 인사이트만<br>
-        정제해 드립니다. 실시간 요약부터 맞춤형 메일링까지,<br>
-        스마트한 AI 큐레이터 Tubify를 만나보세요.
+        Tubify는 유튜브에 붙는 AI 분석 익스텐션입니다.<br>
+        영상 요약·핵심 주장·신뢰도 평가를 즉시 제공하고,<br>
+        관심 주제는 메일로도 받아볼 수 있습니다.
       </p>
-      <a href="/auth/login" class="hero-cta" id="hero-cta-btn">지금 무료로 시작하기</a>
-    </div>
-  </section>
+      <div class="hero-cta-group">
+        <a href="/auth/login" class="hero-cta" id="hero-cta-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          지금 무료로 시작하기
+        </a>
+        <a href="#install-guide" class="hero-cta-secondary">
+          설치 방법 보기 →
+        </a>
+      </div>
 
-  <!-- Feature 1: Extension -->
-  <section class="feature-extension">
-    <div class="feature-extension-inner">
-      <div class="screenshot-wrap">
+      <div class="hero-preview">
         <img
-          class="feature-screenshot"
+          class="hero-preview-img"
           src="/static/images/extension_screenshot.png"
-          alt="Tubify 유튜브 확장 서비스 화면"
+          alt="Tubify 사이드패널 화면"
         />
-        <div class="feature-fab">
-          <img src="/static/images/fab_icon.svg" alt="" />
-        </div>
       </div>
+    </div>
+  </section>
 
-      <span class="feature-badge gray">INTELLIGENT EXTENSION</span>
-      <h2 class="feature-heading">
-        영상을 보는 동시에<br>핵심을 짚어냅니다
-      </h2>
-      <p class="feature-desc">
-        유튜브 창 옆의 플로팅 버튼 하나로 끝.<br>
-        실시간 검색어와 영상 내용을 분석하여 요약해 드립니다.<br>
-        모든 정보에는 영상 링크가 포함되어 출처를 즉시 확인할 수 있습니다.
-      </p>
-      <div class="feature-list">
-        <div class="feature-item">
-          <img class="feature-item-icon"
-            src="/static/images/icon_pin.svg"
-            alt="" />
+  <!-- How it works -->
+  <section class="how-section">
+    <div class="how-inner">
+      <div class="how-header">
+        <span class="section-label gray">HOW IT WORKS</span>
+        <h2 class="section-heading">3단계로 끝납니다</h2>
+        <p class="section-desc">설치부터 분석 결과 확인까지, 복잡한 설정 없이 바로 사용할 수 있습니다.</p>
+      </div>
+      <div class="how-steps">
+        <div class="how-step">
+          <div class="how-step-num">01</div>
           <div>
-            <div class="feature-item-title">원클릭 플로팅 버튼</div>
-            <div class="feature-item-desc">어떤 영상에서든 즉시 요약을 시작하세요.</div>
+            <div class="how-step-title">익스텐션 설치</div>
+            <p class="how-step-desc">Chrome에 Tubify 익스텐션을 추가하고 계정을 연결합니다.</p>
           </div>
         </div>
-        <div class="feature-item">
-          <img class="feature-item-icon"
-            src="/static/images/icon_clock.svg"
-            alt="" />
+        <div class="how-step">
+          <div class="how-step-num">02</div>
           <div>
-            <div class="feature-item-title">타임스탬프 자동 생성</div>
-            <div class="feature-item-desc">핵심 장면으로 바로 이동할 수 있는 링크를 제공합니다.</div>
+            <div class="how-step-title">YouTube에서 영상 시청</div>
+            <p class="how-step-desc">평소처럼 유튜브를 열면 화면 옆에 플로팅 버튼이 나타납니다.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <div class="how-step-num">03</div>
+          <div>
+            <div class="how-step-title">버튼 클릭 → 분석 시작</div>
+            <p class="how-step-desc">한 번의 클릭으로 영상 요약, 핵심 주장, 신뢰도 평가를 즉시 확인합니다.</p>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Feature 2: SNAP SUMMARY -->
-  <section class="feature-section">
+  <!-- Extension: 탭 기능 설명 -->
+  <section class="ext-section">
+    <div class="ext-inner">
+      <div class="ext-header">
+        <span class="section-label red">INTELLIGENT EXTENSION</span>
+        <h2 class="section-heading">영상을 보는 동시에<br>핵심을 짚어냅니다</h2>
+        <p class="section-desc">
+          AI가 자막을 분석해 3가지 관점으로 영상을 해석합니다.<br>
+          단순 요약을 넘어, 신뢰도와 광고 여부까지 한눈에 확인하세요.
+        </p>
+      </div>
+
+      <div class="ext-tabs">
+        <div class="ext-tab-card">
+          <div class="ext-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </div>
+          <div class="ext-tab-label">SUMMARY</div>
+          <div class="ext-tab-title">영상 요약 &amp; 신뢰도</div>
+          <p class="ext-tab-desc">현재 보고 있는 영상의 핵심 내용, 주요 주장, 신뢰도 점수를 즉시 요약합니다. 광고 포함 여부도 자동으로 감지합니다.</p>
+        </div>
+        <div class="ext-tab-card">
+          <div class="ext-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <div class="ext-tab-label">INSIGHTS</div>
+          <div class="ext-tab-title">토픽 심층 분석</div>
+          <p class="ext-tab-desc">같은 주제를 다룬 영상 5개를 교차 분석해 공통 사실, 논쟁점, 주요 인사이트를 정리합니다.</p>
+        </div>
+        <div class="ext-tab-card">
+          <div class="ext-tab-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </div>
+          <div class="ext-tab-label">SOURCES</div>
+          <div class="ext-tab-title">출처 영상 확인</div>
+          <p class="ext-tab-desc">분석에 사용된 관련 영상 5개의 링크, 채널, 광고 여부를 한 곳에서 확인하고 바로 이동할 수 있습니다.</p>
+        </div>
+      </div>
+
+      <div class="ext-screenshot-wrap">
+        <img
+          class="ext-screenshot"
+          src="/static/images/extension_screenshot.png"
+          alt="Tubify 사이드패널 화면"
+        />
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature: SNAP SUMMARY -->
+  <section class="feature-section alt">
     <div class="feature-section-inner">
       <div class="feature-section-text">
-        <span class="feature-badge blue">SNAP SUMMARY</span>
-        <h2 class="feature-section-heading">
-          한 편의 영상,<br>몇 줄의 핵심으로.
-        </h2>
-        <p class="feature-section-desc">
+        <span class="section-label blue">SNAP SUMMARY</span>
+        <h2 class="section-heading">한 편의 영상,<br>몇 줄의 핵심으로.</h2>
+        <p class="section-desc">
           영상 전체를 볼 시간이 없다면, 핵심만 확인하세요.<br>
-          유튜브 자막 스크립트를 분석하여 주요 내용과 인사이트를 한눈에 정리해드립니다.
+          유튜브 자막을 AI가 분석해 주요 내용과 인사이트를 즉시 정리합니다.<br>
+          광고 포함 여부와 신뢰도 점수도 함께 제공됩니다.
         </p>
       </div>
       <div class="feature-img-portrait">
-        <img
-          src="/static/images/snap_summary.png"
-          alt="Tubify 영상 요약 화면"
-        />
+        <img src="/static/images/snap_summary.png" alt="Tubify 영상 요약 화면" />
       </div>
     </div>
   </section>
 
-  <!-- Feature 3: DAILY MAIL -->
+  <!-- Feature: DAILY MAIL -->
   <section class="feature-section">
     <div class="feature-section-inner">
       <div class="feature-section-text">
-        <span class="feature-badge blue">DAILY MAIL</span>
-        <h2 class="feature-section-heading">
-          당신의 관심사를 담아<br>원하는 시간에 메일함으로
-        </h2>
-        <p class="feature-section-desc">
-          유튜브 시청 중 표시한 관심사를 바탕으로<br>
-          넘쳐나는 정보 속에서 당신이 놓치지 말아야 될 핵심 인사이트만 골라 전송합니다.
+        <span class="section-label blue">DAILY MAIL</span>
+        <h2 class="section-heading">관심 주제를 담아<br>원하는 시간에 메일함으로</h2>
+        <p class="section-desc">
+          유튜브 시청 중 저장한 관심 토픽을 기반으로<br>
+          AI가 최신 영상들을 분석해 핵심 인사이트만 골라 메일로 보내드립니다.<br>
+          구독을 원하지 않는 토픽은 메일에서 바로 해제할 수 있습니다.
         </p>
       </div>
       <div class="feature-img-landscape">
-        <img
-          src="/static/images/daily_mail.png"
-          alt="Tubify 뉴스레터 메일 화면"
-        />
+        <img src="/static/images/daily_mail.png" alt="Tubify 뉴스레터 메일 화면" />
       </div>
+    </div>
+  </section>
+
+  <!-- 설치 가이드 -->
+  <section class="install-section" id="install-guide">
+    <div class="install-inner">
+      <div class="install-header">
+        <span class="section-label dark">INSTALL GUIDE</span>
+        <h2 class="section-heading">지금 바로 설치하세요</h2>
+        <p class="section-desc">Chrome 브라우저에서 4단계로 Tubify를 설치할 수 있습니다.</p>
+      </div>
+
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="install-step-num">01</div>
+          <div class="install-step-title">Chrome 웹스토어에서 설치</div>
+          <p class="install-step-desc">Chrome 웹스토어에서 Tubify를 검색하거나 아래 버튼을 눌러 익스텐션을 설치합니다.</p>
+          <span class="install-step-tag">Chrome Web Store</span>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">02</div>
+          <div class="install-step-title">회원가입</div>
+          <p class="install-step-desc">Tubify 사이트에서 Google 계정으로 간편하게 회원가입합니다. 별도의 비밀번호 설정이 필요 없습니다.</p>
+          <span class="install-step-tag">Google 소셜 로그인</span>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">03</div>
+          <div class="install-step-title">YouTube 열기</div>
+          <p class="install-step-desc">YouTube에 접속하면 화면 옆에 Tubify 플로팅 버튼이 자동으로 나타납니다.</p>
+          <span class="install-step-tag">자동 활성화</span>
+        </div>
+        <div class="install-step">
+          <div class="install-step-num">04</div>
+          <div class="install-step-title">버튼 클릭 → 분석 시작</div>
+          <p class="install-step-desc">영상을 보다가 플로팅 버튼을 누르면 AI 분석이 즉시 시작됩니다. 설정은 필요 없습니다.</p>
+          <span class="install-step-tag">원클릭</span>
+        </div>
+      </div>
+
+      <a href="/auth/login" class="install-cta" id="install-cta-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        무료 계정 만들기
+      </a>
     </div>
   </section>
 
@@ -631,6 +833,7 @@
       <h2 class="cta-title">
         지금 Tubify와 함께<br>스마트한 유튜브 생활을 시작하세요.
       </h2>
+      <p class="cta-subtitle">설치 5분 · 무료 · Google 로그인 지원</p>
       <a href="/auth/login" class="cta-btn" id="cta-btn">지금 무료로 시작하기</a>
     </div>
   </div>
@@ -638,7 +841,7 @@
   <!-- Footer -->
   <footer>
     <div class="footer-inner">
-      <span class="footer-logo">Tubify</span>
+      <a href="/intro.html" class="footer-logo">Tubify</a>
       <div class="footer-links">
         <a href="/privacy.html">개인정보처리방침</a>
         <a href="/terms.html">이용약관</a>
@@ -668,7 +871,24 @@
       const ctaBtn = document.getElementById("cta-btn");
       ctaBtn.href = "/mypage.html";
       ctaBtn.textContent = "마이페이지 바로가기 →";
+
+      const installBtn = document.getElementById("install-cta-btn");
+      if (installBtn) {
+        installBtn.href = "/mypage.html";
+        installBtn.textContent = "마이페이지로 이동하기";
+      }
     }
+
+    // smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(function(a) {
+      a.addEventListener("click", function(e) {
+        var target = document.querySelector(a.getAttribute("href"));
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    });
   </script>
 </body>
 </html>
