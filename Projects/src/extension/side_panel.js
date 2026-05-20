@@ -51,7 +51,6 @@ async function checkHeartState(keyword) {
 
 async function toggleHeart() {
   if (!currentJwt) { showToast("로그인 후 이용할 수 있습니다."); return; }
-  var btn = document.querySelector(".btn-heart.hearted") || document.getElementById("btn-heart");
   var isHearted = document.querySelectorAll(".btn-heart.hearted").length > 0;
 
   if (isHearted) {
@@ -473,7 +472,6 @@ document.querySelectorAll(".btn-heart").forEach(function (btn) {
 
 document.getElementById("btn-retry").addEventListener("click", function () {
   if (currentMode === "watch" && currentVideoId) {
-    var tabs = chrome.tabs && chrome.tabs.query;
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
       var tab = tabs && tabs[0];
       var title = (tab && tab.title) || currentKeyword;
