@@ -1799,7 +1799,6 @@ async def analyze_video(
     seen_ids: set[str] = set()
     merged_sources = []
 
-    # 현재 영상을 첫 번째 소스로 추가
     seen_ids.add(video_id)
     merged_sources.append({
         "video_id":         video_id,
@@ -1811,7 +1810,6 @@ async def analyze_video(
         "is_current_video": True,
     })
 
-    # 키워드 분석 소스 추가 (중복 제외)
     for src in pipeline_result.get("sources", []):
         src_vid = src.get("video_id") or src.get("url", "").split("v=")[-1].split("&")[0]
         if src_vid and src_vid not in seen_ids:
@@ -1846,14 +1844,10 @@ async def analyze_video(
         "keyword_analysis": {
             "keyword":            pipeline_result.get("keyword", extracted_topic),
             "category":           pipeline_result.get("category", "정보탐색형"),
-            "layout":             pipeline_result.get("layout", "summary_focus"),
-            "intent_type":        pipeline_result.get("intent_type", "지식형"),
             "summary_lines":      pipeline_result.get("summary_lines", []),
             "common_facts":       pipeline_result.get("common_facts", []),
             "controversies":      pipeline_result.get("controversies", []),
             "recommended_videos": pipeline_result.get("recommended_videos", []),
-            "pros":               pipeline_result.get("pros", []),
-            "cons":               pipeline_result.get("cons", []),
         },
         "sources": merged_sources,
     })

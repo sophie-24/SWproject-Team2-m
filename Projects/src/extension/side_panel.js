@@ -484,17 +484,25 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
     heartedTopic = "";
     checkHeartState(currentKeyword);
 
-    // SUMMARY 탭: 단일 영상 요약
-    renderVideoSummary(videoTitle, { summary: data.video_summary });
+    // SUMMARY 탭: 단일 영상 전체 분석
+    var sv = data.single_video || {};
+    renderVideoSummary(videoTitle, {
+      summary:           sv.summary || "",
+      key_claims:        sv.key_claims || [],
+      credibility_score: sv.credibility_score,
+      ad_score:          sv.ad_score,
+      ad_detected:       sv.ad_detected,
+    });
 
     // INSIGHTS + SOURCES 탭
+    var ka = data.keyword_analysis || {};
     renderResults({
       keyword:             currentKeyword,
-      summary_lines:       data.summary_lines || [],
-      common_facts:        data.common_facts || [],
-      controversies:       data.controversies || [],
-      recommended_videos:  data.recommended_videos || data.sources || [],
-      category:            data.category || "",
+      summary_lines:       ka.summary_lines || [],
+      common_facts:        ka.common_facts || [],
+      controversies:       ka.controversies || [],
+      recommended_videos:  data.sources || ka.recommended_videos || [],
+      category:            ka.category || "",
       cached:              data.cached || false,
     }, true);
 
