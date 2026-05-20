@@ -1,18 +1,17 @@
 <!doctype html>
 <html lang="ko">
-
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tubify — 마이페이지</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: "Noto Sans KR", "Segoe UI", sans-serif;
+      font-family: "Noto Sans KR", sans-serif;
       background: #f7f9fb;
       color: #191c1e;
       min-height: 100vh;
@@ -20,7 +19,7 @@
       flex-direction: column;
     }
 
-    /* ── 네비게이션 ── */
+    /* ── Nav ── */
     .nav {
       position: sticky;
       top: 0;
@@ -33,7 +32,6 @@
       background: rgba(247, 249, 251, 0.8);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
     }
 
     .nav-logo {
@@ -56,10 +54,7 @@
       color: #191c1e;
       text-decoration: none;
       letter-spacing: -0.025em;
-      transition: color 0.15s;
     }
-
-    .nav-link:hover { color: #bc0100; }
 
     .nav-link.active {
       font-weight: 600;
@@ -78,12 +73,11 @@
       color: #0f172a;
       cursor: pointer;
       font-family: inherit;
-      transition: background 0.15s;
     }
 
     .nav-logout:hover { background: #d1d5db; }
 
-    /* ── 메인 ── */
+    /* ── Main ── */
     .main {
       flex: 1;
       display: flex;
@@ -107,15 +101,15 @@
       color: #191c1e;
       text-align: center;
       letter-spacing: -0.025em;
-      line-height: 1.1;
     }
 
-    /* ── 프로필 카드 ── */
+    /* ── Profile Card ── */
     .profile-card {
       background: #fff;
       border-radius: 12px;
       box-shadow: 0 20px 40px rgba(25, 28, 30, 0.04);
       padding: 32px;
+      overflow: hidden;
     }
 
     .profile-name {
@@ -133,7 +127,7 @@
       margin-top: 4px;
     }
 
-    /* ── 관심사 섹션 ── */
+    /* ── Section Card ── */
     .section-card {
       background: #f2f4f6;
       border-radius: 12px;
@@ -154,15 +148,23 @@
       width: 22px;
       height: 22px;
       flex-shrink: 0;
+      object-fit: contain;
+    }
+
+    .section-icon-sm {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      object-fit: contain;
     }
 
     .section-title {
       font-size: 20px;
       font-weight: 700;
       color: #191c1e;
-      line-height: 1.4;
     }
 
+    /* ── Interest Tags ── */
     .interest-tags {
       display: flex;
       flex-wrap: wrap;
@@ -178,8 +180,27 @@
       font-size: 16px;
       font-weight: 600;
       color: #57657a;
-      line-height: 1.5;
       white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .interest-tag-remove {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      color: #bc0100;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      font-family: inherit;
+    }
+
+    .edit-mode .interest-tag-remove {
+      display: inline-flex;
     }
 
     .interest-tags-empty {
@@ -188,6 +209,50 @@
       margin-bottom: 32px;
     }
 
+    /* ── Search Bar (edit mode) ── */
+    .interest-search-wrap {
+      display: none;
+      position: relative;
+      max-width: 576px;
+      margin-bottom: 16px;
+    }
+
+    .edit-mode .interest-search-wrap {
+      display: block;
+    }
+
+    .interest-search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 17px;
+      height: 17px;
+      pointer-events: none;
+    }
+
+    .interest-search-input {
+      width: 100%;
+      background: #f2f4f6;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 16px 14px 44px;
+      font-size: 16px;
+      font-weight: 400;
+      color: #191c1e;
+      font-family: inherit;
+      outline: none;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .interest-search-input::placeholder { color: rgba(81, 95, 116, 0.82); }
+
+    .interest-search-input:focus {
+      outline: 2px solid #bc0100;
+      outline-offset: -2px;
+    }
+
+    /* ── Buttons ── */
     .btn-edit-interest {
       display: inline-flex;
       align-items: center;
@@ -201,27 +266,20 @@
       cursor: pointer;
       font-family: inherit;
       box-shadow: 0 0 10px rgba(188, 1, 0, 0.1);
-      transition: background 0.15s;
-      text-decoration: none;
       align-self: flex-start;
+      margin-top: 10px;
     }
 
-    .btn-edit-interest:hover { background: #9a0000; }
+    .btn-edit-interest:hover { opacity: 0.9; }
 
-    /* ── Delivery Schedule ── */
     .schedule-desc {
       font-size: 14px;
       color: #515f74;
       margin-bottom: 32px;
     }
 
-    .schedule-btns {
-      display: flex;
-      gap: 16px;
-    }
-
     .btn-schedule {
-      flex: 1;
+      width: 100%;
       background: #fff;
       border: 2px solid red;
       border-radius: 12px;
@@ -232,12 +290,11 @@
       text-align: center;
       cursor: pointer;
       font-family: inherit;
-      transition: background 0.15s;
     }
 
     .btn-schedule:hover { background: #fff5f5; }
 
-    /* ── 액션 행 ── */
+    /* ── Action Rows ── */
     .action-row {
       display: flex;
       align-items: center;
@@ -270,7 +327,6 @@
       cursor: pointer;
       font-family: inherit;
       flex-shrink: 0;
-      transition: background 0.15s;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
@@ -278,10 +334,7 @@
 
     .btn-action:hover { background: #d1d5db; }
 
-    .btn-action.danger { color: #dc2626; }
-    .btn-action.danger:hover { background: #fee2e2; }
-
-    /* ── 모달 ── */
+    /* ── Modal Overlay ── */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -304,15 +357,16 @@
     .modal {
       background: #fff;
       border-radius: 16px;
-      box-shadow: 0 20px 40px rgba(25, 28, 30, 0.06);
       width: 100%;
-      max-width: 520px;
       overflow: hidden;
       transform: translateY(12px);
       transition: transform 0.2s;
     }
 
     .modal-overlay.open .modal { transform: translateY(0); }
+
+    /* ── Schedule Modal ── */
+    .modal-schedule { max-width: 480px; box-shadow: 0 20px 40px rgba(25, 28, 30, 0.06); }
 
     .modal-header {
       padding: 40px 32px 24px;
@@ -337,10 +391,7 @@
     }
 
     .modal-body {
-      padding: 0 32px 40px;
-      display: flex;
-      flex-direction: column;
-      gap: 32px;
+      padding: 0 32px 6px;
     }
 
     .time-picker-group {
@@ -353,14 +404,12 @@
       font-size: 14px;
       font-weight: 700;
       color: #515f74;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.025em;
     }
 
-    .time-input-wrap {
-      position: relative;
-    }
+    .time-input-wrap { position: relative; }
 
-    .time-input-wrap .time-icon {
+    .time-icon {
       position: absolute;
       left: 16px;
       top: 50%;
@@ -394,6 +443,7 @@
       padding: 24px;
       display: flex;
       gap: 12px;
+      margin-top: 20px;
     }
 
     .btn-modal-cancel {
@@ -408,7 +458,6 @@
       color: #515f74;
       cursor: pointer;
       font-family: inherit;
-      transition: background 0.15s;
     }
 
     .btn-modal-cancel:hover { background: #f2f4f6; }
@@ -425,13 +474,120 @@
       cursor: pointer;
       font-family: inherit;
       box-shadow: 0 20px 20px rgba(25, 28, 30, 0.06);
-      transition: opacity 0.15s;
     }
 
     .btn-modal-save:hover { opacity: 0.9; }
 
-    /* ── 푸터 ── */
-    .footer {
+    /* ── Alert Modal (관심사 초과 / 회원탈퇴) ── */
+    .modal-alert { max-width: 400px; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25); }
+
+    .modal-alert .modal-alert-body {
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .alert-icon-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      width: 64px;
+      height: 64px;
+      margin-bottom: 24px;
+      flex-shrink: 0;
+    }
+
+    .alert-icon-wrap.red { background: #fef2f2; }
+    .alert-icon-wrap.warning { background: rgba(255, 218, 214, 0.2); }
+
+    .alert-icon-wrap img {
+      width: 30px;
+      height: 30px;
+      object-fit: contain;
+    }
+
+    .alert-icon-wrap.warning img {
+      width: 33px;
+      height: 28.5px;
+    }
+
+    .alert-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #191c1e;
+      text-align: center;
+      letter-spacing: -0.025em;
+      margin-bottom: 12px;
+    }
+
+    .alert-desc {
+      font-size: 14px;
+      color: #515f74;
+      text-align: center;
+      line-height: 1.625;
+      margin-bottom: 24px;
+    }
+
+    .btn-alert-close {
+      width: 243px;
+      background: linear-gradient(135deg, #bc0100 0%, #eb0000 100%);
+      border: none;
+      border-radius: 12px;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 20px 20px rgba(25, 28, 30, 0.06);
+    }
+
+    .btn-alert-close:hover { opacity: 0.9; }
+
+    /* 회원탈퇴 전용 버튼들 */
+    .withdraw-btns {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .btn-withdraw-confirm {
+      width: 100%;
+      background: linear-gradient(174deg, #bc0100 0%, #eb0000 100%);
+      border: none;
+      border-radius: 16px;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn-withdraw-confirm:hover { opacity: 0.9; }
+
+    .btn-withdraw-cancel {
+      width: 100%;
+      background: #e6e8ea;
+      border: none;
+      border-radius: 16px;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 500;
+      color: #3a485b;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn-withdraw-cancel:hover { background: #d1d5db; }
+
+    /* ── Footer ── */
+    footer {
       border-top: 1px solid rgba(244, 244, 245, 0.1);
       padding: 48px 24px;
       display: flex;
@@ -440,25 +596,15 @@
     }
 
     .footer-logo { font-size: 18px; font-weight: 700; color: red; }
-
     .footer-links { display: flex; gap: 32px; }
-
-    .footer-links a {
-      font-size: 14px;
-      color: #71717a;
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-
+    .footer-links a { font-size: 14px; color: #71717a; text-decoration: none; }
     .footer-links a:hover { color: #191c1e; }
-
     .footer-copy { margin-left: auto; font-size: 14px; color: #71717a; }
   </style>
 </head>
-
 <body>
 
-  <!-- 네비게이션 -->
+  <!-- Nav -->
   <nav class="nav">
     <a href="/intro.html" class="nav-logo">Tubify</a>
     <div class="nav-links">
@@ -468,7 +614,7 @@
     <button class="nav-logout" onclick="logout()">로그아웃</button>
   </nav>
 
-  <!-- 메인 -->
+  <!-- Main -->
   <main class="main">
     <div class="page-container">
 
@@ -481,44 +627,46 @@
       </div>
 
       <!-- 관심사 섹션 -->
-      <div class="section-card">
+      <div class="section-card" id="interest-section">
         <div class="section-header">
-          <svg class="section-icon" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M11 2L12.5 9L19 11L12.5 13L11 20L9.5 13L3 11L9.5 9L11 2Z" fill="red"/>
-          </svg>
-          <span class="section-title" id="interest-title">관심사</span>
+          <img class="section-icon" src="/static/images/icon_sparkle.png" alt="" />
+          <span class="section-title" id="interest-title">관심 토픽</span>
         </div>
+
         <div class="interest-tags" id="interest-tags">
           <span class="interest-tags-empty">관심사를 불러오는 중...</span>
         </div>
-        <a href="/home.html?from=mypage" class="btn-edit-interest">관심사 수정</a>
+
+        <div class="interest-search-wrap">
+          <img class="interest-search-icon" src="/static/images/icon_search.png" alt="" />
+          <input
+            class="interest-search-input"
+            id="interest-search"
+            type="text"
+            placeholder="키워드 검색 (예: AI 기술, 노트북 ...)"
+          />
+        </div>
+
+        <button class="btn-edit-interest" id="btn-edit-interest" onclick="toggleEditMode()">관심사 수정</button>
       </div>
 
       <!-- Delivery Schedule -->
       <div class="section-card">
         <div class="section-header">
-          <svg class="section-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="10" cy="10" r="8.5" stroke="#191c1e" stroke-width="1.5"/>
-            <path d="M10 6V10.5L13 12.5" stroke="#191c1e" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+          <img class="section-icon-sm" src="/static/images/icon_delivery.png" alt="" />
           <span class="section-title">Delivery Schedule</span>
         </div>
-        <p class="schedule-desc">하루 두 번, 요약 레포트 수신 시간을 설정하세요.</p>
-        <div class="schedule-btns">
-          <button class="btn-schedule" id="btn-morning" onclick="openModal('morning')">
-            1차: <span id="morning-display">오전 08:00</span>
-          </button>
-          <button class="btn-schedule" id="btn-evening" onclick="openModal('evening')">
-            2차: <span id="evening-display">오후 09:00</span>
-          </button>
-        </div>
+        <p class="schedule-desc">요약 레포트 수신 시간을 설정하세요.</p>
+        <button class="btn-schedule" id="btn-schedule" onclick="openScheduleModal()">
+          요약 레포트 수신 시간 : <span id="schedule-display">오전 08:00</span>
+        </button>
       </div>
 
       <!-- 이용 가이드 -->
       <div class="action-row">
         <div class="action-info">
           <span class="action-title">이용 가이드</span>
-          <span class="action-desc">탈퇴 시 회원정보는 개인정보 처리방침에 의해 처리됩니다.</span>
+          <span class="action-desc">Tubify 서비스 이용을 돕기 위한 안내를 제공합니다.</span>
         </div>
         <a href="/intro.html" class="btn-action">보러 가기</a>
       </div>
@@ -529,14 +677,14 @@
           <span class="action-title">회원 탈퇴</span>
           <span class="action-desc">탈퇴 시 회원정보는 개인정보 처리방침에 의해 처리됩니다.</span>
         </div>
-        <button class="btn-action danger" onclick="confirmWithdraw()">회원 탈퇴</button>
+        <button class="btn-action" onclick="openWithdrawModal()">회원 탈퇴</button>
       </div>
 
     </div>
   </main>
 
-  <!-- 푸터 -->
-  <footer class="footer">
+  <!-- Footer -->
+  <footer>
     <span class="footer-logo">Tubify</span>
     <div class="footer-links">
       <a href="/privacy.html">개인정보처리방침</a>
@@ -545,48 +693,74 @@
     <span class="footer-copy">© 2026 Tubify. 보고 싶은 것만. 핵심만.</span>
   </footer>
 
-  <!-- 수신 시간 설정 모달 -->
-  <div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
-    <div class="modal">
+  <!-- ══ 수신 시간 설정 모달 ══ -->
+  <div class="modal-overlay" id="modal-schedule" onclick="handleOverlayClick(event, 'modal-schedule')">
+    <div class="modal modal-schedule">
       <div class="modal-header">
         <h2 class="modal-title">수신 시간 설정</h2>
         <p class="modal-subtitle">인사이트를 받아보실 최적의 시간을 선택해주세요.</p>
       </div>
       <div class="modal-body">
         <div class="time-picker-group">
-          <label class="time-label" for="input-morning">1차 수신 시간</label>
+          <label class="time-label" for="input-send-time">요약 레포트 수신 시간</label>
           <div class="time-input-wrap">
-            <svg class="time-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="10" cy="10" r="8.5" stroke="#515f74" stroke-width="1.5"/>
-              <path d="M10 6V10.5L13 12.5" stroke="#515f74" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <input class="time-input" type="time" id="input-morning" value="08:00" />
-          </div>
-        </div>
-        <div class="time-picker-group">
-          <label class="time-label" for="input-evening">2차 수신 시간</label>
-          <div class="time-input-wrap">
-            <svg class="time-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="10" cy="10" r="8.5" stroke="#515f74" stroke-width="1.5"/>
-              <path d="M10 6V10.5L13 12.5" stroke="#515f74" stroke-width="1.5" stroke-linecap="round"/>
-              <path d="M7 3.5L10 2L13 3.5" stroke="#515f74" stroke-width="1.2" stroke-linecap="round"/>
-            </svg>
-            <input class="time-input" type="time" id="input-evening" value="21:00" />
+            <img class="time-icon" src="/static/images/icon_clock_input.png" alt="" />
+            <input class="time-input" type="time" id="input-send-time" value="08:00" />
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn-modal-cancel" onclick="closeModal()">취소</button>
+        <button class="btn-modal-cancel" onclick="closeModal('modal-schedule')">취소</button>
         <button class="btn-modal-save" onclick="saveSchedule()">저장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 관심사 개수 초과 팝업 ══ -->
+  <div class="modal-overlay" id="modal-limit" onclick="handleOverlayClick(event, 'modal-limit')">
+    <div class="modal modal-alert">
+      <div class="modal-alert-body">
+        <div class="alert-icon-wrap red">
+          <img src="/static/images/icon_warning_circle.png" alt="!" />
+        </div>
+        <h3 class="alert-title">관심사 개수 초과</h3>
+        <p class="alert-desc">
+          관심사 개수가 초과되었습니다.<br>
+          관심사 수정을 원하시면 현재 관심사 취소 후 수정가능합니다.
+        </p>
+        <button class="btn-alert-close" onclick="closeModal('modal-limit')">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 회원탈퇴 확인 팝업 ══ -->
+  <div class="modal-overlay" id="modal-withdraw" onclick="handleOverlayClick(event, 'modal-withdraw')">
+    <div class="modal modal-alert" style="border-radius:24px;">
+      <div class="modal-alert-body">
+        <div class="alert-icon-wrap warning">
+          <img src="/static/images/icon_warning_triangle.png" alt="!" style="width:33px;height:28.5px;" />
+        </div>
+        <h3 class="alert-title">정말 탈퇴하시겠어요?</h3>
+        <p class="alert-desc">
+          탈퇴 시 모든 데이터와 관심사 설정이 삭제되며<br>
+          복구할 수 없습니다.
+        </p>
+        <div class="withdraw-btns">
+          <button class="btn-withdraw-confirm" onclick="doWithdraw()">회원 탈퇴</button>
+          <button class="btn-withdraw-cancel" onclick="closeModal('modal-withdraw')">취소</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
     const API = "";
+    let currentInterests = [];  // [{ id, topic }]
+    let editMode = false;
+    let userName = "";
 
-    // OAuth 콜백 후 URL에 token이 있으면 저장
-    (function() {
+    // ── 초기화 ──────────────────────────────────────────────────────────────────
+    (function () {
       const p = new URLSearchParams(location.search);
       const t = p.get("token");
       if (t) {
@@ -596,86 +770,153 @@
       }
     })();
 
+    // ── 프로필 로드 ──────────────────────────────────────────────────────────────
     async function loadProfile() {
       const jwt = localStorage.getItem("access_token");
-      if (!jwt) { window.location.href = "/"; return; }
+      if (!jwt) { location.href = "/"; return; }
 
       try {
         const res = await fetch(`${API}/my/profile`, {
           headers: { "Authorization": `Bearer ${jwt}` }
         });
-        if (res.status === 401) { window.location.href = "/"; return; }
+        if (res.status === 401) { location.href = "/"; return; }
         if (!res.ok) return;
 
         const data = await res.json();
-        const name = data.name || data.display_name || data.email?.split("@")[0] || "사용자";
-        const email = data.email || "";
-        const interests = Array.isArray(data.interest_categories) ? data.interest_categories : [];
+        userName = data.name || data.display_name || data.email?.split("@")[0] || "사용자";
+        document.getElementById("profile-name").textContent = userName;
+        document.getElementById("profile-email").textContent = data.email || "";
+        document.getElementById("interest-title").textContent = `${userName} 님의 관심 토픽`;
 
-        document.getElementById("profile-name").textContent = name;
-        document.getElementById("profile-email").textContent = email;
-        document.getElementById("interest-title").textContent = `${name} 님의 관심사`;
-
-        const tagsEl = document.getElementById("interest-tags");
-        tagsEl.innerHTML = interests.length > 0
-          ? interests.map(t => `<span class="interest-tag">${escHtml(t)}</span>`).join("")
-          : `<span class="interest-tags-empty">아직 설정된 관심사가 없어요.</span>`;
-
-        // 발송 시간 로드
-        const sendTimes = Array.isArray(data.send_time) ? data.send_time : [data.send_time || "21:00"];
-        const morning = sendTimes[0] || "08:00";
-        const evening = sendTimes[sendTimes.length - 1] || "21:00";
-        document.getElementById("input-morning").value = morning;
-        document.getElementById("input-evening").value = evening;
-        updateScheduleDisplay(morning, evening);
+        // 발송 시간
+        const sendTime = Array.isArray(data.send_time)
+          ? (data.send_time[0] || "08:00")
+          : (data.send_time || "08:00");
+        document.getElementById("input-send-time").value = sendTime;
+        document.getElementById("schedule-display").textContent = formatTime(sendTime);
       } catch (e) {
         console.warn("[mypage] 프로필 로드 실패:", e);
       }
+
+      await loadInterests();
     }
 
-    function updateScheduleDisplay(morning, evening) {
-      document.getElementById("morning-display").textContent = formatTime(morning);
-      document.getElementById("evening-display").textContent = formatTime(evening);
+    // ── 관심사 로드 ──────────────────────────────────────────────────────────────
+    async function loadInterests() {
+      const jwt = localStorage.getItem("access_token");
+      try {
+        const res = await fetch(`${API}/interests`, {
+          headers: { "Authorization": `Bearer ${jwt}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        currentInterests = data.interests || [];
+        renderTags();
+      } catch (e) {
+        console.warn("[mypage] 관심사 로드 실패:", e);
+      }
     }
 
-    function formatTime(hhmm) {
-      const [h, m] = hhmm.split(":").map(Number);
-      const ampm = h < 12 ? "오전" : "오후";
-      const hour = h % 12 || 12;
-      return `${ampm} ${String(hour).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    // ── 태그 렌더 ────────────────────────────────────────────────────────────────
+    function renderTags() {
+      const el = document.getElementById("interest-tags");
+      if (currentInterests.length === 0) {
+        el.innerHTML = `<span class="interest-tags-empty">아직 설정된 관심사가 없어요.</span>`;
+        return;
+      }
+      el.innerHTML = currentInterests.map(i => `
+        <span class="interest-tag">
+          ${escHtml(i.topic)}
+          <button class="interest-tag-remove" onclick="removeInterest('${escHtml(i.topic)}')" title="삭제">✕</button>
+        </span>
+      `).join("");
     }
 
-    function openModal(target) {
-      document.getElementById("modal-overlay").classList.add("open");
-      const focusEl = target === "morning" ? "input-morning" : "input-evening";
-      setTimeout(() => document.getElementById(focusEl).focus(), 100);
+    // ── 편집 모드 토글 ───────────────────────────────────────────────────────────
+    function toggleEditMode() {
+      editMode = !editMode;
+      const section = document.getElementById("interest-section");
+      if (editMode) {
+        section.classList.add("edit-mode");
+        document.getElementById("interest-search").value = "";
+      } else {
+        section.classList.remove("edit-mode");
+      }
     }
 
-    function closeModal() {
-      document.getElementById("modal-overlay").classList.remove("open");
+    // ── 관심사 삭제 ──────────────────────────────────────────────────────────────
+    async function removeInterest(topic) {
+      const jwt = localStorage.getItem("access_token");
+      try {
+        const res = await fetch(`${API}/interests/${encodeURIComponent(topic)}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${jwt}` }
+        });
+        if (res.ok) {
+          currentInterests = currentInterests.filter(i => i.topic !== topic);
+          renderTags();
+        }
+      } catch (e) {
+        console.warn("[mypage] 관심사 삭제 실패:", e);
+      }
     }
 
-    function handleOverlayClick(e) {
-      if (e.target === document.getElementById("modal-overlay")) closeModal();
-    }
+    // ── 관심사 추가 (키워드 검색 Enter) ─────────────────────────────────────────
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("interest-search").addEventListener("keydown", async (e) => {
+        if (e.key !== "Enter") return;
+        const keyword = e.target.value.trim();
+        if (!keyword) return;
 
+        if (currentInterests.length >= 5) {
+          openModal("modal-limit");
+          return;
+        }
+
+        const jwt = localStorage.getItem("access_token");
+        try {
+          const res = await fetch(`${API}/interests`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${jwt}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ title: keyword, video_id: "" })
+          });
+
+          if (res.status === 409) {
+            openModal("modal-limit");
+            return;
+          }
+
+          if (res.ok) {
+            const data = await res.json();
+            e.target.value = "";
+            await loadInterests();
+          }
+        } catch (err) {
+          console.warn("[mypage] 관심사 추가 실패:", err);
+        }
+      });
+    });
+
+    // ── 수신 시간 저장 ───────────────────────────────────────────────────────────
     async function saveSchedule() {
       const jwt = localStorage.getItem("access_token");
-      const morning = document.getElementById("input-morning").value;
-      const evening = document.getElementById("input-evening").value;
+      const sendTime = document.getElementById("input-send-time").value;
 
       try {
-        const res = await fetch(`${API}/my/profile`, {
-          method: "PUT",
+        const res = await fetch(`${API}/my/send-time`, {
+          method: "PATCH",
           headers: {
             "Authorization": `Bearer ${jwt}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ send_time: [morning, evening] })
+          body: JSON.stringify({ send_time: sendTime })
         });
         if (res.ok) {
-          updateScheduleDisplay(morning, evening);
-          closeModal();
+          document.getElementById("schedule-display").textContent = formatTime(sendTime);
+          closeModal("modal-schedule");
         } else {
           alert("저장에 실패했습니다. 다시 시도해주세요.");
         }
@@ -684,9 +925,8 @@
       }
     }
 
-    async function confirmWithdraw() {
-      if (!confirm("정말 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.")) return;
-
+    // ── 회원 탈퇴 ────────────────────────────────────────────────────────────────
+    async function doWithdraw() {
       const jwt = localStorage.getItem("access_token");
       try {
         const res = await fetch(`${API}/my/withdraw`, {
@@ -694,35 +934,61 @@
           headers: { "Authorization": `Bearer ${jwt}` }
         });
         if (res.ok) {
-          alert("탈퇴가 완료되었습니다.");
+          closeModal("modal-withdraw");
           logout();
         } else {
-          alert("탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+          alert("탈퇴 처리 중 오류가 발생했습니다.");
         }
       } catch (e) {
-        alert("서버에 연결할 수 없습니다. 다시 시도해주세요.");
+        alert("서버에 연결할 수 없습니다.");
       }
+    }
+
+    // ── 모달 유틸 ────────────────────────────────────────────────────────────────
+    function openScheduleModal() { openModal("modal-schedule"); }
+    function openWithdrawModal() { openModal("modal-withdraw"); }
+
+    function openModal(id) {
+      document.getElementById(id).classList.add("open");
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove("open");
+    }
+
+    function handleOverlayClick(e, id) {
+      if (e.target === document.getElementById(id)) closeModal(id);
+    }
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        ["modal-schedule", "modal-limit", "modal-withdraw"].forEach(closeModal);
+      }
+    });
+
+    // ── 유틸 ─────────────────────────────────────────────────────────────────────
+    function formatTime(hhmm) {
+      const [h, m] = hhmm.split(":").map(Number);
+      const ampm = h < 12 ? "오전" : "오후";
+      const hour = h % 12 || 12;
+      return `${ampm} ${String(hour).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     }
 
     function logout() {
       localStorage.removeItem("access_token");
       sessionStorage.removeItem("loggedIn");
-      window.location.href = "/";
+      location.href = "/";
     }
 
     function escHtml(str) {
       return String(str ?? "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
     }
-
-    document.addEventListener("keydown", e => {
-      if (e.key === "Escape") closeModal();
-    });
 
     loadProfile();
   </script>
 </body>
-
 </html>

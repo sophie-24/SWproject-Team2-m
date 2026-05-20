@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tubify — 크롬 익스텐션 설치</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans KR", sans-serif;
+      background: #f7f9fb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 배경 블러 장식 */
+    .bg-blob {
+      position: fixed;
+      border-radius: 9999px;
+      filter: blur(60px);
+      pointer-events: none;
+    }
+
+    .bg-blob-red {
+      background: rgba(255, 0, 0, 0.05);
+      width: 40%;
+      height: 500px;
+      left: 25%;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .bg-blob-blue {
+      background: rgba(0, 89, 186, 0.05);
+      width: 47%;
+      height: 600px;
+      left: 28%;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    /* 메인 컨텐츠 */
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 672px;
+      width: 100%;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* 브랜딩 */
+    .branding {
+      margin-bottom: 48px;
+    }
+
+    .brand-logo {
+      font-size: 60px;
+      font-weight: 800;
+      color: red;
+      letter-spacing: -3px;
+      line-height: 1;
+      text-decoration: none;
+    }
+
+    /* 카드 */
+    .card {
+      background: white;
+      border: 1px solid rgba(235, 187, 180, 0.2);
+      border-radius: 24px;
+      box-shadow: 0 32px 64px rgba(25, 28, 30, 0.08);
+      padding: 65px;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 왼쪽 빨간 장식 선 */
+    .card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      background: rgba(255, 0, 0, 0.2);
+    }
+
+    .card-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 48px;
+    }
+
+    .card-text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .card-title {
+      font-size: 28px;
+      font-weight: 400;
+      color: #191c1e;
+      text-align: center;
+      line-height: 1.34;
+      letter-spacing: -0.75px;
+    }
+
+    .card-desc {
+      font-size: 18px;
+      font-weight: 400;
+      color: #515f74;
+      text-align: center;
+      line-height: 1.625;
+      max-width: 448px;
+    }
+
+    .install-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 48px;
+      background: linear-gradient(135deg, #ff0000 0%, #d40000 100%);
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 900;
+      color: white;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+
+    .install-btn:hover { opacity: 0.9; }
+
+    @media (max-width: 480px) {
+      .card { padding: 40px 28px; }
+      .card-title { font-size: 22px; }
+      .card-desc { font-size: 16px; }
+      .brand-logo { font-size: 44px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-blob bg-blob-red"></div>
+  <div class="bg-blob bg-blob-blue"></div>
+
+  <div class="container">
+    <div class="branding">
+      <a href="/intro.html" class="brand-logo">Tubify</a>
+    </div>
+
+    <div class="card">
+      <div class="card-inner">
+        <div class="card-text">
+          <h1 class="card-title">크롬 익스텐션 설치를 위해 이동해주세요.</h1>
+          <p class="card-desc">
+            Tubify가 제공하는 실시간 요약 서비스를<br>
+            사용하기 위해 크롬익스텐션 설치가 필요합니다.
+          </p>
+        </div>
+        <a class="install-btn" id="install-btn" href="#" target="_blank">설치하러 가기</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 토큰 저장 (OAuth 콜백에서 넘어올 경우)
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token");
+    if (token) {
+      localStorage.setItem("access_token", token);
+      // 익스텐션에 토큰 전달
+      const EXTENSION_IDS = ["__EXTENSION_ID__"];
+      if (typeof chrome !== "undefined" && chrome.runtime) {
+        EXTENSION_IDS.forEach(id => {
+          try { chrome.runtime.sendMessage(id, { type: "SET_TOKEN", token }, () => {}); } catch (_) {}
+        });
+      }
+      history.replaceState({}, "", location.pathname);
+    }
+
+    // 이미 설치 안내를 봤으면 마이페이지로
+    if (!token && !localStorage.getItem("access_token")) {
+      location.href = "/intro.html";
+    }
+
+    // 설치하러 가기 버튼 — Chrome Web Store URL 설정
+    const STORE_URL = "__EXTENSION_STORE_URL__";
+    const btn = document.getElementById("install-btn");
+    btn.href = STORE_URL || "https://chrome.google.com/webstore";
+    btn.addEventListener("click", function () {
+      // 스토어 탭 열고 마이페이지로 이동
+      setTimeout(() => { location.href = "/mypage.html"; }, 300);
+    });
+  </script>
+</body>
+</html>
