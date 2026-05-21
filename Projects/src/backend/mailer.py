@@ -1,20 +1,19 @@
-# Resend API를 통한 HTML 뉴스레터 이메일 발송 — Figma 디자인 기반
+# Gmail SMTP를 통한 HTML 뉴스레터 이메일 발송 — Figma 디자인 기반
 import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Dict, Any, List
 from urllib.parse import quote
 from dotenv import load_dotenv
-
-import resend
 
 load_dotenv()
 from logger import get_logger
 logger = get_logger(__name__)
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-RESEND_FROM    = os.getenv("RESEND_FROM_EMAIL", "curator@tubify.com")
-BACKEND_URL    = os.getenv("FRONTEND_URL", "http://localhost:8000")
-
-resend.api_key = RESEND_API_KEY
+GMAIL_USER         = os.getenv("GMAIL_USER", "")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+BACKEND_URL        = os.getenv("FRONTEND_URL", "http://localhost:8000")
 
 _FONT = "'Apple SD Gothic Neo','Noto Sans KR','Segoe UI',sans-serif"
 
@@ -268,7 +267,7 @@ def send_email(
     newsletter: Dict[str, Any],
 ) -> Dict[str, bool]:
     """
-    Resend API를 통한 뉴스레터 발송
+    Gmail SMTP를 통한 뉴스레터 발송
 
     INPUT:
       - user_email (str)  — 수신자 이메일
@@ -276,22 +275,31 @@ def send_email(
 
     OUTPUT:
       - {"success": bool}
+
+    ENV:
+      - GMAIL_USER         — 발신 Gmail 주소
+      - GMAIL_APP_PASSWORD — Google 앱 비밀번호 (16자리)
     """
-    if not RESEND_API_KEY:
-        logger.warning("[email] RESEND_API_KEY 없음 — 발송 스킵")
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        logger.warning("[email] GMAIL_USER 또는 GMAIL_APP_PASSWORD 없음 — 발송 스킵")
         return {"success": False}
 
     subject   = newsletter.get("subject", "오늘의 Tubify 브리핑")
     html_body = _format_html(newsletter, recipient_email=user_email)
 
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = f"Tubify <{GMAIL_USER}>"
+    msg["To"]      = user_email
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
     try:
-        response = resend.Emails.send({
-            "from":    RESEND_FROM,
-            "to":      [user_email],
-            "subject": subject,
-            "html":    html_body,
-        })
-        logger.info(f"[email] 발송 성공 → {user_email} | id={response.get('id', '-')}")
+        with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            smtp.sendmail(GMAIL_USER, user_email, msg.as_bytes())
+        logger.info(f"[email] 발송 성공 → {user_email}")
         return {"success": True}
 
     except Exception as e:
