@@ -1395,9 +1395,9 @@ async def subscriptions(user=Depends(get_current_user), db: AsyncSession = Depen
     if not db_user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
 
-    # ── OAuth credentials 로드: 메모리 캐시 → DB 순으로 탐색 ──────────────────
-    creds_data = next(iter(_oauth_credentials.values()), None) if _oauth_credentials else None
-    if not creds_data and db_user.oauth_credentials:
+    # ── OAuth credentials 로드: DB에서 해당 유저 것만 사용 ─────────────────────
+    creds_data = None
+    if db_user.oauth_credentials:
         try:
             creds_data = _json.loads(db_user.oauth_credentials)
         except Exception:
