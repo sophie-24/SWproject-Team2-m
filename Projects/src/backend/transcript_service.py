@@ -34,7 +34,7 @@ if _cookies_b64 and not os.path.exists(COOKIES_PATH):
 
 _LANG_PRIORITY = ["ko", "en"]
 # 쿠키 파일이 있으면 인증된 요청으로 YouTube 429 우회
-_api = YouTubeTranscriptApi(cookie_path=COOKIES_PATH) if os.path.exists(COOKIES_PATH) else YouTubeTranscriptApi()
+_api = YouTubeTranscriptApi(cookies=COOKIES_PATH) if os.path.exists(COOKIES_PATH) else YouTubeTranscriptApi()
 
 # ── 자막 캐시 ─────────────────────────────────────────────────────────────────
 # 인기 영상은 여러 사용자가 동일 video_id를 요청하므로 인메모리 캐시로 중복 수집 방지.
