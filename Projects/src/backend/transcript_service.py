@@ -20,8 +20,21 @@ logger = get_logger(__name__)
 
 COOKIES_PATH = os.path.join(os.path.dirname(__file__), "cookies.txt")
 
+# YOUTUBE_COOKIES_B64 환경변수에 cookies.txt를 base64 인코딩한 값을 넣으면
+# 서버 시작 시 자동으로 cookies.txt로 복원 — Cloudtype 배포 환경에서 YouTube 429 우회용
+_cookies_b64 = os.getenv("YOUTUBE_COOKIES_B64", "")
+if _cookies_b64 and not os.path.exists(COOKIES_PATH):
+    try:
+        import base64
+        with open(COOKIES_PATH, "wb") as _f:
+            _f.write(base64.b64decode(_cookies_b64))
+        logger.info("[transcript] cookies.txt 복원 완료 (YOUTUBE_COOKIES_B64)")
+    except Exception as _e:
+        logger.warning("[transcript] cookies.txt 복원 실패: %s", _e)
+
 _LANG_PRIORITY = ["ko", "en"]
-_api = YouTubeTranscriptApi()  # v1.x: 인스턴스 메서드 사용
+# 쿠키 파일이 있으면 인증된 요청으로 YouTube 429 우회
+_api = YouTubeTranscriptApi(cookie_path=COOKIES_PATH) if os.path.exists(COOKIES_PATH) else YouTubeTranscriptApi()
 
 # ── 자막 캐시 ─────────────────────────────────────────────────────────────────
 # 인기 영상은 여러 사용자가 동일 video_id를 요청하므로 인메모리 캐시로 중복 수집 방지.
