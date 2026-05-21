@@ -1589,6 +1589,7 @@ async def analyze_search(
 
     **소요 시간:** 최초 분석 10~30초 / 캐시 히트 즉시
     """
+    import json as _json
     from pipeA_orchestrator import run_pipeline_a
     from database import User
 
@@ -1724,6 +1725,7 @@ async def analyze_video(
     2. 단일 영상 풀 분석 + Pipeline A를 asyncio.gather로 병렬 실행
     3. 소스 중복 제거 (단일 영상이 상위 5개에 포함되면 최대 5개 소스 유지)
     """
+    import json as _json
     from pipeA_orchestrator import run_pipeline_a
     from agents.title_topic_ai import extract_topic_from_title
     from database import User
