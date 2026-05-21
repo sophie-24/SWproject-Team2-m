@@ -17,12 +17,11 @@ CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("REDIRECT_URI", "http://localhost:8000/auth/callback")
 
-# YouTube 구독 목록 읽기 + 기본 프로필 정보
+# 기본 프로필 정보만 요청 (youtube.readonly 제거 — Google 심사 불필요)
 SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
-    "https://www.googleapis.com/auth/youtube.readonly",
 ]
 
 CLIENT_CONFIG = {
