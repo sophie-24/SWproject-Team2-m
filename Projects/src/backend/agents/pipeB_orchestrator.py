@@ -24,11 +24,14 @@ def _dashboard_to_analysis(topic: str, cached: Dict[str, Any]) -> Dict[str, Any]
     rec_videos = cached.get("recommended_videos", [])
     sources = [
         {
-            "title": v.get("title", ""),
+            "title":         v.get("title", ""),
             "url": (
                 v.get("url")
                 or (f"https://youtube.com/watch?v={v['video_id']}" if v.get("video_id") else "")
             ),
+            "thumbnail_url": v.get("thumbnail_url", ""),
+            "channel_title": v.get("channel_title", ""),
+            "summary":       v.get("summary", ""),
         }
         for v in rec_videos
     ]

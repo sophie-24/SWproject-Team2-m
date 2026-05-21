@@ -274,10 +274,12 @@ function renderResults(data, watchMode) {
   // SUMMARY 탭 버튼: watch=보임, search=숨김
   var summaryTabBtn = document.querySelector('[data-tab="summary"]');
   if (summaryTabBtn) summaryTabBtn.style.display = watchMode ? "" : "none";
-  // INSIGHTS 내 검색 헤더: watch=숨김, search=보임 (search 모드에서 따로 설정)
+  // INSIGHTS 내 검색 헤더: watch=키워드 표시(하트 없음), search=키워드+하트
   if (watchMode) {
-    document.getElementById("insights-kw-header").style.display = "none";
-    document.getElementById("insights-kw-underline").style.display = "none";
+    document.getElementById("kw-title-insights").textContent = keyword || "";
+    document.getElementById("btn-heart-insights").style.display = "none";
+    document.getElementById("insights-kw-header").style.display = keyword ? "" : "none";
+    document.getElementById("insights-kw-underline").style.display = keyword ? "" : "none";
   }
 
   if (watchMode) {
