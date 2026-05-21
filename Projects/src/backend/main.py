@@ -350,9 +350,12 @@ class AdminLogsResponse(BaseModel):
 
 # ── 정적 파일 ─────────────────────────────────────────────────────────────────
 
-@app.get("/", tags=["프론트엔드"], summary="로그인 페이지 제공 ✅", response_class=HTMLResponse)
+@app.get("/", tags=["프론트엔드"], summary="서비스 소개 페이지 제공 ✅", response_class=FileResponse)
 def root():
-    # login.html 에 EXTENSION_ID 주입
+    return FileResponse(os.path.join(FRONTEND_DIR, "intro.html"))
+
+@app.get("/login", tags=["프론트엔드"], summary="로그인 페이지 제공 ✅", response_class=HTMLResponse)
+def login_page():
     with open(os.path.join(FRONTEND_DIR, "login.html"), "r", encoding="utf-8") as f:
         html = f.read()
     html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
@@ -478,7 +481,7 @@ async def callback(
         if is_new_user:
             redirect_url = f"{FRONTEND_URL}/extension-guide.html?token={jwt_token}"
         else:
-            redirect_url = f"{FRONTEND_URL}?token={jwt_token}"
+            redirect_url = f"{FRONTEND_URL}/mypage.html?token={jwt_token}"
 
     response = RedirectResponse(url=redirect_url)
     response.set_cookie(
