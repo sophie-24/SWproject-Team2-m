@@ -307,8 +307,6 @@ async def _cross_and_generate(
     """
     valid = [v for v in video_results if v["transcript_available"] and v["key_claims"]]
     if not valid:
-        valid = [v for v in video_results if v["transcript_available"]]
-    if not valid:
         return {
             "common_facts": [],
             "controversies": [],
