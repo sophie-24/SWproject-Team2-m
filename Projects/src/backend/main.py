@@ -1633,9 +1633,18 @@ async def analyze_search(
             .order_by(UserInterest.weight.desc())
             .limit(10)
         )
+        user_categories = [row[0] for row in interest_result.all()]
+
+        # ── 구독 채널 ID 조회 (/subscriptions 호출 시 캐싱된 값) ──────────────
+        user_row = await db.execute(select(User).where(User.google_id == user_id))
+        db_user  = user_row.scalar_one_or_none()
         subscribed_channel_ids = []
-        user_categories        = [row[0] for row in interest_result.all()]
-        clicked_channel_ids    = []
+        if db_user and db_user.subscribed_channels:
+            try:
+                subscribed_channel_ids = _json.loads(db_user.subscribed_channels)
+            except Exception:
+                subscribed_channel_ids = []
+        clicked_channel_ids = []
 
         try:
             result = await run_pipeline_a(
@@ -1753,7 +1762,7 @@ async def analyze_video(
     normalized_topic = topic_result["normalized_topic"]
     logger.info(f"[analyze_video] topic='{extracted_topic}' video_id={video_id}")
 
-    # ── Step 2: 유저 관심사 조회 (Pipeline A 개인화용) ────────────────────────
+    # ── Step 2: 유저 관심사 + 구독 채널 조회 (Pipeline A 개인화용) ───────────
     interest_result = await db.execute(
         select(UserInterest.category)
         .where(UserInterest.user_id == user_id)
@@ -1761,6 +1770,15 @@ async def analyze_video(
         .limit(10)
     )
     user_categories = [row[0] for row in interest_result.all()]
+
+    user_row = await db.execute(select(User).where(User.google_id == user_id))
+    db_user  = user_row.scalar_one_or_none()
+    subscribed_channel_ids = []
+    if db_user and db_user.subscribed_channels:
+        try:
+            subscribed_channel_ids = _json.loads(db_user.subscribed_channels)
+        except Exception:
+            subscribed_channel_ids = []
 
     # ── Step 3: 단일 영상 풀 분석 + Pipeline A 병렬 실행 ─────────────────────
     single_cache_key   = f"single_video_full:{video_id}"
@@ -1779,7 +1797,7 @@ async def analyze_video(
         try:
             result = await run_pipeline_a(
                 keyword=extracted_topic,
-                subscribed_channel_ids=[],
+                subscribed_channel_ids=subscribed_channel_ids,
                 user_categories=user_categories,
                 clicked_channel_ids=[],
             )
