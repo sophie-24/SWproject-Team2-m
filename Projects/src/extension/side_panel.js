@@ -203,8 +203,11 @@ function renderVideoSummary(videoTitle, aiData) {
 
     // summary 문자열 → 첫 번째 카드
     var summaryText = (aiData.summary || "").trim();
-    if (summaryText && summaryText !== "자막 없음" && summaryText !== "분석 실패") {
-      cards.push({ title: "영상 요약", body: summaryText, icon: 0 });
+    if (summaryText && summaryText !== "분석 실패") {
+      var summaryBody = (summaryText === "자막 없음")
+        ? "이 영상은 자막 정보를 가져올 수 없어 AI 요약을 제공하기 어렵습니다."
+        : summaryText;
+      cards.push({ title: "영상 요약", body: summaryBody, icon: 0 });
     }
 
     // key_claims 배열 → 카드 추가 (최대 2개)
@@ -484,10 +487,10 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
     heartedTopic = "";
     checkHeartState(currentKeyword);
 
-    // SUMMARY 탭: 단일 영상 전체 분석
-    var sv = data.single_video || {};
+    // SUMMARY 탭: 단일 영상 전체 분석 (single_video 중첩 또는 flat 구조 모두 대응)
+    var sv = data.single_video || data;
     renderVideoSummary(videoTitle, {
-      summary:           sv.summary || "",
+      summary:           sv.summary || sv.video_summary || "",
       key_claims:        sv.key_claims || [],
       credibility_score: sv.credibility_score,
       ad_score:          sv.ad_score,

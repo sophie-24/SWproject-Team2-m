@@ -358,17 +358,6 @@ def root():
     html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
     return HTMLResponse(content=html)
 
-@app.get("/home.html", tags=["프론트엔드"], summary="홈 페이지 제공 ✅", response_class=FileResponse)
-def home():
-    return FileResponse(os.path.join(FRONTEND_DIR, "home.html"))
-
-@app.get("/onboarding.html", tags=["프론트엔드"], summary="온보딩 페이지 제공 ✅", response_class=HTMLResponse)
-def onboarding():
-    with open(os.path.join(FRONTEND_DIR, "onboarding.html"), "r", encoding="utf-8") as f:
-        html = f.read()
-    html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
-    return HTMLResponse(content=html)
-
 @app.get("/extension-guide.html", tags=["프론트엔드"], summary="크롬 익스텐션 설치 안내 페이지 제공 ✅", response_class=HTMLResponse)
 def extension_guide():
     with open(os.path.join(FRONTEND_DIR, "extension-guide.html"), "r", encoding="utf-8") as f:
@@ -376,14 +365,6 @@ def extension_guide():
     html = html.replace("__EXTENSION_ID__", EXTENSION_IDS_JS)
     html = html.replace("__EXTENSION_STORE_URL__", EXTENSION_STORE_URL)
     return HTMLResponse(content=html)
-
-@app.get("/dashboard.html", tags=["프론트엔드"], summary="대시보드 페이지 제공 ✅", response_class=FileResponse)
-def dashboard():
-    return FileResponse(os.path.join(FRONTEND_DIR, "dashboard.html"))
-
-@app.get("/search_dashboard.html", tags=["프론트엔드"], summary="검색 대시보드 페이지 제공 ✅", response_class=FileResponse)
-def search_dashboard():
-    return FileResponse(os.path.join(FRONTEND_DIR, "search_dashboard.html"))
 
 @app.get("/mypage.html", tags=["프론트엔드"], summary="마이페이지 제공 ✅", response_class=FileResponse)
 def mypage():
@@ -402,7 +383,6 @@ def terms():
 def intro():
     return FileResponse(os.path.join(FRONTEND_DIR, "intro.html"))
 
-# login.html / home.html 이 참조하는 정적 에셋 (/static/ 마운트와 별개로 루트 경로 노출)
 @app.get("/app.js", tags=["프론트엔드"], summary="공통 앱 스크립트 제공 ✅", response_class=FileResponse)
 def serve_app_js():
     return FileResponse(os.path.join(FRONTEND_DIR, "app.js"), media_type="application/javascript")
@@ -410,14 +390,6 @@ def serve_app_js():
 @app.get("/style.css", tags=["프론트엔드"], summary="공통 스타일시트 제공 ✅", response_class=FileResponse)
 def serve_style_css():
     return FileResponse(os.path.join(FRONTEND_DIR, "style.css"), media_type="text/css")
-
-@app.get("/home.js", tags=["프론트엔드"], summary="홈 스크립트 제공 ✅", response_class=FileResponse)
-def serve_home_js():
-    return FileResponse(os.path.join(FRONTEND_DIR, "home.js"), media_type="application/javascript")
-
-@app.get("/home.css", tags=["프론트엔드"], summary="홈 스타일시트 제공 ✅", response_class=FileResponse)
-def serve_home_css():
-    return FileResponse(os.path.join(FRONTEND_DIR, "home.css"), media_type="text/css")
 
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────────────
