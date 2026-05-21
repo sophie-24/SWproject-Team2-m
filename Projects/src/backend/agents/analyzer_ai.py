@@ -116,7 +116,7 @@ async def _analyze_single_video(
         f"- 먼저 이 영상이 검색 주제와 실제로 관련 있는지 판단하세요.\n"
         f"- 제목, 채널명, 자막 내용이 검색 주제와 직접 연결되지 않으면 억지로 연결하지 마세요.\n"
         f"- 단순히 같은 단어가 일부 등장한다는 이유만으로 관련성이 높다고 판단하지 마세요.\n"
-        f"- 관련도가 낮은 영상은 [요약]에 '검색 주제와 직접 관련이 낮은 영상입니다.'라고 명시하고, [핵심주장]에는 주제와 무관한 주장을 만들지 마세요.\n"
+        f"- 관련도가 낮은 영상이라도 자막에 등장하는 내용 중 검색 주제와 조금이라도 연관된 주장은 핵심주장에 포함하세요.\n"
         f"- 뮤직비디오, 음원, 라이브 무대, 직캠, 플레이리스트, lyrics, 가사 영상, cover 영상은 일반 정보성 영상으로 단정하지 마세요.\n"
         f"- 자막이 노래 가사, 반복 구절, 후렴, 감탄사 중심이면 이를 일반 정보성 발화로 해석하지 마세요.\n"
         f"- 가사 내용을 바탕으로 제품 추천, 지식 설명, 사회적 쟁점, 실천 조언을 추측하지 마세요.\n"
@@ -306,6 +306,8 @@ async def _cross_and_generate(
       구매형 - 공통사실·요약·장단점, 실용적 비교 언어
     """
     valid = [v for v in video_results if v["transcript_available"] and v["key_claims"]]
+    if not valid:
+        valid = [v for v in video_results if v["transcript_available"]]
     if not valid:
         return {
             "common_facts": [],
