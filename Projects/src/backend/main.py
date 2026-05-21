@@ -1591,6 +1591,7 @@ async def analyze_search(
     **소요 시간:** 최초 분석 10~30초 / 캐시 히트 즉시
     """
     from pipeA_orchestrator import run_pipeline_a
+    from database import User
 
     user_id = user["user_id"]
     cache_key = f"{user_id}:{keyword}"
@@ -1726,6 +1727,7 @@ async def analyze_video(
     """
     from pipeA_orchestrator import run_pipeline_a
     from agents.title_topic_ai import extract_topic_from_title
+    from database import User
 
     video_id = data.video_id
     title    = data.title
