@@ -1549,7 +1549,6 @@ async def send_now(
     email_result = _send_email(
         user_email=db_user.email if db_user else "",
         newsletter=newsletter,
-        newsletter_type="interest",
     )
 
     record.delivery_status = "sent" if email_result.get("success") else "failed"
