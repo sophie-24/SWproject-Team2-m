@@ -45,6 +45,8 @@ class User(Base):
     unsubscribed_at      = Column(DateTime, nullable=True)
     # DEPRECATED: scheduler selector_ai 가산점용 구독 채널 캐시 — 행동기록 기반 파이프라인 제거로 불필요
     subscribed_channels  = Column(Text, nullable=True)
+    # selector_ai ω₄ click_score용 — /analyze_video 호출 시 시청 채널 ID 누적 저장 (최대 50개)
+    watched_channels     = Column(Text, nullable=True)
     # Google OAuth credentials JSON — 서버 재시작 후에도 /subscriptions 호출 가능하도록 DB에 저장
     oauth_credentials    = Column(Text, nullable=True)
     created_at           = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

@@ -1779,6 +1779,12 @@ async def analyze_video(
             subscribed_channel_ids = _json.loads(db_user.subscribed_channels)
         except Exception:
             subscribed_channel_ids = []
+    clicked_channel_ids = []
+    if db_user and db_user.watched_channels:
+        try:
+            clicked_channel_ids = _json.loads(db_user.watched_channels)
+        except Exception:
+            clicked_channel_ids = []
 
     # ── Step 3: 단일 영상 풀 분석 + Pipeline A 병렬 실행 ─────────────────────
     single_cache_key   = f"single_video_full:{video_id}"
@@ -1799,7 +1805,7 @@ async def analyze_video(
                 keyword=extracted_topic,
                 subscribed_channel_ids=subscribed_channel_ids,
                 user_categories=user_categories,
-                clicked_channel_ids=[],
+                clicked_channel_ids=clicked_channel_ids,
             )
         except ValueError:
             result = {
@@ -1812,6 +1818,18 @@ async def analyze_video(
         return result
 
     single_result, pipeline_result = await asyncio.gather(_run_single(), _run_pipeline())
+
+    # ── Step 3.5: 시청 채널 ID 누적 저장 (selector_ai ω₄ click_score용) ───────
+    watched_channel_id = single_result.get("channel_id")
+    if db_user and watched_channel_id:
+        try:
+            current = clicked_channel_ids[:]
+            if watched_channel_id not in current:
+                current.append(watched_channel_id)
+            db_user.watched_channels = _json.dumps(current[-50:], ensure_ascii=False)  # 최대 50개 유지
+            await db.commit()
+        except Exception as e:
+            logger.warning(f"[analyze_video] watched_channels 저장 실패: {e}")
 
     # ── Step 4: 소스 통합 — video_id 기준 중복 제거 ──────────────────────────
     seen_ids: set[str] = set()
