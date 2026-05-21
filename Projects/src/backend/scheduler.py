@@ -41,6 +41,7 @@ async def _already_sent_in_window(db, user_id: str, hours: int = 10) -> bool:
         select(Newsletter).where(
             Newsletter.user_id == user_id,
             Newsletter.delivered_at >= cutoff,
+            Newsletter.delivery_status == "sent",
         )
     )
     return result.scalar_one_or_none() is not None
@@ -100,7 +101,6 @@ async def _deliver_newsletter(
         result = send_email(
             user_email=user.email,
             newsletter=newsletter,
-            newsletter_type="interest",
         )
         return result if result else {"success": True}
     except Exception as e:
