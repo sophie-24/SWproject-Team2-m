@@ -33,8 +33,22 @@ if _cookies_b64 and not os.path.exists(COOKIES_PATH):
         logger.warning("[transcript] cookies.txt 복원 실패: %s", _e)
 
 _LANG_PRIORITY = ["ko", "en"]
-# 쿠키 파일이 있으면 인증된 요청으로 YouTube 429 우회
-_api = YouTubeTranscriptApi(cookies=COOKIES_PATH) if os.path.exists(COOKIES_PATH) else YouTubeTranscriptApi()
+# 쿠키 파일이 있으면 인증된 요청으로 YouTube 429 우회 (v1.2.4: http_client로 전달)
+if os.path.exists(COOKIES_PATH):
+    try:
+        import requests
+        from http.cookiejar import MozillaCookieJar
+        _session = requests.Session()
+        _jar = MozillaCookieJar(COOKIES_PATH)
+        _jar.load(ignore_discard=True, ignore_expires=True)
+        _session.cookies = _jar
+        _api = YouTubeTranscriptApi(http_client=_session)
+        logger.info("[transcript] YouTubeTranscriptApi 쿠키 세션 적용 완료")
+    except Exception as _e:
+        logger.warning("[transcript] 쿠키 세션 적용 실패, 기본 모드 사용: %s", _e)
+        _api = YouTubeTranscriptApi()
+else:
+    _api = YouTubeTranscriptApi()
 
 # ── 자막 캐시 ─────────────────────────────────────────────────────────────────
 # 인기 영상은 여러 사용자가 동일 video_id를 요청하므로 인메모리 캐시로 중복 수집 방지.
