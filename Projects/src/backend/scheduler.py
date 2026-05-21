@@ -41,10 +41,10 @@ async def _already_sent_in_window(db, user_id: str, hours: int = 10) -> bool:
         select(Newsletter).where(
             Newsletter.user_id == user_id,
             Newsletter.delivered_at >= cutoff,
-            Newsletter.delivery_status == "sent",
         )
     )
-    return result.scalar_one_or_none() is not None
+    records = result.scalars().all()
+    return any(r.delivery_status == "sent" for r in records)
 
 
 async def _get_active_interest_topics(db, user_id: str) -> List[str]:
