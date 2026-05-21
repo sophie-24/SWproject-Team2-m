@@ -43,7 +43,7 @@ def search_videos(keyword: str, max_results: int = 10) -> List[dict]:
         .execute()
     )
 
-    video_ids = [item["id"]["videoId"] for item in search_response.get("items", [])]
+    video_ids = [item["id"]["videoId"] for item in search_response.get("items", []) if "videoId" in item.get("id", {})]
 
     if not video_ids:
         return []
@@ -64,6 +64,8 @@ def search_videos(keyword: str, max_results: int = 10) -> List[dict]:
 
     results = []
     for item in search_response.get("items", []):
+        if "videoId" not in item.get("id", {}):
+            continue
         video_id = item["id"]["videoId"]
         snippet = item["snippet"]
         stats = stats_map.get(video_id, {})
