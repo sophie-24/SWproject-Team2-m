@@ -374,6 +374,13 @@ def mypage():
     return FileResponse(os.path.join(FRONTEND_DIR, "mypage.html"))
 
 
+@app.get("/guide.html", tags=["프론트엔드"], summary="이용 가이드 페이지 제공 ✅", response_class=HTMLResponse)
+def guide():
+    with open(os.path.join(FRONTEND_DIR, "guide.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("__EXTENSION_STORE_URL__", EXTENSION_STORE_URL)
+    return HTMLResponse(content=html)
+
 @app.get("/privacy.html", tags=["프론트엔드"], summary="개인정보 처리방침 페이지 제공 ✅", response_class=FileResponse)
 def privacy():
     return FileResponse(os.path.join(FRONTEND_DIR, "privacy.html"))

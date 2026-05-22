@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>이용 가이드 — Tubify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans KR", sans-serif;
+      background: #f7f9fb;
+      color: #191c1e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky;
+      top: 0;
+      width: 100%;
+      background: rgba(247, 249, 251, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 100;
+      border-bottom: 1px solid rgba(235, 235, 235, 0.5);
+    }
+    .nav-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 32px;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-size: 22px;
+      font-weight: 800;
+      color: red;
+      text-decoration: none;
+      letter-spacing: -0.5px;
+    }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-link {
+      font-size: 15px;
+      font-weight: 500;
+      color: #515f74;
+      text-decoration: none;
+    }
+    .nav-link:hover { color: #191c1e; }
+    .nav-link.active { color: #bc0100; font-weight: 700; }
+    .nav-btn {
+      background: #191c1e;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+    }
+    .nav-btn:hover { background: #2d3135; }
+
+    /* ── 공통 레이아웃 ── */
+    .page-wrap {
+      width: 100%;
+      max-width: 1080px;
+      padding: 0 32px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      width: 100%;
+      padding: 96px 32px 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(188,1,0,0.07) 0%, transparent 70%);
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      background: #fef2f2;
+      border: 1px solid #fee2e2;
+      border-radius: 9999px;
+      padding: 6px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #bc0100;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .hero-title {
+      font-size: 56px;
+      font-weight: 800;
+      color: #191c1e;
+      letter-spacing: -2.5px;
+      line-height: 1.1;
+    }
+    .hero-title .accent { color: #bc0100; }
+    .hero-desc {
+      font-size: 18px;
+      font-weight: 400;
+      color: #515f74;
+      line-height: 1.7;
+      max-width: 520px;
+    }
+
+    /* ── TOC (목차) ── */
+    .toc {
+      width: 100%;
+      max-width: 1080px;
+      padding: 0 32px;
+      margin-bottom: 80px;
+    }
+    .toc-inner {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 32px 40px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .toc-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-decoration: none;
+    }
+    .toc-item:hover { background: #f8fafc; }
+    .toc-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: #bc0100;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .toc-label {
+      font-size: 15px;
+      font-weight: 700;
+      color: #191c1e;
+    }
+    .toc-sub {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    /* ── 섹션 공통 ── */
+    .section {
+      width: 100%;
+      max-width: 1080px;
+      padding: 0 32px 100px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .section-num {
+      width: 40px;
+      height: 40px;
+      background: #bc0100;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 28px;
+      font-weight: 800;
+      color: #191c1e;
+      letter-spacing: -1px;
+    }
+    .section-desc {
+      font-size: 16px;
+      color: #515f74;
+      margin-top: 4px;
+      line-height: 1.6;
+    }
+    .divider-line {
+      width: 100%;
+      height: 1px;
+      background: #e2e8f0;
+      margin-bottom: 100px;
+    }
+
+    /* ── Step 카드 (설치 가이드) ── */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .step-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 36px 40px;
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 28px;
+      align-items: start;
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .step-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.07); }
+    .step-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 5px;
+      background: linear-gradient(180deg, #bc0100, #ff4444);
+    }
+    .step-icon {
+      width: 72px;
+      height: 72px;
+      background: #fef2f2;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      flex-shrink: 0;
+    }
+    .step-body { display: flex; flex-direction: column; gap: 10px; }
+    .step-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .step-badge {
+      background: #fef2f2;
+      border: 1px solid #fee2e2;
+      border-radius: 9999px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #bc0100;
+      letter-spacing: 0.5px;
+    }
+    .step-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #191c1e;
+      letter-spacing: -0.5px;
+    }
+    .step-desc {
+      font-size: 15px;
+      color: #475569;
+      line-height: 1.7;
+    }
+    .step-tip {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.6;
+      margin-top: 4px;
+    }
+    .step-tip strong { color: #191c1e; font-weight: 700; }
+    .step-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #bc0100, #e60000);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      width: fit-content;
+      transition: opacity 0.15s;
+      margin-top: 8px;
+    }
+    .step-btn:hover { opacity: 0.88; }
+
+    /* ── 기능 그리드 ── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .feature-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+    .feature-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.07); transform: translateY(-2px); }
+    .feature-icon {
+      font-size: 28px;
+      width: 52px;
+      height: 52px;
+      background: #fef2f2;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .feature-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #191c1e;
+    }
+    .feature-desc {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.7;
+    }
+    .feature-tag {
+      display: inline-block;
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      width: fit-content;
+    }
+
+    /* ── 사용법 (번호 리스트) ── */
+    .how-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .how-item {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .how-num {
+      width: 32px;
+      height: 32px;
+      border: 2px solid #bc0100;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      color: #bc0100;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .how-content { display: flex; flex-direction: column; gap: 6px; }
+    .how-title { font-size: 16px; font-weight: 700; color: #191c1e; }
+    .how-desc { font-size: 14px; color: #475569; line-height: 1.7; }
+
+    /* ── 결과 카드 미리보기 ── */
+    .result-preview {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .result-item {
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .result-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .result-label-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .result-label-dot.red { background: #ef4444; }
+    .result-label-dot.green { background: #22c55e; }
+    .result-label-dot.blue { background: #3b82f6; }
+    .result-label-dot.orange { background: #f97316; }
+    .result-content {
+      font-size: 14px;
+      color: #334155;
+      line-height: 1.65;
+    }
+    .result-bar {
+      height: 6px;
+      border-radius: 9999px;
+      background: #e2e8f0;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .result-bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, #22c55e, #16a34a);
+    }
+    .result-score {
+      font-size: 22px;
+      font-weight: 800;
+      color: #22c55e;
+    }
+
+    /* ── 뉴스레터 카드 ── */
+    .newsletter-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+    .nl-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .nl-icon { font-size: 28px; }
+    .nl-title { font-size: 17px; font-weight: 700; color: #191c1e; }
+    .nl-desc { font-size: 14px; color: #475569; line-height: 1.7; }
+    .nl-chip {
+      display: inline-block;
+      background: #fef2f2;
+      border: 1px solid #fee2e2;
+      border-radius: 9999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #bc0100;
+      width: fit-content;
+    }
+
+    /* ── FAQ ── */
+    .faq-list { display: flex; flex-direction: column; gap: 12px; }
+    .faq-item {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .faq-q {
+      padding: 22px 28px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #191c1e;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      user-select: none;
+    }
+    .faq-q:hover { background: #fafafa; }
+    .faq-arrow {
+      font-size: 18px;
+      color: #94a3b8;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .faq-item.open .faq-arrow { transform: rotate(180deg); }
+    .faq-a {
+      display: none;
+      padding: 0 28px 22px;
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.75;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 18px;
+    }
+    .faq-item.open .faq-a { display: block; }
+
+    /* ── CTA ── */
+    .cta-section {
+      width: 100%;
+      padding: 80px 32px 120px;
+      display: flex;
+      justify-content: center;
+    }
+    .cta-card {
+      max-width: 640px;
+      width: 100%;
+      background: linear-gradient(135deg, #bc0100 0%, #e60000 100%);
+      border-radius: 24px;
+      padding: 56px 48px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-card::before {
+      content: '';
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 50%;
+      top: -100px;
+      right: -80px;
+    }
+    .cta-title {
+      font-size: 30px;
+      font-weight: 800;
+      color: white;
+      letter-spacing: -1px;
+      line-height: 1.2;
+    }
+    .cta-desc {
+      font-size: 16px;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.7;
+    }
+    .cta-btn {
+      background: white;
+      color: #bc0100;
+      border: none;
+      border-radius: 12px;
+      padding: 16px 40px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .cta-btn:hover { opacity: 0.92; }
+
+    /* ── Footer ── */
+    footer {
+      width: 100%;
+      border-top: 1px solid #e2e8f0;
+      padding: 40px 32px;
+    }
+    .footer-inner {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .footer-logo { font-size: 16px; font-weight: 800; color: red; text-decoration: none; }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { font-size: 13px; color: #71717a; text-decoration: none; }
+    .footer-links a:hover { color: #191c1e; }
+    .footer-copy { margin-left: auto; font-size: 13px; color: #94a3b8; }
+
+    /* ── 반응형 ── */
+    @media (max-width: 768px) {
+      .hero { padding: 64px 24px 56px; }
+      .hero-title { font-size: 36px; letter-spacing: -1.5px; }
+      .hero-desc { font-size: 15px; }
+      .toc-inner { grid-template-columns: repeat(2, 1fr); }
+      .feature-grid { grid-template-columns: 1fr; }
+      .newsletter-grid { grid-template-columns: 1fr; }
+      .result-preview { grid-template-columns: 1fr; }
+      .step-card { grid-template-columns: 1fr; }
+      .step-icon { width: 52px; height: 52px; font-size: 24px; }
+      .cta-card { padding: 40px 28px; }
+      .cta-title { font-size: 24px; }
+      .flow-steps { flex-direction: column; align-items: flex-start; }
+      .flow-arrow { transform: rotate(90deg); }
+      .page-wrap, .section, .toc { padding-left: 20px; padding-right: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-inner">
+      <a href="/intro.html" class="nav-logo">Tubify</a>
+      <div class="nav-links">
+        <a href="/intro.html" class="nav-link">홈</a>
+        <a href="/guide.html" class="nav-link active">이용 가이드</a>
+        <a href="/mypage.html" class="nav-link" id="nav-mypage-link" style="display:none">마이페이지</a>
+      </div>
+      <a href="/intro.html" class="nav-btn" id="nav-mypage-btn">로그인</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <div class="hero">
+    <span class="hero-badge">USER GUIDE</span>
+    <h1 class="hero-title">Tubify <span class="accent">이용 가이드</span></h1>
+    <p class="hero-desc">
+      설치부터 뉴스레터 수신까지, Tubify를 100% 활용하는 방법을 안내드립니다.
+    </p>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <div class="toc-inner">
+      <a href="#section-install" class="toc-item">
+        <span class="toc-num">STEP 01</span>
+        <span class="toc-label">시작하기</span>
+        <span class="toc-sub">로그인 및 익스텐션 설치</span>
+      </a>
+      <a href="#section-analyze" class="toc-item">
+        <span class="toc-num">STEP 02</span>
+        <span class="toc-label">실시간 분석</span>
+        <span class="toc-sub">AI 사이드패널 사용법</span>
+      </a>
+      <a href="#section-heart" class="toc-item">
+        <span class="toc-num">STEP 03</span>
+        <span class="toc-label">관심 토픽 등록</span>
+        <span class="toc-sub">하트로 뉴스레터 구독</span>
+      </a>
+      <a href="#section-newsletter" class="toc-item">
+        <span class="toc-num">STEP 04</span>
+        <span class="toc-label">뉴스레터 설정</span>
+        <span class="toc-sub">발송 시간 및 구독 관리</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- STEP 01 — 시작하기 -->
+  <div class="section" id="section-install">
+    <div class="section-header">
+      <div class="section-num">1</div>
+      <div>
+        <div class="section-title">시작하기</div>
+        <div class="section-desc">Google 로그인 후 크롬 익스텐션을 설치하면 모든 준비가 완료됩니다.</div>
+      </div>
+    </div>
+
+    <div class="steps">
+
+      <div class="step-card">
+        <div class="step-icon">🔐</div>
+        <div class="step-body">
+          <div class="step-meta">
+            <span class="step-badge">STEP 1</span>
+          </div>
+          <div class="step-title">Google 계정으로 로그인</div>
+          <div class="step-desc">
+            Tubify는 별도의 회원가입 없이 Google 계정으로 바로 시작할 수 있습니다.
+            홈 화면의 <strong>로그인</strong> 버튼을 클릭하면 구글 인증 페이지로 이동합니다.
+          </div>
+          <div class="step-tip">
+            <strong>수집 정보:</strong> 이름, 이메일, 프로필 이미지만 수집합니다. YouTube 시청 기록이나 구독 정보에는 접근하지 않습니다.
+          </div>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-icon">🧩</div>
+        <div class="step-body">
+          <div class="step-meta">
+            <span class="step-badge">STEP 2</span>
+          </div>
+          <div class="step-title">크롬 익스텐션 설치</div>
+          <div class="step-desc">
+            로그인 후 Chrome 웹 스토어로 이동해 Tubify 익스텐션을 설치합니다.
+            <strong>Chrome에 추가</strong> 버튼을 클릭하고 권한을 허용해주세요.
+          </div>
+          <div class="step-tip">
+            <strong>필요 권한:</strong>
+            <br>· <strong>활성 탭 읽기</strong> — 현재 보고 있는 YouTube 페이지 정보 감지
+            <br>· <strong>사이드 패널</strong> — 화면 오른쪽에 분석 패널 표시
+            <br>· <strong>저장소</strong> — 로그인 토큰 및 설정 저장
+          </div>
+          <a class="step-btn" id="store-btn" href="#" target="_blank">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Chrome 웹 스토어에서 설치
+          </a>
+        </div>
+      </div>
+
+      <div class="step-card">
+        <div class="step-icon">✅</div>
+        <div class="step-body">
+          <div class="step-meta">
+            <span class="step-badge">STEP 3</span>
+          </div>
+          <div class="step-title">설치 확인 및 로그인 연동</div>
+          <div class="step-desc">
+            설치 완료 후 YouTube에 접속하면 화면 우측 하단에 <strong>빨간 말풍선 버튼</strong>이 나타납니다.
+            버튼이 보이면 모든 준비가 된 것입니다.
+          </div>
+          <div class="step-tip">
+            <strong>버튼이 안 보인다면?</strong> 페이지를 새로고침(F5)하거나, 크롬 우측 상단 퍼즐 아이콘 → Tubify를 클릭해 익스텐션이 활성화됐는지 확인해주세요.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="divider-line page-wrap"></div>
+
+  <!-- STEP 02 — 실시간 분석 -->
+  <div class="section" id="section-analyze">
+    <div class="section-header">
+      <div class="section-num">2</div>
+      <div>
+        <div class="section-title">실시간 AI 분석</div>
+        <div class="section-desc">YouTube에서 검색하거나 영상을 볼 때, 빨간 버튼 하나로 AI 분석 결과를 바로 확인하세요.</div>
+      </div>
+    </div>
+
+    <!-- 사용 방법 -->
+    <div class="how-list" style="margin-bottom: 40px;">
+      <div class="how-item">
+        <div class="how-num">1</div>
+        <div class="how-content">
+          <div class="how-title">YouTube에서 검색하거나 영상을 재생하세요</div>
+          <div class="how-desc">검색 결과 페이지 또는 영상 시청 페이지 어디서든 사용할 수 있습니다. Tubify가 현재 보고 있는 키워드나 영상 제목을 자동으로 감지합니다.</div>
+        </div>
+      </div>
+      <div class="how-item">
+        <div class="how-num">2</div>
+        <div class="how-content">
+          <div class="how-title">화면 우측 하단의 빨간 말풍선 버튼을 클릭하세요</div>
+          <div class="how-desc">클릭하면 화면 오른쪽에 Tubify 사이드패널이 열립니다. 관련 영상들을 자동으로 수집하고 AI 분석을 시작합니다.</div>
+        </div>
+      </div>
+      <div class="how-item">
+        <div class="how-num">3</div>
+        <div class="how-content">
+          <div class="how-title">3단계 로딩 후 결과를 확인하세요</div>
+          <div class="how-desc">① 의도 분류 → ② 영상 선정 → ③ 자막 분석 순서로 진행됩니다. 보통 10~20초 내에 완료됩니다.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 분석 결과 미리보기 -->
+    <div class="result-preview">
+      <div class="result-item">
+        <div class="result-label"><div class="result-label-dot red"></div>광고 탐지</div>
+        <div class="result-content">자막·설명란·API 플래그 4계층으로 광고 여부를 0~100점으로 표시합니다. 협찬·유료광고 영상을 자동으로 구분해드립니다.</div>
+      </div>
+      <div class="result-item">
+        <div class="result-label"><div class="result-label-dot green"></div>신뢰도 점수</div>
+        <div class="result-score">87<span style="font-size:14px;font-weight:500;color:#64748b"> / 100</span></div>
+        <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.5px;">예시 수치</div>
+        <div class="result-bar"><div class="result-bar-fill" style="width:87%"></div></div>
+        <div class="result-content" style="font-size:12px;color:#64748b">채널 구독자 수, 자막 품질, 정보 일관성 등을 종합해 산출</div>
+      </div>
+      <div class="result-item">
+        <div class="result-label"><div class="result-label-dot blue"></div>핵심 요약</div>
+        <div class="result-content">관련 영상 5개의 자막을 교차 분석해 <strong>공통으로 언급된 사실</strong>과 <strong>영상 간 의견 차이(쟁점)</strong>를 분리해서 보여줍니다.</div>
+      </div>
+      <div class="result-item">
+        <div class="result-label"><div class="result-label-dot orange"></div>의도별 레이아웃</div>
+        <div class="result-content">
+          검색 의도를 자동 판별해 화면 구성을 다르게 보여줍니다.<br>
+          · <strong>유희형</strong> — 영상 카드 우선 노출<br>
+          · <strong>지식형</strong> — 요약 + 공통사실/쟁점<br>
+          · <strong>구매형</strong> — 장단점 비교 패널
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="divider-line page-wrap"></div>
+
+  <!-- STEP 03 — 관심 토픽 등록 -->
+  <div class="section" id="section-heart">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <div>
+        <div class="section-title">관심 토픽 등록 (하트 ♥)</div>
+        <div class="section-desc">마음에 드는 주제에 하트를 누르면, 그 토픽으로 뉴스레터를 발송해드립니다.</div>
+      </div>
+    </div>
+
+    <div class="feature-grid" style="margin-bottom: 40px;">
+      <div class="feature-card">
+        <div class="feature-icon">♥</div>
+        <div class="feature-title">사이드패널에서 하트 누르기</div>
+        <div class="feature-desc">분석 결과 상단의 하트 버튼을 클릭하면 해당 토픽이 관심 목록에 추가됩니다. 다시 누르면 취소됩니다.</div>
+        <span class="feature-tag">최대 5개 등록 가능</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📋</div>
+        <div class="feature-title">마이페이지에서 관리</div>
+        <div class="feature-desc">등록한 관심 토픽 목록을 마이페이지에서 확인하고 삭제할 수 있습니다. 토픽당 분석된 영상 수도 함께 표시됩니다.</div>
+        <span class="feature-tag">관심 토픽 관리</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📧</div>
+        <div class="feature-title">자동 뉴스레터 발송</div>
+        <div class="feature-desc">등록된 관심 토픽을 기반으로 매일 설정한 시간에 AI가 분석한 뉴스레터를 이메일로 보내드립니다.</div>
+        <span class="feature-tag">등록 즉시 적용</span>
+      </div>
+    </div>
+
+    <div class="how-list">
+      <div class="how-item">
+        <div class="how-num">1</div>
+        <div class="how-content">
+          <div class="how-title">분석 결과 확인 후 하트 버튼 클릭</div>
+          <div class="how-desc">사이드패널 상단 또는 요약 카드 옆의 ♥ 버튼을 클릭하세요. "<strong>○○○ 관련 뉴스레터를 보내드릴게요! 💌</strong>" 토스트 메시지가 뜨면 등록 완료입니다.</div>
+        </div>
+      </div>
+      <div class="how-item">
+        <div class="how-num">2</div>
+        <div class="how-content">
+          <div class="how-title">관심 토픽은 최대 5개까지</div>
+          <div class="how-desc">5개를 초과하면 "<strong>관심 토픽은 최대 5개까지 저장할 수 있어요.</strong>" 안내가 나타납니다. 마이페이지에서 기존 토픽을 삭제한 후 새로 추가할 수 있습니다.</div>
+        </div>
+      </div>
+      <div class="how-item">
+        <div class="how-num">3</div>
+        <div class="how-content">
+          <div class="how-title">뉴스레터 구독 취소도 하트로</div>
+          <div class="how-desc">이미 하트를 누른 토픽에서 다시 하트를 클릭하면 관심 취소와 함께 뉴스레터 수신이 중단됩니다. 마이페이지의 이메일 구독 취소 링크를 통해서도 개별 토픽을 취소할 수 있습니다.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="divider-line page-wrap"></div>
+
+  <!-- STEP 04 — 뉴스레터 -->
+  <div class="section" id="section-newsletter">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <div>
+        <div class="section-title">뉴스레터 설정</div>
+        <div class="section-desc">발송 시간을 설정하고 매일 AI가 큐레이션한 유튜브 브리핑을 받아보세요.</div>
+      </div>
+    </div>
+
+    <div class="newsletter-grid">
+      <div class="nl-card">
+        <div class="nl-icon">⏰</div>
+        <div class="nl-title">발송 시간 설정</div>
+        <div class="nl-desc">마이페이지 → <strong>발송 시간 설정</strong>에서 원하는 시간을 입력하세요. 매일 해당 시간에 맞춰 자동으로 발송됩니다.</div>
+        <span class="nl-chip">24시간 형식 HH:MM</span>
+      </div>
+      <div class="nl-card">
+        <div class="nl-icon">🧠</div>
+        <div class="nl-title">의도 맞춤 뉴스레터</div>
+        <div class="nl-desc">등록한 토픽의 특성을 AI가 분석해 유희형·지식형·구매형에 맞는 형식과 말투로 내용을 구성합니다.</div>
+        <span class="nl-chip">AI 자동 판별</span>
+      </div>
+      <div class="nl-card">
+        <div class="nl-icon">📬</div>
+        <div class="nl-title">발송 이력 확인</div>
+        <div class="nl-desc">마이페이지 → <strong>뉴스레터 히스토리</strong>에서 지금까지 받은 뉴스레터 내용을 모두 다시 확인할 수 있습니다.</div>
+        <span class="nl-chip">발송 이력 보관</span>
+      </div>
+      <div class="nl-card">
+        <div class="nl-icon">🚫</div>
+        <div class="nl-title">수신 거부</div>
+        <div class="nl-desc">뉴스레터 하단의 수신 거부 링크를 클릭하거나, 마이페이지에서 전체 구독을 취소할 수 있습니다. 언제든지 다시 구독할 수 있습니다.</div>
+        <span class="nl-chip">즉시 적용</span>
+      </div>
+    </div>
+
+    <!-- 주의사항 -->
+    <div class="step-tip" style="font-size:14px; padding: 20px 24px;">
+      <strong>📌 뉴스레터가 오지 않는다면?</strong><br><br>
+      · 등록된 관심 토픽이 0개인 경우 해당 회차 발송이 skip됩니다.<br>
+      · 설정한 시간과 서버 시간이 일치해야 합니다 (한국 표준시 KST 기준).<br>
+      · 스팸 또는 프로모션 폴더를 확인해주세요.<br>
+      · 문의: tutubifyswproject@gmail.com
+    </div>
+
+  </div>
+
+  <div class="divider-line page-wrap"></div>
+
+  <!-- FAQ -->
+  <div class="section" id="section-faq">
+    <div class="section-header">
+      <div class="section-num" style="background:#475569; font-size:20px;">💬</div>
+      <div>
+        <div class="section-title">자주 묻는 질문</div>
+        <div class="section-desc">사용 중 궁금한 점을 확인해보세요.</div>
+      </div>
+    </div>
+
+    <div class="faq-list">
+      <div class="faq-item">
+        <div class="faq-q">
+          YouTube 외 다른 사이트에서도 사용할 수 있나요?
+          <span class="faq-arrow">▾</span>
+        </div>
+        <div class="faq-a">
+          현재 Tubify 익스텐션은 YouTube(youtube.com)에서만 동작합니다. 검색 결과 페이지와 영상 시청 페이지 모두 지원합니다.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">
+          분석 결과가 나오는 데 얼마나 걸리나요?
+          <span class="faq-arrow">▾</span>
+        </div>
+        <div class="faq-a">
+          일반적으로 10~20초 내외입니다. 관련 영상 5개의 자막을 병렬로 분석하기 때문에 서버 상태나 영상 길이에 따라 다소 차이가 있을 수 있습니다.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">
+          자막이 없는 영상은 어떻게 처리되나요?
+          <span class="faq-arrow">▾</span>
+        </div>
+        <div class="faq-a">
+          자막이 없는 영상은 AI 분석 없이 규칙 기반 광고 탐지만 수행됩니다. 요약과 교차 분석은 자막이 있는 영상들로만 구성됩니다.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">
+          관심 토픽을 등록했는데 뉴스레터가 오지 않아요.
+          <span class="faq-arrow">▾</span>
+        </div>
+        <div class="faq-a">
+          마이페이지에서 이메일 주소와 발송 시간이 올바르게 설정됐는지 확인해주세요. 발송 시간 설정이 없으면 뉴스레터가 발송되지 않습니다. 스팸·프로모션 폴더도 확인해보세요.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">
+          내 유튜브 시청 기록이 수집되나요?
+          <span class="faq-arrow">▾</span>
+        </div>
+        <div class="faq-a">
+          아니요. Tubify는 사용자가 직접 검색하거나 시청 중인 페이지의 키워드만 사용하며, YouTube 시청 기록·구독 정보·계정 데이터에는 일절 접근하지 않습니다. 수집 정보는 이름·이메일·프로필 이미지가 전부입니다.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">
+          로그인이 되지 않거나 버튼이 보이지 않아요.
+          <span class="faq-arrow">▾</span>
+        </div>
+        <div class="faq-a">
+          ① YouTube 페이지를 새로고침(F5)해보세요.<br>
+          ② 크롬 우측 상단 퍼즐 아이콘에서 Tubify가 활성화되어 있는지 확인하세요.<br>
+          ③ 익스텐션을 삭제 후 재설치해보세요.<br>
+          ④ 위 방법으로도 해결이 안 되면 tutubifyswproject@gmail.com으로 문의해주세요.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <div class="cta-card">
+      <div class="cta-title">지금 바로 시작해보세요</div>
+      <div class="cta-desc">유튜브 알고리즘이 아닌, 내가 선택한 관심사로만<br>구성된 AI 뉴스레터를 받아보세요.</div>
+      <a class="cta-btn" id="cta-store-btn" href="#" target="_blank">익스텐션 설치하기</a>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <a href="/intro.html" class="footer-logo">Tubify</a>
+      <div class="footer-links">
+        <a href="/privacy.html">개인정보처리방침</a>
+        <a href="/terms.html">이용약관</a>
+      </div>
+      <span class="footer-copy">© 2026 Tubify. 보고 싶은 것만. 핵심만.</span>
+    </div>
+  </footer>
+
+  <script>
+    // FAQ 아코디언
+    document.querySelectorAll(".faq-q").forEach(function(q) {
+      q.addEventListener("click", function() {
+        var item = q.closest(".faq-item");
+        item.classList.toggle("open");
+      });
+    });
+
+    // 스토어 URL 주입
+    const STORE_URL = "__EXTENSION_STORE_URL__";
+    document.getElementById("store-btn").href = STORE_URL || "https://chrome.google.com/webstore";
+    document.getElementById("cta-store-btn").href = STORE_URL || "https://chrome.google.com/webstore";
+
+    // 로그인 상태에 따라 Nav 변경
+    window.addEventListener("DOMContentLoaded", function() {
+      const hasToken = localStorage.getItem("access_token");
+      const btn = document.getElementById("nav-mypage-btn");
+      const mypageLink = document.getElementById("nav-mypage-link");
+      if (hasToken) {
+        btn.textContent = "마이페이지";
+        btn.href = "/mypage.html";
+        if (mypageLink) mypageLink.style.display = "block";
+      }
+    });
+
+    // 목차 스무스 스크롤
+    document.querySelectorAll('a[href^="#"]').forEach(function(a) {
+      a.addEventListener("click", function(e) {
+        const id = a.getAttribute("href").slice(1);
+        const el = document.getElementById(id);
+        if (el) {
+          e.preventDefault();
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
