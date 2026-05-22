@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>개인정보처리방침 — Tubify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Noto Sans KR", sans-serif;
+      background: #f7f9fb;
+      color: #191c1e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 128px;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky;
+      top: 0;
+      width: 100%;
+      background: rgba(247, 249, 251, 0.8);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 100;
+      border-bottom: 1px solid rgba(235, 235, 235, 0.4);
+    }
+    .nav-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 32px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-logo {
+      font-size: 24px;
+      font-weight: 800;
+      color: red;
+      letter-spacing: -0.48px;
+      text-decoration: none;
+      line-height: 1;
+    }
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+    .nav-link {
+      font-size: 18px;
+      font-weight: 500;
+      color: #191c1e;
+      text-decoration: none;
+      letter-spacing: -0.45px;
+    }
+    .nav-link.active {
+      font-weight: 600;
+      color: #bc0100;
+      border-bottom: 2px solid #bc0100;
+      padding-bottom: 2px;
+    }
+    .nav-btn {
+      background: #e6e8ea;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .nav-btn:hover { background: #d1d5db; }
+
+    /* ── Main Content ── */
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 80px;
+      width: 100%;
+      max-width: 896px;
+      padding: 0 24px;
+    }
+
+    /* ── Header Hero ── */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    .hero-badge {
+      background: #fef2f2;
+      border: 1px solid #fee2e2;
+      border-radius: 9999px;
+      padding: 7px 17px;
+      font-size: 12px;
+      font-weight: 700;
+      color: red;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+    .hero-title {
+      font-size: 60px;
+      font-weight: 700;
+      color: #191c1e;
+      text-align: center;
+      letter-spacing: -3px;
+      line-height: 1;
+      margin-top: 8px;
+    }
+    .hero-date {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #515f74;
+      font-size: 14px;
+    }
+    .hero-date img { width: 12px; height: 13.3px; object-fit: contain; }
+
+    /* ── Summary Card ── */
+    .summary-card {
+      background: white;
+      border: 1px solid #f1f5f9;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.05);
+      padding: 49px;
+      position: relative;
+      overflow: hidden;
+    }
+    .summary-card::before {
+      content: '';
+      position: absolute;
+      right: -192px;
+      top: -192px;
+      width: 384px;
+      height: 384px;
+      background: rgba(255,0,0,0.05);
+      border-radius: 9999px;
+      filter: blur(32px);
+      pointer-events: none;
+    }
+    .summary-quote {
+      font-size: 24px;
+      font-weight: 300;
+      color: #191c1e;
+      text-align: center;
+      line-height: 1.625;
+      margin-bottom: 48px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+    }
+    .feature-card {
+      background: #f8fafc;
+      border: 1px solid #f1f5f9;
+      border-radius: 12px;
+      padding: 24px 16px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+    .feature-icon-wrap {
+      width: 48px;
+      height: 48px;
+      background: white;
+      border-radius: 9999px;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+    .feature-icon-wrap img { max-width: 22px; max-height: 20px; object-fit: contain; }
+    .feature-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #191c1e;
+      margin-bottom: 4px;
+    }
+    .feature-desc {
+      font-size: 14px;
+      font-weight: 400;
+      color: #515f74;
+      line-height: 1.625;
+    }
+
+    /* ── Articles ── */
+    .articles {
+      display: flex;
+      flex-direction: column;
+      gap: 96px;
+      padding: 16px 0 48px;
+    }
+    .article-section {
+      display: grid;
+      grid-template-columns: 4fr 8fr;
+      gap: 48px;
+      align-items: start;
+    }
+    .article-heading {
+      border-left: 4px solid red;
+      padding-left: 20px;
+    }
+    .article-heading h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: red;
+      line-height: 1.25;
+    }
+    .article-body {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .article-body p {
+      font-size: 18px;
+      font-weight: 400;
+      color: #334155;
+      line-height: 1.625;
+    }
+    .divider {
+      height: 1px;
+      background: #e2e8f0;
+      width: 100%;
+    }
+
+    /* ── Numbered List ── */
+    .num-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .num-item {
+      display: flex;
+      gap: 16px;
+      padding: 16px;
+      border-radius: 12px;
+    }
+    .num-label {
+      font-size: 20px;
+      font-weight: 700;
+      color: red;
+      line-height: 1;
+      flex-shrink: 0;
+      width: 28px;
+    }
+    .num-content h5 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #191c1e;
+      margin-bottom: 4px;
+    }
+    .num-content p {
+      font-size: 14px !important;
+      color: #475569 !important;
+      line-height: 1.43 !important;
+    }
+
+    /* ── Table ── */
+    .data-table {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      overflow: hidden;
+      border-collapse: collapse;
+    }
+    .data-table thead tr {
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .data-table th {
+      padding: 16px 24px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+    .data-table th:last-child { text-align: right; }
+    .data-table td {
+      padding: 20px 24px;
+      font-size: 14px;
+      color: #475569;
+      border-top: 1px solid #e2e8f0;
+    }
+    .data-table td:first-child { font-weight: 500; color: #191c1e; }
+    .data-table td:last-child { text-align: right; }
+
+    /* ── Rights Cards ── */
+    .rights-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .rights-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 33px;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .rights-icon-wrap {
+      width: 40px;
+      height: 40px;
+      background: #fef2f2;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .rights-icon-wrap img { max-width: 18px; max-height: 18px; object-fit: contain; }
+    .rights-card h5 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #191c1e;
+    }
+    .rights-card p {
+      font-size: 14px !important;
+      color: #475569 !important;
+      line-height: 1.625 !important;
+    }
+
+    /* ── Info Box ── */
+    .info-box {
+      background: #f2f4f6;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 25px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .info-box img { width: 20px; height: 22px; flex-shrink: 0; object-fit: contain; }
+    .info-box p {
+      font-size: 14px !important;
+      color: #475569 !important;
+      line-height: 1.625 !important;
+    }
+
+    /* ── Footer ── */
+    footer {
+      width: 100%;
+      border-top: 1px solid rgba(244, 244, 245, 0.3);
+      padding: 48px 32px;
+      margin-top: auto;
+    }
+    .footer-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .footer-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: red;
+      text-decoration: none;
+    }
+    .footer-links {
+      display: flex;
+      gap: 32px;
+    }
+    .footer-links a {
+      font-size: 14px;
+      color: #71717a;
+      text-decoration: none;
+    }
+    .footer-links a:hover { color: #191c1e; }
+    .footer-copy {
+      margin-left: auto;
+      font-size: 14px;
+      color: #71717a;
+    }
+
+    @media (max-width: 768px) {
+      body { gap: 64px; }
+      .hero-title { font-size: 40px; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .article-section { grid-template-columns: 1fr; gap: 24px; }
+      .rights-grid { grid-template-columns: 1fr; }
+      .summary-card { padding: 32px 24px; }
+      .footer-copy { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-inner">
+      <span class="nav-logo">Tubify</span>
+      <div class="nav-links">
+        <a href="./privacy.html" class="nav-link active">개인정보처리방침</a>
+        <a href="./terms.html" class="nav-link">이용약관</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Hero Header -->
+    <div class="hero">
+      <span class="hero-badge">LEGAL DOCUMENTATION</span>
+      <h1 class="hero-title">개인정보처리방침</h1>
+      <div class="hero-date">
+        <img src="images/icon_pin_date.svg" alt="" />
+        <span>최종 업데이트: 2026년 5월 6일</span>
+      </div>
+    </div>
+
+    <!-- Summary Card -->
+    <div class="summary-card">
+      <p class="summary-quote">
+        "Tubify는 사용자의 프라이버시를 최우선으로 생각합니다. 본 방침은 귀하의<br>
+        소중한 정보를 어떻게 보호하고 관리하는지에 대한 투명한 약속입니다."
+      </p>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <img src="images/icon_shield.svg" alt="" />
+          </div>
+          <div class="feature-title">강력한 보안</div>
+          <div class="feature-desc">PostgreSQL 및 최신 보안 프로토콜을 적용하여 정보를 보호합니다.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <img src="images/icon_eye.svg" alt="" />
+          </div>
+          <div class="feature-title">투명성 보장</div>
+          <div class="feature-desc">수집되는 데이터의 항목과 처리 목적을 명확하고 투명하게 공개합니다.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrap">
+            <img src="images/icon_user.svg" alt="" />
+          </div>
+          <div class="feature-title">사용자 권리</div>
+          <div class="feature-desc">정보주체는 언제든지 자신의 개인정보를 수정하거나 삭제를 요청할 수 있습니다.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Articles -->
+    <div class="articles">
+
+      <!-- 제1조 -->
+      <div class="article-section">
+        <div class="article-heading">
+          <h2>제1조<br>(개인정보의 처리 목적)</h2>
+        </div>
+        <div class="article-body">
+          <p>Tubify(이하 '회사')는 다음의 목적을 위하여 개인정보를 처리합니다. 처리하고 있는 개인정보는 다음의 목적 이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우에는 「개인정보 보호법」 제18조에 따라 별도의 동의를 받는 등 필요한 조치를 이행할 예정입니다.</p>
+          <div class="num-list">
+            <div class="num-item">
+              <span class="num-label">01</span>
+              <div class="num-content">
+                <h5>홈페이지 회원 가입 및 관리</h5>
+                <p>회원 가입의사 확인, 서비스 제공에 따른 본인 식별·인증, 회원자격 유지·관리, 서비스 부정이용 방지</p>
+              </div>
+            </div>
+            <div class="num-item">
+              <span class="num-label">02</span>
+              <div class="num-content">
+                <h5>서비스 제공</h5>
+                <p>AI 큐레이션 서비스 제공, 콘텐츠 제공, 맞춤 서비스 제공, 본인인증</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 제2조 -->
+      <div class="article-section">
+        <div class="article-heading">
+          <h2>제2조<br>(개인정보의 처리 및<br>보유 기간)</h2>
+        </div>
+        <div class="article-body">
+          <p>회사는 법령에 따른 개인정보 보유·이용기간 또는 정보주체로부터 개인정보를 수집 시에 동의받은 개인정보 보유·이용기간 내에서 개인정보를 처리·보유합니다.</p>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>수집 항목</th>
+                <th>보유 기간</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>회원 가입 정보 (이메일, 이름)</td>
+                <td>회원 탈퇴 시 즉시 파기</td>
+              </tr>
+              <tr>
+                <td>서비스 이용 기록 (요약 내역 등)</td>
+                <td>2년 (통계 분석 목적)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 제3조 -->
+      <div class="article-section">
+        <div class="article-heading">
+          <h2>제3조<br>(정보주체의 권리·의무<br>및 행사방법)</h2>
+        </div>
+        <div class="article-body">
+          <p>정보주체는 회사에 대해 언제든지 개인정보 열람·정정·삭제·처리정지 요구 등의 권리를 행사할 수 있습니다.</p>
+          <div class="rights-grid">
+            <div class="rights-card">
+              <div class="rights-icon-wrap">
+                <img src="images/icon_edit.svg" alt="" />
+              </div>
+              <h5>열람 및 정정</h5>
+              <p>귀하의 정보가 정확하지 않을 경우 언제든 프로필 설정 페이지에서 직접 수정하거나 귀사에 요청할 수 있습니다.</p>
+            </div>
+            <div class="rights-card">
+              <div class="rights-icon-wrap">
+                <img src="images/icon_trash.svg" alt="" />
+              </div>
+              <h5>삭제 및 파기</h5>
+              <p>계정 탈퇴 시, 관련 법령에 따른 보관 의무가 없는 모든 데이터는 즉각 파기되어 복구가 불가능함을 안내드립니다.</p>
+            </div>
+          </div>
+          <div class="info-box">
+            <img src="images/icon_info.svg" alt="" />
+            <p>권리 행사는 서면, 전자우편, 모사전송(FAX) 등을 통하여 하실 수 있으며 회사는 이에 대해 지체 없이 조치하겠습니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 제4조 -->
+      <div class="article-section">
+        <div class="article-heading">
+          <h2>제4조<br>(수집하는 개인정보<br>및 수집 방법)</h2>
+        </div>
+        <div class="article-body">
+          <p>회사는 크롬 익스텐션 및 웹 서비스를 통해 다음의 개인정보를 수집합니다.</p>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>수집 항목</th>
+                <th>수집 방법</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>이메일 주소, 이름, 프로필 이미지</td>
+                <td>Google OAuth 2.0 로그인</td>
+              </tr>
+              <tr>
+                <td>시청 중인 YouTube 영상 URL</td>
+                <td>크롬 익스텐션 자동 감지</td>
+              </tr>
+              <tr>
+                <td>YouTube 검색어</td>
+                <td>크롬 익스텐션 자동 감지</td>
+              </tr>
+              <tr>
+                <td>YouTube 영상 자막(transcript)</td>
+                <td>AI 분석을 위해 자동 수집</td>
+              </tr>
+              <tr>
+                <td>관심 토픽 및 뉴스레터 구독 정보</td>
+                <td>사용자 직접 입력</td>
+              </tr>
+              <tr>
+                <td>인증 토큰(access token)</td>
+                <td>로그인 후 브라우저 로컬 스토리지에 저장</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 제5조 -->
+      <div class="article-section">
+        <div class="article-heading">
+          <h2>제5조<br>(개인정보의<br>제3자 제공)</h2>
+        </div>
+        <div class="article-body">
+          <p>회사는 원칙적으로 이용자의 개인정보를 제3자에게 제공하지 않습니다. 다만, 서비스 제공을 위해 아래 외부 서비스에 최소한의 데이터가 전달될 수 있습니다.</p>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>제공 대상</th>
+                <th>제공 정보</th>
+                <th>목적</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Google (Gemini API)</td>
+                <td>YouTube 영상 자막 텍스트</td>
+                <td>AI 콘텐츠 분석</td>
+              </tr>
+              <tr>
+                <td>Google (Gmail SMTP)</td>
+                <td>수신자 이메일 주소</td>
+                <td>뉴스레터 발송</td>
+              </tr>
+              <tr>
+                <td>Google (OAuth 2.0)</td>
+                <td>이메일, 이름</td>
+                <td>회원 인증</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="info-box">
+            <img src="images/icon_info.svg" alt="" />
+            <p>각 외부 서비스는 해당 서비스의 개인정보처리방침에 따라 데이터를 처리하며, 회사는 제공 목적 범위를 초과하여 이용하지 않도록 계약상 의무를 부과하고 있습니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 제6조 -->
+      <div class="article-section">
+        <div class="article-heading">
+          <h2>제6조<br>(쿠키 및<br>웹스토리지 사용)</h2>
+        </div>
+        <div class="article-body">
+          <p>회사의 크롬 익스텐션 및 웹 서비스는 다음과 같이 브라우저 저장소를 사용합니다.</p>
+          <div class="num-list">
+            <div class="num-item">
+              <span class="num-label">01</span>
+              <div class="num-content">
+                <h5>로컬 스토리지 (localStorage)</h5>
+                <p>로그인 후 발급되는 JWT 인증 토큰을 저장합니다. 로그아웃 시 즉시 삭제됩니다.</p>
+              </div>
+            </div>
+            <div class="num-item">
+              <span class="num-label">02</span>
+              <div class="num-content">
+                <h5>세션 스토리지 (sessionStorage)</h5>
+                <p>브라우저 세션 동안만 유지되는 임시 상태 정보를 저장합니다. 브라우저 종료 시 자동 삭제됩니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 제7조 -->
+      <div class="article-section">
+        <div class="article-heading">
+          <h2>제7조<br>(개인정보<br>보호책임자)</h2>
+        </div>
+        <div class="article-body">
+          <p>회사는 개인정보 처리에 관한 업무를 총괄해서 책임지고, 이용자의 개인정보 관련 문의, 불만처리, 피해구제 등을 위하여 아래와 같이 개인정보 보호책임자를 지정하고 있습니다.</p>
+          <div class="rights-grid">
+            <div class="rights-card">
+              <div class="rights-icon-wrap">
+                <img src="images/icon_user.svg" alt="" />
+              </div>
+              <h5>개인정보 보호책임자</h5>
+              <p>Tubify 개발팀<br>이메일: gimijun74@gmail.com</p>
+            </div>
+            <div class="rights-card">
+              <div class="rights-icon-wrap">
+                <img src="images/icon_info.svg" alt="" />
+              </div>
+              <h5>문의 처리 기간</h5>
+              <p>개인정보 관련 문의는 이메일 접수 후 영업일 기준 3일 이내에 답변 드립니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <span class="footer-logo">Tubify</span>
+      <div class="footer-links">
+        <a href="./privacy.html">개인정보처리방침</a>
+        <a href="./terms.html">이용약관</a>
+      </div>
+      <span class="footer-copy">© 2026 Tubify. 보고 싶은 것만. 핵심만.</span>
+    </div>
+  </footer>
+
+</body>
+</html>
