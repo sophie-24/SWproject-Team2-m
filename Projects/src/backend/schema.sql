@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TYPE log_status AS ENUM ('pending', 'processed', 'archived');
 CREATE TYPE event_type AS ENUM ('search', 'watch');
 CREATE TYPE batch_status AS ENUM ('created', 'processing', 'completed', 'failed');
-CREATE TYPE delivery_status AS ENUM ('generated', 'sent', 'failed');
+CREATE TYPE delivery_status AS ENUM ('generated', 'prepared', 'sent', 'failed');
 CREATE TYPE interest_source AS ENUM ('behavior', 'onboarding', 'manual');
 CREATE TYPE window_type AS ENUM ('before_cutoff', 'after_cutoff');
 -- 2. users 테이블
@@ -94,6 +94,8 @@ CREATE TABLE newsletters (
     delivery_status delivery_status DEFAULT 'generated',
     error_message TEXT,
     delivered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    scheduled_send_time TIMESTAMP,
+    -- 사전 생성 시 발송 예정 시각 (UTC) — delivery_status='prepared'일 때 사용
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 -- 8. 인덱스
@@ -124,3 +126,13 @@ CREATE INDEX idx_report_batches_user ON report_batches (user_id, started_at);
 --     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 --     CONSTRAINT uq_interest_video UNIQUE (user_interest_id, video_id)
 -- );
+-- ── 뉴스레터 정시 발송 (사전 생성) 마이그레이션 ──────────────────────────────
+-- delivery_status enum에 'prepared' 추가
+-- 주의: PostgreSQL ENUM 값 추가는 트랜잭션 밖에서 실행해야 합니다
+-- ALTER TYPE delivery_status ADD VALUE IF NOT EXISTS 'prepared';
+-- newsletters: 사전 생성 발송 예정 시각 컬럼 추가
+-- ALTER TABLE newsletters ADD COLUMN IF NOT EXISTS scheduled_send_time TIMESTAMP;
+-- 사전 생성 뉴스레터 조회용 인덱스
+-- CREATE INDEX IF NOT EXISTS idx_newsletters_prepared
+--     ON newsletters (user_id, delivery_status, scheduled_send_time)
+--     WHERE delivery_status = 'prepared';

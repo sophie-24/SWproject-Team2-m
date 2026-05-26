@@ -78,18 +78,45 @@ async def _save_newsletter(
     db,
     user: User,
     newsletter: Dict[str, Any],
+    status: str = "generated",
+    scheduled_send_time: Optional[datetime] = None,
 ) -> Newsletter:
-    """뉴스레터를 DB에 저장하고 ORM 객체를 반환."""
+    """뉴스레터를 DB에 저장하고 ORM 객체를 반환.
+
+    Args:
+        status: 'generated'(즉시 발송용) | 'prepared'(사전 생성용)
+        scheduled_send_time: 사전 생성 시 발송 예정 시각 (UTC, tzinfo 없음)
+    """
     record = Newsletter(
         user_id=user.google_id,
         subject=newsletter.get("subject", ""),
         content_json=json.dumps(newsletter, ensure_ascii=False),
-        delivery_status="generated",
+        delivery_status=status,
+        scheduled_send_time=scheduled_send_time,
     )
     db.add(record)
     await db.commit()
     await db.refresh(record)
     return record
+
+
+async def _find_prepared_newsletter(
+    db,
+    user_id: str,
+    target_dt_utc: datetime,
+) -> Optional[Newsletter]:
+    """scheduled_send_time이 target_dt_utc ±5분 이내이고 delivery_status='prepared'인 뉴스레터 반환."""
+    window_start = target_dt_utc - timedelta(minutes=5)
+    window_end   = target_dt_utc + timedelta(minutes=5)
+    result = await db.execute(
+        select(Newsletter).where(
+            Newsletter.user_id          == user_id,
+            Newsletter.delivery_status  == "prepared",
+            Newsletter.scheduled_send_time >= window_start,
+            Newsletter.scheduled_send_time <= window_end,
+        )
+    )
+    return result.scalars().first()
 
 
 async def _deliver_newsletter(
@@ -113,6 +140,12 @@ async def _deliver_newsletter(
 async def _run_batch_for_send_time(send_time: str) -> None:
     logger.info(f"[scheduler] {send_time} batch start")
 
+    # 발송 예정 시각 → UTC (DB 비교용)
+    now_kst = datetime.now(KST)
+    h, m = map(int, send_time.split(":"))
+    target_kst    = now_kst.replace(hour=h, minute=m, second=0, microsecond=0)
+    target_dt_utc = target_kst.astimezone(timezone.utc).replace(tzinfo=None)
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(User).where(User.is_subscribed == True)  # noqa: E712
@@ -130,24 +163,26 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                     logger.warning(f"  [skip] {user.email} — 최근 10시간 내 발송 이력 있음")
                     continue
 
-                # ── 하트 관심 토픽 조회 ────────────────────────────────────
-                topics = await _get_active_interest_topics(db, str(user.google_id))
+                # ── 사전 생성 뉴스레터 확인 (있으면 파이프라인 스킵) ───────
+                nl_record = await _find_prepared_newsletter(db, str(user.google_id), target_dt_utc)
 
-                if not topics:
-                    logger.info(f"  [skip] {user.email} — 활성 관심 토픽 없음")
-                    continue
+                if nl_record:
+                    logger.info(f"  [prepared] {user.email} — 사전 생성 뉴스레터 사용")
+                    newsletter = json.loads(nl_record.content_json)
+                else:
+                    # ── fallback: 파이프라인 직접 실행 ───────────────────
+                    topics = await _get_active_interest_topics(db, str(user.google_id))
+                    if not topics:
+                        logger.info(f"  [skip] {user.email} — 활성 관심 토픽 없음")
+                        continue
 
-                logger.info(f"  [run] {user.email} — 관심 토픽 {len(topics)}개: {topics}")
-
-                # ── 파이프라인 실행 (관심 토픽 기반) ─────────────────────
-                newsletter = await run_pipeline(
-                    user_id=str(user.google_id),
-                    raw_keywords=topics,
-                    skip_clustering=True,   # 하트 토픽은 이미 정제됨 — 클러스터링 불필요
-                )
-
-                # ── 뉴스레터 저장 ─────────────────────────────────────────
-                nl_record = await _save_newsletter(db, user, newsletter)
+                    logger.info(f"  [fallback] {user.email} — 파이프라인 실행 (사전 생성 없음)")
+                    newsletter = await run_pipeline(
+                        user_id=str(user.google_id),
+                        raw_keywords=topics,
+                        skip_clustering=True,
+                    )
+                    nl_record = await _save_newsletter(db, user, newsletter)
 
                 # ── 이메일 발송 ───────────────────────────────────────────
                 deliver_result = await _deliver_newsletter(user, newsletter)
@@ -176,7 +211,74 @@ async def per_minute_batch():
     await _run_batch_for_send_time(now_hhmm)
 
 
+async def pre_generate_batch():
+    """매분: 10분 후 send_time인 유저의 뉴스레터를 사전 생성해 DB에 'prepared'로 저장.
+
+    발송 시각 10분 전에 파이프라인(AI 호출 등 무거운 작업)을 미리 실행해두어
+    정각 발송 시에는 DB에서 꺼내 즉시 이메일만 전송 → 사용자가 정시에 수신 가능.
+    """
+    now_kst      = datetime.now(KST)
+    target_kst   = now_kst + timedelta(minutes=10)
+    target_hhmm  = target_kst.strftime("%H:%M")
+    target_dt_utc = target_kst.replace(second=0, microsecond=0).astimezone(timezone.utc).replace(tzinfo=None)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(User).where(User.is_subscribed == True)  # noqa: E712
+        )
+        all_users = result.scalars().all()
+        users = [u for u in all_users if target_hhmm in _parse_send_times(u.send_time)]
+
+        if not users:
+            return  # 10분 후 발송 대상 없으면 조용히 종료
+
+        logger.info(f"[pre_generate] {target_hhmm} 발송 예정 — {len(users)}명 사전 생성 시작")
+
+        for user in users:
+            try:
+                # 중복 발송 방지 (이미 최근에 sent된 경우 스킵)
+                if await _already_sent_in_window(db, str(user.google_id), hours=10):
+                    logger.info(f"  [skip] {user.email} — 최근 10시간 내 발송 이력 있음")
+                    continue
+
+                # 이미 사전 생성된 레코드가 있으면 스킵 (중복 방지)
+                existing = await _find_prepared_newsletter(db, str(user.google_id), target_dt_utc)
+                if existing:
+                    logger.info(f"  [skip] {user.email} — 이미 사전 생성 완료")
+                    continue
+
+                topics = await _get_active_interest_topics(db, str(user.google_id))
+                if not topics:
+                    logger.info(f"  [skip] {user.email} — 활성 관심 토픽 없음")
+                    continue
+
+                logger.info(f"  [pre_gen] {user.email} — 파이프라인 실행 ({len(topics)}개 토픽)")
+                newsletter = await run_pipeline(
+                    user_id=str(user.google_id),
+                    raw_keywords=topics,
+                    skip_clustering=True,
+                )
+                await _save_newsletter(
+                    db, user, newsletter,
+                    status="prepared",
+                    scheduled_send_time=target_dt_utc,
+                )
+                logger.info(f"  [pre_gen done] {user.email} — {target_hhmm} 발송 예정으로 저장")
+
+            except Exception as e:
+                logger.error(f"  [pre_gen error] {user.email} — {e}")
+                continue
+
+    logger.info(f"[pre_generate] {target_hhmm} 사전 생성 완료")
+
+
 def start_scheduler():
+    scheduler.add_job(
+        pre_generate_batch,
+        CronTrigger(minute="*", timezone="Asia/Seoul"),
+        id="pre_generate_batch",
+        replace_existing=True,
+    )
     scheduler.add_job(
         per_minute_batch,
         CronTrigger(minute="*", timezone="Asia/Seoul"),
@@ -184,7 +286,7 @@ def start_scheduler():
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("[scheduler] 스케줄러 시작 — 하트 관심 토픽 기반 발송")
+    logger.info("[scheduler] 스케줄러 시작 — 하트 관심 토픽 기반 발송 (사전 생성 포함)")
 
 
 def stop_scheduler():

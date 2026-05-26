@@ -76,14 +76,15 @@ class BehaviorLog(Base):
 class Newsletter(Base):
     __tablename__ = "newsletters"
 
-    id               = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id          = Column(String(255), nullable=False)
-    subject          = Column(String(500), nullable=True)
-    content_json     = Column(Text, nullable=False)
-    delivered_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    delivery_status  = Column(SAEnum('generated', 'sent', 'failed', name='delivery_status', create_type=False), nullable=False, default="generated")
-    error_message    = Column(Text, nullable=True)
-    batch_id         = Column(UUID(as_uuid=True), nullable=True)
+    id                  = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id             = Column(String(255), nullable=False)
+    subject             = Column(String(500), nullable=True)
+    content_json        = Column(Text, nullable=False)
+    delivered_at        = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    delivery_status     = Column(SAEnum('generated', 'prepared', 'sent', 'failed', name='delivery_status', create_type=False), nullable=False, default="generated")
+    error_message       = Column(Text, nullable=True)
+    batch_id            = Column(UUID(as_uuid=True), nullable=True)
+    scheduled_send_time = Column(DateTime, nullable=True)   # 사전 생성 시 발송 예정 시각 (UTC, tzinfo 없음)
 
     __table_args__ = (
         Index("idx_newsletters_history",  "user_id", "delivered_at"),
