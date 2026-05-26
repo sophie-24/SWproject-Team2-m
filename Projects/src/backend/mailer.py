@@ -36,6 +36,52 @@ def _keyword_pills(topics: List[Dict[str, Any]]) -> str:
     )
 
 
+def _inline_source_tag(source: Dict[str, Any]) -> str:
+    """출처 영상 1개 → 인라인 채널명 태그 HTML (YouTube 아이콘 + 채널명)."""
+    channel = source.get("channel_title", "")
+    url     = source.get("url", "#")
+    if not channel:
+        return ""
+    yt_icon = (
+        '<img src="https://www.youtube.com/favicon.ico" width="10" height="10" '
+        'alt="YouTube" style="vertical-align:middle;margin-right:3px;">'
+    )
+    return (
+        f'<a href="{url}" target="_blank" '
+        f'style="display:inline-flex;align-items:center;font-size:11px;color:#515f74;'
+        f'background:#f2f4f6;border:1px solid #eceef0;border-radius:4px;'
+        f'padding:1px 7px;margin-left:5px;text-decoration:none;'
+        f'vertical-align:middle;white-space:nowrap;font-family:{_FONT};">'
+        f'{yt_icon}{channel}</a>'
+    )
+
+
+def _controversy_bullets(controversies: List[str], sources: List[Dict[str, Any]]) -> str:
+    """쟁점 목록 → 불릿 리스트 HTML. 각 항목 끝에 인라인 출처 태그 추가.
+
+    출처가 여러 개일 경우 controversy 순서에 맞춰 순환 배분
+    (controversy[i] → sources[i % len(sources)]).
+    """
+    if not controversies:
+        return ""
+    items = []
+    for i, c in enumerate(controversies):
+        if not c:
+            continue
+        tag_html = _inline_source_tag(sources[i % len(sources)]) if sources else ""
+        items.append(
+            f'<li style="margin-bottom:12px;font-size:17px;color:#191c1e;'
+            f'line-height:1.65;font-family:{_FONT};">'
+            f'{c}{tag_html}'
+            f'</li>'
+        )
+    return (
+        f'<ul style="margin:0;padding-left:22px;list-style-type:disc;">'
+        + "".join(items)
+        + '</ul>'
+    )
+
+
 def _source_video_cards(sources: List[Dict[str, Any]]) -> str:
     """출처 영상 목록 → 세로 스택 카드 HTML."""
     if not sources:
@@ -101,25 +147,21 @@ def _build_topic_section(topic_data: Dict[str, Any], unsubscribe_url: str = "") 
     left_items = [s for s in summary if s] or [p for p in pros if p] or [f for f in common_facts if f]
     left_text  = " ".join(left_items) if left_items else "분석 중입니다."
 
-    right_items = [c for c in controversies if c] or [c for c in cons if c]
-    right_text  = " ".join(right_items) if right_items else ""
-
-    sources_html = _source_video_cards(sources)
-
-    unsubscribe_html = (
-        f'<p style="text-align:right;margin:6px 0 0;">'
-        f'<a href="{unsubscribe_url}" style="font-size:12px;color:#bbb;text-decoration:none;">'
-        f'이 주제 구독 취소</a></p>'
-    ) if unsubscribe_url else ""
-
+    # 쟁점: 불릿 리스트 + 인라인 출처 태그
+    right_items    = [c for c in controversies if c] or [c for c in cons if c]
     right_col_html = (
         f'<td style="width:50%;vertical-align:top;padding-left:20px;">'
         f'<p style="margin:0 0 10px;font-size:12px;color:#0059ba;letter-spacing:1.2px;'
         f'text-transform:uppercase;font-weight:600;font-family:{_FONT};">&#8593; 주요 쟁점</p>'
-        f'<p style="margin:0;font-size:17px;color:#191c1e;line-height:1.65;'
-        f'font-family:{_FONT};">{right_text}</p>'
-        f'</td>'
-    ) if right_text else '<td style="width:50%;"></td>'
+        + _controversy_bullets(right_items, sources)
+        + f'</td>'
+    ) if right_items else '<td style="width:50%;"></td>'
+
+    unsubscribe_html = (
+        f'<p style="text-align:right;margin:16px 0 0;">'
+        f'<a href="{unsubscribe_url}" style="font-size:12px;color:#bbb;text-decoration:none;">'
+        f'이 주제 구독 취소</a></p>'
+    ) if unsubscribe_url else ""
 
     return (
         f'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:64px;">'
@@ -138,7 +180,7 @@ def _build_topic_section(topic_data: Dict[str, Any], unsubscribe_url: str = "") 
         f'</tr>'
         f'</table>'
 
-        # 2열 콘텐츠
+        # 2열 콘텐츠 (핵심 내용 | 주요 쟁점 + 인라인 출처)
         f'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:32px;">'
         f'<tr>'
         f'<td style="width:50%;vertical-align:top;padding-right:20px;">'
@@ -151,13 +193,7 @@ def _build_topic_section(topic_data: Dict[str, Any], unsubscribe_url: str = "") 
         f'</tr>'
         f'</table>'
 
-        # 주요 소스
-        f'<p style="margin:0 0 16px;font-size:13px;color:#515f74;letter-spacing:1.4px;'
-        f'text-transform:uppercase;border-top:1px solid #eceef0;padding-top:16px;'
-        f'font-family:{_FONT};">주요 소스</p>'
-        f'{sources_html}'
         f'{unsubscribe_html}'
-
         f'</td></tr>'
         f'</table>'
     )
