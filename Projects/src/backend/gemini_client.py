@@ -105,6 +105,15 @@ async def call_gemini_async(
     return await asyncio.to_thread(call_gemini, prompt, temperature, json_mode)
 
 
+def _strip_markdown(text: str) -> str:
+    """Gemini가 출력한 마크다운 기호 제거 — 프론트에서 plain text로 렌더링하므로 필요."""
+    # **bold** / *italic* → 텍스트만
+    text = re.sub(r"\*{1,3}(.+?)\*{1,3}", r"\1", text)
+    # __bold__ / _italic_
+    text = re.sub(r"_{1,2}(.+?)_{1,2}", r"\1", text)
+    return text
+
+
 def parse_section(text: str, section_name: str) -> str:
     """
     '[섹션명] ... [다음섹션]' 패턴에서 섹션 내용 추출.
@@ -114,11 +123,11 @@ def parse_section(text: str, section_name: str) -> str:
         section_name: 추출할 섹션 이름 (예: '요약', '광고점수')
 
     Returns:
-        섹션 내용 문자열. 섹션이 없으면 빈 문자열.
+        섹션 내용 문자열 (마크다운 기호 제거). 섹션이 없으면 빈 문자열.
     """
     pattern = rf"\[{section_name}\]\s*(.*?)(?=\[|\Z)"
     match = re.search(pattern, text, re.DOTALL)
-    return match.group(1).strip() if match else ""
+    return _strip_markdown(match.group(1).strip()) if match else ""
 
 
 def parse_bullet_list(text: str, section_name: str) -> List[str]:
@@ -130,8 +139,8 @@ def parse_bullet_list(text: str, section_name: str) -> List[str]:
         section_name: 추출할 섹션 이름
 
     Returns:
-        항목 문자열 리스트. 없으면 빈 리스트.
+        항목 문자열 리스트 (마크다운 기호 제거). 없으면 빈 리스트.
     """
     section = parse_section(text, section_name)
     items = re.findall(r"^-\s+(.+)", section, re.MULTILINE)
-    return [item.strip() for item in items if item.strip()]
+    return [_strip_markdown(item.strip()) for item in items if item.strip()]

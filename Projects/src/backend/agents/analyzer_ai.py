@@ -53,7 +53,10 @@ def _collect_transcript(video_id: str) -> Optional[str]:
 
 # ── 영상 1개 분석 (Gemini 1회 호출) ──────────────────────────────────────────
 
-_ANALYZE_SEMAPHORE_SIZE = 5  # 토픽당 최대 동시 Gemini 호출 수
+_ANALYZE_SEMAPHORE_SIZE    = 5  # 토픽당 최대 동시 Gemini 호출 수
+_MAX_CLAIMS_PER_VIDEO      = 3  # 교차분석 프롬프트에 넘길 영상당 최대 핵심주장 수 (토큰 절감)
+_TRANSCRIPT_SEMAPHORE_SIZE = 2  # YouTube 429 방지: 동시 자막 요청 수 제한
+_TRANSCRIPT_FAIL_DELAY     = 1.5  # 자막 수집 실패 시 다음 요청 전 대기 시간 (초)
 
 
 async def _analyze_single_video(
@@ -182,9 +185,19 @@ async def _analyze_videos_parallel(
 
     Gemini 호출 수: 영상 5개 기준 1회 → 5회 (+ 교차분석 1회로 총 6회)
     """
-    # Step 1: 자막 수집 — 병렬
+    # Step 1: 자막 수집 — 세마포어로 동시 요청 수 제한 (YouTube 429 방지)
+    # 병렬 5개 동시 요청 → YouTube가 429로 차단하는 문제 완화
+    _transcript_sem = asyncio.Semaphore(_TRANSCRIPT_SEMAPHORE_SIZE)
+
+    async def _collect_with_throttle(video_id: str) -> Optional[str]:
+        async with _transcript_sem:
+            result = await asyncio.to_thread(_collect_transcript, video_id)
+            if result is None:
+                await asyncio.sleep(_TRANSCRIPT_FAIL_DELAY)  # 실패 시 대기 후 다음 진입
+            return result
+
     transcripts: List[Optional[str]] = list(await asyncio.gather(
-        *[asyncio.to_thread(_collect_transcript, v["video_id"]) for v in videos]
+        *[_collect_with_throttle(v["video_id"]) for v in videos]
     ))
 
     # Step 2: 영상별 개별 분석 — 병렬 (Semaphore로 동시 Gemini 호출 수 제한)
@@ -305,12 +318,23 @@ async def _cross_and_generate(
       지식형 - 모든 섹션, 신뢰감 있는 문체
       구매형 - 공통사실·요약·장단점, 실용적 비교 언어
     """
-    valid = [v for v in video_results if v["transcript_available"] and v["key_claims"]]
+    # transcript_available + key_claims 가 있는 영상 우선
+    valid = [v for v in video_results if v.get("transcript_available") and v.get("key_claims")]
+
+    # key_claims가 없지만 요약이 있는 영상 → summary를 단일 claim으로 보완 (YouTube 429 등 자막 실패 시 복구)
+    if not valid:
+        for v in video_results:
+            if v.get("transcript_available") and not v.get("key_claims"):
+                summary_text = v.get("summary", "")
+                if summary_text and summary_text not in ("분석 실패", "자막 없음", ""):
+                    v["key_claims"] = [summary_text]
+        valid = [v for v in video_results if v.get("key_claims")]
+
     if not valid:
         return {
             "common_facts": [],
             "controversies": [],
-            "summary": ["분석 가능한 영상이 없습니다", "", ""],
+            "summary": ["자막을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.", "", ""],
             "pros": [],
             "cons": [],
         }
@@ -323,7 +347,7 @@ async def _cross_and_generate(
         claims_lines.append(
             f"영상{i + 1} [{v['channel_title']} / 신뢰도:{cred:.1f}{ad_tag}]:"
         )
-        for c in v["key_claims"]:
+        for c in v["key_claims"][:_MAX_CLAIMS_PER_VIDEO]:
             claims_lines.append(f"  - {c}")
     claims_block = "\n".join(claims_lines)
 

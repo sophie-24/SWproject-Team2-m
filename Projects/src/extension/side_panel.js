@@ -184,6 +184,13 @@ var SECTION_ICONS = [
 ];
 
 // ── 단일 영상 요약 렌더링 ──────────────────────────────────────────────────────
+// TODO [디자인 개선 포인트]
+// 1. 영상 요약 본문 폰트: font-size 13px → 13.5px, line-height 1.6 → 1.75 (가독성↑)
+// 2. section-block 카드 배경: 흰색(#fff) + box-shadow: 0 1px 4px rgba(0,0,0,0.07) 추가 (입체감)
+// 3. 핵심 주장 bullet: <li> 앞에 빨간 점(•) 대신 체크 아이콘(✓) 또는 컬러 dot으로 교체
+// 4. 신뢰도 바: 높이 6px → 8px, border-radius 키워서 pill 형태로 (더 세련됨)
+// 5. 광고 의심 배너: 현재 inline style → 전용 CSS class로 분리
+// 6. 카드 간격(margin-bottom): 12px → 16px으로 여유 확보
 
 function renderVideoSummary(videoTitle, aiData) {
   // SUMMARY 탭 헤더 설정
