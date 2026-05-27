@@ -149,6 +149,82 @@ document.addEventListener("click", function (e) {
   if (e.target && e.target.id === "btn-view-all") switchTab("sources");
 });
 
+// ── 신뢰도 토글 헬퍼 ─────────────────────────────────────────────────────────
+
+function toggleCredDetail(id) {
+  var detail = document.getElementById("cred-detail-" + id);
+  var btn    = document.getElementById("cred-btn-" + id);
+  if (!detail || !btn) return;
+  var isOpen = detail.style.display !== "none";
+  detail.style.display = isOpen ? "none" : "block";
+  btn.textContent = isOpen ? "더 보기 ▾" : "접기 ▴";
+}
+
+function buildAdBanner(adScore, adSignals) {
+  function layerLabel(rule) {
+    if (!rule) return "";
+    if (rule === "paid_flag")          return "Layer 3";
+    if (rule.indexOf("gemini") === 0)  return "Layer 4";
+    if (rule.indexOf("transcript") === 0) return "Layer 2";
+    if (rule.indexOf("description") === 0) return "Layer 1";
+    return "";
+  }
+  var signals = Array.isArray(adSignals) ? adSignals.filter(function(s) { return s.score > 0; }).slice(0, 2) : [];
+  var signalRows = signals.map(function(s) {
+    var lbl = layerLabel(s.rule);
+    return '<div style="font-size:10px;color:#c2410c;margin-top:3px;">'
+      + (lbl ? '<span style="font-weight:600;">' + lbl + '</span>: ' : '')
+      + esc(s.evidence || s.rule)
+      + '</div>';
+  }).join('');
+  return '<div class="cache-notice" style="background:#fff7ed;border-color:#fed7aa;color:#ea580c;margin-bottom:12px;">'
+    + '<div>⚠️ 광고 의심 점수: ' + adScore + '점</div>'
+    + signalRows
+    + '</div>';
+}
+
+function buildCredibilityCard(credScore, components, uniqId) {
+  var pct      = Math.round(credScore * 100);
+  var label    = pct >= 70 ? "높음" : pct >= 40 ? "보통" : "낮음";
+  var color    = pct >= 70 ? "#16a34a" : pct >= 40 ? "#d97706" : "#dc2626";
+  var compMap  = [
+    { key: "transcript_quality",  label: "자막 품질" },
+    { key: "ad_free",             label: "광고 없음" },
+    { key: "channel_credibility", label: "채널 신뢰도" },
+    { key: "consistency",         label: "정보 일관성" },
+  ];
+  var hasComponents = components && Object.keys(components).length > 0;
+  var summaryHtml =
+    '<div style="display:flex;align-items:center;gap:8px;">'
+    + '<div style="flex:1;height:6px;background:#e6e8ea;border-radius:3px;overflow:hidden;">'
+    + '<div style="width:' + pct + '%;height:100%;background:' + color + ';border-radius:3px;"></div>'
+    + '</div>'
+    + '<span style="font-size:12px;font-weight:700;color:' + color + ';">' + pct + '% ' + label + '</span>'
+    + (hasComponents
+      ? '<button id="cred-btn-' + uniqId + '" onclick="toggleCredDetail(\'' + uniqId + '\')" '
+        + 'style="font-size:10px;color:#888;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap;">'
+        + '더 보기 ▾</button>'
+      : '')
+    + '</div>';
+  var detailRows = hasComponents ? compMap.map(function(c) {
+    var v = components[c.key] || 0;
+    var vPct = Math.round(v * 100);
+    var vColor = vPct >= 70 ? "#16a34a" : vPct >= 40 ? "#d97706" : "#dc2626";
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+      + '<span style="font-size:10px;color:#888;width:62px;flex-shrink:0;">' + c.label + '</span>'
+      + '<div style="flex:1;height:4px;background:#e6e8ea;border-radius:2px;overflow:hidden;">'
+      + '<div style="width:' + vPct + '%;height:100%;background:' + vColor + ';border-radius:2px;"></div>'
+      + '</div>'
+      + '<span style="font-size:10px;color:#666;width:28px;text-align:right;">' + vPct + '%</span>'
+      + '</div>';
+  }).join('') : '';
+  var detailHtml = hasComponents
+    ? '<div id="cred-detail-' + uniqId + '" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #e6e8ea;">'
+      + detailRows + '</div>'
+    : '';
+  return summaryHtml + detailHtml;
+}
+
 // ── 단일 영상 요약 파싱 ──────────────────────────────────────────────────────
 
 function parseAnalysisToSections(text) {
@@ -203,7 +279,7 @@ function renderVideoSummary(videoTitle, aiData) {
   if (aiData) {
     var adScore = aiData.ad_score || 0;
     if (adScore > 5) {
-      html += '<div class="cache-notice" style="background:#fff7ed;border-color:#fed7aa;color:#ea580c;margin-bottom:12px;">⚠️ 광고 의심 점수: ' + adScore + '점</div>';
+      html += buildAdBanner(adScore, aiData.ad_signals);
     }
 
     var cards = [];
@@ -224,19 +300,11 @@ function renderVideoSummary(videoTitle, aiData) {
       cards.push({ title: "핵심 주장", bodyHtml: '<ul class="bullet-list">' + claimBullets + '</ul>', icon: 1 });
     }
 
-    // 신뢰도 점수 → 세 번째 카드
+    // 신뢰도 점수 → 세 번째 카드 (더 보기 토글 포함)
     if (typeof aiData.credibility_score === "number") {
-      var pct = Math.round(aiData.credibility_score * 100);
-      var credLabel = pct >= 70 ? "높음" : pct >= 40 ? "보통" : "낮음";
-      var credColor = pct >= 70 ? "#16a34a" : pct >= 40 ? "#d97706" : "#dc2626";
       cards.push({
         title: "신뢰도",
-        bodyHtml: '<div style="display:flex;align-items:center;gap:8px;">'
-          + '<div style="flex:1;height:6px;background:#e6e8ea;border-radius:3px;overflow:hidden;">'
-          + '<div style="width:' + pct + '%;height:100%;background:' + credColor + ';border-radius:3px;"></div>'
-          + '</div>'
-          + '<span style="font-size:12px;font-weight:700;color:' + credColor + ';">' + pct + '% ' + credLabel + '</span>'
-          + '</div>',
+        bodyHtml: buildCredibilityCard(aiData.credibility_score, aiData.credibility_components, "watch"),
         icon: 2
       });
     }
@@ -366,7 +434,10 @@ function renderResults(data, watchMode) {
       var adBadge   = v.ad_detected ? '<span class="badge badge-ad">광고 포함</span>' : '<span class="badge badge-noad">광고 없음</span>';
       var credBadge = v.credibility_score != null ? '<span class="badge badge-cred">신뢰도 ' + Math.round(v.credibility_score * 100) + '%</span>' : "";
       var chBadge   = v.channel_title ? '<span class="channel-badge">' + esc(v.channel_title).toUpperCase() + '</span>' : "";
-      return '<div class="video-card"><div class="video-card-inner">' + thumb + '<div class="video-info"><a class="video-title-text" href="' + url + '" target="_blank">' + esc(v.title) + '</a>' + (v.summary ? '<div class="video-subtitle">' + esc(v.summary) + '</div>' : "") + '<div class="video-meta-row">' + chBadge + adBadge + credBadge + '</div></div></div></div>';
+      var tagBadges = (v.selection_tags || []).map(function(t) {
+        return '<span style="font-size:10px;color:#475569;background:#f1f5f9;padding:2px 6px;border-radius:4px;white-space:nowrap;">' + esc(t) + '</span>';
+      }).join('');
+      return '<div class="video-card"><div class="video-card-inner">' + thumb + '<div class="video-info"><a class="video-title-text" href="' + url + '" target="_blank">' + esc(v.title) + '</a>' + (v.summary ? '<div class="video-subtitle">' + esc(v.summary) + '</div>' : "") + '<div class="video-meta-row">' + chBadge + adBadge + credBadge + tagBadges + '</div></div></div></div>';
     }
   }
 

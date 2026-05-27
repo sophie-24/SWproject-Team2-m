@@ -248,6 +248,19 @@ def select_top_videos(
         # 신뢰도(credibility)는 analyzer_ai 이후 orchestrator에서 곱셈
         pre_score = norm_view_rate * max(personalization, 0.05)
 
+        # 선정 이유 태그 — 프론트 영상 카드 표시용
+        tags = ["ViewRate 기반 선정"]
+        if is_subscribed:
+            tags.append("구독 채널")
+        if click_score >= 1.0:
+            tags.append("시청 이력")
+        if recency >= 0.9:
+            tags.append("최신 영상")
+        elif recency >= 0.5:
+            tags.append("최근 업로드")
+        if condition_match >= 0.3:
+            tags.append("관심사 매칭")
+
         scored.append({
             **v,
             "subscriber_count":  subscriber_counts.get(v.get("channel_id", ""), 0),
@@ -259,6 +272,7 @@ def select_top_videos(
             "personalization":   round(personalization, 4),
             "view_rate_raw":     round(raw_vr, 2),
             "score":             round(pre_score, 6),
+            "selection_tags":    tags,           # 프론트 영상 카드 선정 이유 표시용
         })
 
     # 10. 점수 내림차순 정렬 후 상위 top_n개 선정
