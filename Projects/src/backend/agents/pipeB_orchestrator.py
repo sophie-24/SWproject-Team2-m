@@ -7,6 +7,7 @@ from agents.intent_ai import classify_intent, FORMAT_MAP as INTENT_FORMAT_MAP
 from agents.selector_ai import select_top_videos
 from agents.analyzer_ai import analyze_videos
 from agents.newsletter_ai import generate_newsletter
+from shared_cache import get_cached
 
 from logger import get_logger
 logger = get_logger(__name__)
@@ -84,12 +85,7 @@ async def run_pipeline(
     if clicked_video_titles is None:
         clicked_video_titles = []
     if pipeline_a_cache is None:
-        # shared_cache에서 자동 로드 — 별도로 전달하지 않아도 동작
-        try:
-            from shared_cache import search_analysis_cache
-            pipeline_a_cache = search_analysis_cache
-        except ImportError:
-            pipeline_a_cache = {}
+        pipeline_a_cache = {}  # legacy 파라미터 — 실제 캐시 조회는 get_cached() 사용
 
     # ── Step 0: 토픽 목록 구성 (cluster_ai 제거 — 하트 토픽은 이미 정제됨) ────
     clusters = [{"topic": kw, "keywords": [kw]} for kw in raw_keywords]
@@ -112,24 +108,48 @@ async def run_pipeline(
         if not topic:
             continue
 
-        # Pipeline A 캐시 확인 — 캐시 히트 여부에 따라 병렬 범위 결정
-        cache_hit = pipeline_a_cache.get(topic) or pipeline_a_cache.get(f"{user_id}:{topic}")
+        # Pipeline A 캐시 확인 (TTL 포함) — 신선(0~1시간) 여부로 전략 분기
+        cache_hit = get_cached(topic)
 
         if cache_hit:
-            # 캐시 히트: intent_ai만 실행 (영상 선정 불필요)
-            logger.info(f"[orchestrator] Step 1 — '{topic}' 의도 분류 (캐시 히트)")
+            # ── 캐시 히트 (신선 < 1시간) ─────────────────────────────────────────
+            # intent_type만 재활용 (Gemini 0회) + 사이드패널 영상 배제 후 새로 선정
+            intent_type  = cache_hit.get("intent_type") or "지식형"
+            format_style = dict(INTENT_FORMAT_MAP.get(intent_type, INTENT_FORMAT_MAP["지식형"]))
+            logger.info(
+                f"[orchestrator] '{topic}' 캐시 히트 — intent_type='{intent_type}' 재활용"
+                f", 새 영상 선정"
+            )
+
+            # 새 영상 선정 (intent_type은 캐시에서 재활용, 영상은 새로 선정)
             try:
-                intent_result = await classify_intent([topic], clicked_video_titles)
+                videos = await asyncio.to_thread(
+                    select_top_videos,
+                    topic,
+                    subscribed_channel_ids,
+                )
             except Exception as e:
-                logger.warning(f"[orchestrator] '{topic}' 의도 분류 실패 — 기본값: {e}")
-                intent_result = _default_intent()
-            intent_type  = intent_result.get("intent_type") or "지식형"
-            format_style = intent_result["format_style"]
-            logger.info(f"[orchestrator] '{topic}' → Pipeline A 캐시 재활용 / 의도={intent_type}")
-            analysis = _dashboard_to_analysis(topic, cache_hit)
-            analysis["intent_type"]  = intent_type
-            analysis["format_style"] = format_style
-            analyses.append(analysis)
+                logger.warning(f"[orchestrator] '{topic}' 영상 선정 실패 (캐시 히트): {e}")
+                videos = []
+
+            if not videos:
+                logger.warning(f"[orchestrator] '{topic}' 영상 없음 (캐시 히트) — 스킵")
+                continue
+
+            # 새 영상으로 신규 분석 실행
+            logger.info(f"[orchestrator] '{topic}' 새 영상 {len(videos)}개 분석 (캐시 히트)")
+            try:
+                analysis = await analyze_videos(
+                    keyword=topic,
+                    videos=videos,
+                    format_style=format_style,
+                    intent_type=intent_type,
+                )
+                analysis["intent_type"]  = intent_type
+                analysis["format_style"] = format_style
+                analyses.append(analysis)
+            except Exception as e:
+                logger.warning(f"[orchestrator] '{topic}' 분석 실패 (캐시 히트): {e}")
             continue
 
         # 캐시 미스: Step 1(intent) + Step 2(영상 선정) 병렬 실행
