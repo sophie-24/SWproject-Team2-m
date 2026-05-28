@@ -75,21 +75,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
 
-    // keyword를 storage에 미리 저장 → side_panel이 init() 시 읽어감
-    const storeAndOpen = () =>
-      chrome.sidePanel
-        .open({ tabId })
-        .then(() => sendResponse({ success: true }))
-        .catch(e => {
-          console.error("[Tubify] sidePanel.open 실패:", e.message);
-          sendResponse({ success: false, error: e.message });
-        });
-
-    if (message.keyword) {
-      chrome.storage.local.set({ pendingKeyword: message.keyword }, storeAndOpen);
-    } else {
-      storeAndOpen();
-    }
+    // sidePanel.open()은 유저 제스처 컨텍스트가 필요하므로 메시지 리스너에서 즉시 호출.
+    // storage.set()을 먼저 하면 콜백 안에서 호출되어 제스처 컨텍스트가 끊김 → 순서 역전.
+    chrome.sidePanel
+      .open({ tabId })
+      .then(() => {
+        if (message.keyword) {
+          // 패널이 열린 뒤 keyword 저장 → side_panel의 storage.onChanged가 수신해 분석 시작
+          chrome.storage.local.set({ pendingKeyword: message.keyword });
+        }
+        sendResponse({ success: true });
+      })
+      .catch(e => {
+        console.error("[Tubify] sidePanel.open 실패:", e.message);
+        sendResponse({ success: false, error: e.message });
+      });
 
     return true; // 비동기 sendResponse 유지
   }
