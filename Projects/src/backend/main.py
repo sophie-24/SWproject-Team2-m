@@ -18,7 +18,7 @@ from youtube_search import search_videos, get_subscriptions
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
 from gemini_client import call_gemini_async
-from shared_cache import search_analysis_cache as _search_analysis_cache_shared
+from shared_cache import search_analysis_cache as _search_analysis_cache_shared, get_cached as _cache_get, set_cached as _cache_set
 from database import init_db, get_db, Newsletter, UserInterest, UserInterestVideo
 from agents.pipeB_orchestrator import run_pipeline
 from scheduler import start_scheduler, stop_scheduler
@@ -1561,12 +1561,14 @@ async def analyze_search(
     user_id = user["user_id"]
     cache_key = f"{user_id}:{keyword}"
 
-    if cache_key in _search_analysis_cache:
-        return JSONResponse(_search_analysis_cache[cache_key])
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return JSONResponse(cached)
 
     async with _search_analysis_lock:
-        if cache_key in _search_analysis_cache:
-            return JSONResponse(_search_analysis_cache[cache_key])
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            return JSONResponse(cached)
 
         interest_result = await db.execute(
             select(UserInterest.category)
@@ -1597,7 +1599,7 @@ async def analyze_search(
         except ValueError:
             result = {"keyword": keyword, "videos": [], "common_facts": [], "controversies": []}
 
-        _search_analysis_cache[cache_key] = result
+        _cache_set(cache_key, result)
 
     return JSONResponse(result)
 
@@ -1734,15 +1736,17 @@ async def analyze_video(
     pipeline_cache_key = f"{user_id}:video:{normalized_topic}"
 
     async def _run_single():
-        if single_cache_key in _search_analysis_cache:
-            return _search_analysis_cache[single_cache_key]
+        cached = _cache_get(single_cache_key)
+        if cached is not None:
+            return cached
         result = await _full_analyze_single_video(video_id, title, extracted_topic)
-        _search_analysis_cache[single_cache_key] = result
+        _cache_set(single_cache_key, result)
         return result
 
     async def _run_pipeline():
-        if pipeline_cache_key in _search_analysis_cache:
-            return _search_analysis_cache[pipeline_cache_key]
+        cached = _cache_get(pipeline_cache_key)
+        if cached is not None:
+            return cached
         try:
             result = await run_pipeline_a(
                 keyword=extracted_topic,
@@ -1757,7 +1761,7 @@ async def analyze_video(
                 "summary_lines": [], "common_facts": [], "controversies": [],
                 "recommended_videos": [], "pros": [], "cons": [], "sources": [],
             }
-        _search_analysis_cache[pipeline_cache_key] = result
+        _cache_set(pipeline_cache_key, result)
         return result
 
     single_result, pipeline_result = await asyncio.gather(_run_single(), _run_pipeline())
@@ -1901,8 +1905,9 @@ async def ai_analyze_video(
     from agents.analyzer_ai import analyze_videos
 
     cache_key = f"ai_analyze:{video_id}"
-    if cache_key in _search_analysis_cache:
-        return JSONResponse(_search_analysis_cache[cache_key])
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return JSONResponse(cached)
 
     try:
         keyword = query or video_id
@@ -1919,7 +1924,7 @@ async def ai_analyze_video(
             "credibility_score": first.get("credibility_score", 0.5),
             "ad_detected":       first.get("ad_detected", False),
         }
-        _search_analysis_cache[cache_key] = response
+        _cache_set(cache_key, response)
         return JSONResponse(response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"분석 실패: {str(e)}")
