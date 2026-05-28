@@ -163,22 +163,24 @@ function toggleCredDetail(id) {
 function buildAdBanner(adScore, adSignals) {
   function layerLabel(rule) {
     if (!rule) return "";
-    if (rule === "paid_flag")          return "Layer 3";
-    if (rule.indexOf("gemini") === 0)  return "Layer 4";
+    if (rule === "paid_flag")             return "Layer 3";
+    if (rule.indexOf("gemini") === 0)     return "Layer 4";
     if (rule.indexOf("transcript") === 0) return "Layer 2";
     if (rule.indexOf("description") === 0) return "Layer 1";
     return "";
   }
-  var signals = Array.isArray(adSignals) ? adSignals.filter(function(s) { return s.score > 0; }).slice(0, 2) : [];
-  var signalRows = signals.map(function(s) {
+  var signals = Array.isArray(adSignals) ? adSignals.filter(function(s) { return s.score > 0; }).slice(0, 3) : [];
+  var signalRows = signals.map(function(s, idx) {
     var lbl = layerLabel(s.rule);
-    return '<div style="font-size:10px;color:#c2410c;margin-top:3px;">'
-      + (lbl ? '<span style="font-weight:600;">' + lbl + '</span>: ' : '')
+    var prefix = idx === signals.length - 1 ? '└' : '├';
+    return '<div style="font-size:10px;color:#c2410c;margin-top:3px;font-family:monospace;">'
+      + '<span style="color:#f97316;">' + prefix + ' </span>'
+      + (lbl ? '<span style="font-weight:700;">' + lbl + '</span>: ' : '')
       + esc(s.evidence || s.rule)
       + '</div>';
   }).join('');
   return '<div class="cache-notice" style="background:#fff7ed;border-color:#fed7aa;color:#ea580c;margin-bottom:12px;">'
-    + '<div>⚠️ 광고 의심 점수: ' + adScore + '점</div>'
+    + '<div style="font-weight:600;">⚠️ 광고 의심 ' + adScore + '점</div>'
     + signalRows
     + '</div>';
 }
@@ -206,16 +208,21 @@ function buildCredibilityCard(credScore, components, uniqId) {
         + '더 보기 ▾</button>'
       : '')
     + '</div>';
-  var detailRows = hasComponents ? compMap.map(function(c) {
+  var detailRows = hasComponents ? compMap.map(function(c, idx) {
     var v = components[c.key] || 0;
     var vPct = Math.round(v * 100);
     var vColor = vPct >= 70 ? "#16a34a" : vPct >= 40 ? "#d97706" : "#dc2626";
-    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
-      + '<span style="font-size:10px;color:#888;width:62px;flex-shrink:0;">' + c.label + '</span>'
-      + '<div style="flex:1;height:4px;background:#e6e8ea;border-radius:2px;overflow:hidden;">'
-      + '<div style="width:' + vPct + '%;height:100%;background:' + vColor + ';border-radius:2px;"></div>'
-      + '</div>'
-      + '<span style="font-size:10px;color:#666;width:28px;text-align:right;">' + vPct + '%</span>'
+    var prefix = idx === compMap.length - 1 ? '└' : '├';
+    var filledCount = Math.round(vPct / 100 * 6);
+    var bar = '█'.repeat(filledCount) + '░'.repeat(6 - filledCount);
+    var annotation = (c.key === 'ad_free' && vPct < 60)
+      ? ' <span style="font-size:9px;color:#94a3b8;">← 광고 의심 반영</span>' : '';
+    return '<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;font-family:monospace;font-size:11px;">'
+      + '<span style="color:#94a3b8;">' + prefix + '</span>'
+      + '<span style="color:#888;min-width:56px;flex-shrink:0;font-family:\'Noto Sans KR\',sans-serif;font-size:10px;">' + c.label + '</span>'
+      + '<span style="color:' + vColor + ';letter-spacing:-0.5px;">' + bar + '</span>'
+      + '<span style="color:#666;margin-left:4px;white-space:nowrap;">' + vPct + '%</span>'
+      + annotation
       + '</div>';
   }).join('') : '';
   var detailHtml = hasComponents
@@ -570,11 +577,13 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
     // SUMMARY 탭: 단일 영상 전체 분석 (single_video 중첩 또는 flat 구조 모두 대응)
     var sv = data.single_video || data;
     renderVideoSummary(videoTitle, {
-      summary:           sv.summary || sv.video_summary || "",
-      key_claims:        sv.key_claims || [],
-      credibility_score: sv.credibility_score,
-      ad_score:          sv.ad_score,
-      ad_detected:       sv.ad_detected,
+      summary:                sv.summary || sv.video_summary || "",
+      key_claims:             sv.key_claims || [],
+      credibility_score:      sv.credibility_score,
+      credibility_components: sv.credibility_components || {},
+      ad_score:               sv.ad_score,
+      ad_detected:            sv.ad_detected,
+      ad_signals:             sv.ad_signals || [],
     });
 
     // INSIGHTS + SOURCES 탭
@@ -756,6 +765,19 @@ chrome.storage.onChanged.addListener(function (changes, area) {
     var keyword = changes.pendingKeyword.newValue;
     if (!keyword || !currentJwt) return;
     chrome.storage.local.remove("pendingKeyword");
-    analyze(keyword.trim(), currentJwt);
+    // 현재 탭 URL 확인 → watch 페이지면 analyzeWatch, 아니면 analyze
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      var tab = tabs && tabs[0];
+      if (tab && tab.url) {
+        try {
+          var u = new URL(tab.url);
+          if (u.hostname.includes("youtube.com") && u.pathname === "/watch") {
+            var vid = u.searchParams.get("v");
+            if (vid) { analyzeWatch(vid, tab.title, currentJwt); return; }
+          }
+        } catch (e) {}
+      }
+      analyze(keyword.trim(), currentJwt);
+    });
   }
 });
