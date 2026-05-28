@@ -148,7 +148,6 @@ def select_top_videos(
     clicked_channel_ids: List[str] = None,
     max_fetch: int = 25,
     top_n: int = 5,
-    exclude_video_ids: List[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     주제로 유튜브 영상 후보를 수집하고 PPT 스코어링 공식으로 상위 top_n개 선정.
@@ -166,8 +165,6 @@ def select_top_videos(
         clicked_channel_ids:    유저가 이전에 시청한 채널 ID 목록 — 클릭 여부용 (ω₄)
         max_fetch:              YouTube API에서 가져올 후보 영상 수 (기본 25 — 광고/쇼츠 필터 후 5개 확보 여유)
         top_n:                  최종 선정 영상 수 (기본 5)
-        exclude_video_ids:      제외할 영상 ID 목록 — Pipeline B에서 사이드패널 노출 영상 배제용.
-                                후보가 top_n 미만이면 제외 조건 완화 후 fallback 선정.
 
     Returns:
         점수 내림차순으로 정렬된 상위 top_n개 영상 메타데이터 (subscriber_count 포함)
@@ -178,12 +175,9 @@ def select_top_videos(
         user_categories = []
     if clicked_channel_ids is None:
         clicked_channel_ids = []
-    if exclude_video_ids is None:
-        exclude_video_ids = []
 
     subscribed_set = set(subscribed_channel_ids)
     clicked_set    = set(clicked_channel_ids)
-    exclude_set    = set(exclude_video_ids)
 
     # 1. 후보 영상 수집
     candidates = search_videos(topic, max_results=max_fetch)
@@ -283,20 +277,6 @@ def select_top_videos(
 
     # 10. 점수 내림차순 정렬 후 상위 top_n개 선정
     scored.sort(key=lambda x: x["score"], reverse=True)
-
-    # 11. exclude_set 적용 — best-effort: 제외 후 top_n 확보 불가시 fallback
-    if exclude_set:
-        filtered = [v for v in scored if v["video_id"] not in exclude_set]
-        if len(filtered) >= top_n:
-            scored = filtered
-        else:
-            # 부족한 수만큼 excluded 영상에서 보충 (fallback)
-            excluded_fallback = [v for v in scored if v["video_id"] in exclude_set]
-            scored = filtered + excluded_fallback[:top_n - len(filtered)]
-            logger.info(
-                f"[selector] exclude fallback: 제외 후 {len(filtered)}개만 확보"
-                f" → {top_n - len(filtered)}개 보충"
-            )
 
     logger.info(
         f"[selector] '{topic}' — 후보 {len(candidates)}개 → 상위 {top_n}개 선정"
