@@ -108,9 +108,12 @@ def _build_dashboard(
             "thumbnail_url":      v.get("thumbnail_url", v.get("thumbnail",
                                       f"https://img.youtube.com/vi/{v.get('video_id', '')}/mqdefault.jpg")),
             "url":               f"https://youtube.com/watch?v={v.get('video_id', '')}",
-            "credibility_score": v.get("credibility_score", 0.5),
-            "ad_detected":       v.get("ad_detected", False),
-            "summary":           v.get("summary", ""),
+            "credibility_score":      v.get("credibility_score", 0.5),
+            "credibility_components": v.get("credibility_components", {}),
+            "ad_detected":            v.get("ad_detected", False),
+            "ad_signals":             v.get("ad_signals", []),
+            "selection_tags":         v.get("selection_tags", []),
+            "summary":                v.get("summary", ""),
         }
         for v in analyzer_result.get("videos", [])
     ]

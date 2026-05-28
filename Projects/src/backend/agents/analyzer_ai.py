@@ -98,6 +98,7 @@ async def _analyze_single_video(
             "summary":             "자막 없음",
             "key_claims":          [],
             "credibility_score":   0.3,
+            "selection_tags":      video.get("selection_tags", []),
         }
 
     # 자막 있음 — Semaphore 획득 후 Gemini 호출
@@ -166,6 +167,7 @@ async def _analyze_single_video(
         "summary":             summary or "분석 실패",
         "key_claims":          key_claims,
         "credibility_score":   0.3 if ad_score >= 60 else 0.5,
+        "selection_tags":      video.get("selection_tags", []),
     }
 
 
@@ -457,9 +459,20 @@ def _channel_credibility_score(subscriber_count: int) -> float:
     return round(min(1.0, max(0.0, score)), 4)
 
 
-def _calc_credibility(video: Dict[str, Any], common_facts: List[str]) -> float:
+def _calc_credibility(video: Dict[str, Any], common_facts: List[str]) -> Dict[str, Any]:
     """
     신뢰도 = ω₁·자막품질 + ω₂·(1-광고확률) + ω₃·채널신뢰도 + ω₄·정보일관성
+
+    Returns:
+        {
+            "score":      float,   # 최종 가중합 (0~1)
+            "components": {        # 프론트 더보기 토글용 컴포넌트별 점수
+                "transcript_quality": float,
+                "ad_free":            float,
+                "channel_credibility": float,
+                "consistency":        float,
+            }
+        }
     """
     # ω₁ 자막품질
     transcript_q = _transcript_quality_score(
@@ -489,7 +502,15 @@ def _calc_credibility(video: Dict[str, Any], common_facts: List[str]) -> float:
         + W_CHANNEL     * channel_cred
         + W_CONSISTENCY * consistency
     )
-    return round(max(0.0, min(1.0, score)), 4)
+    return {
+        "score": round(max(0.0, min(1.0, score)), 4),
+        "components": {
+            "transcript_quality":  round(transcript_q, 4),
+            "ad_free":             round(ad_free, 4),
+            "channel_credibility": round(channel_cred, 4),
+            "consistency":         round(consistency, 4),
+        },
+    }
 
 
 # ── 메인 진입점 ───────────────────────────────────────────────────────────────
@@ -525,7 +546,9 @@ async def analyze_videos(
     # Step 3: 최종 신뢰도 보정 (공통사실 기반, 호출 없음)
     common_facts = content["common_facts"]
     for vr in video_results:
-        vr["credibility_score"] = _calc_credibility(vr, common_facts)
+        cred = _calc_credibility(vr, common_facts)
+        vr["credibility_score"]      = cred["score"]
+        vr["credibility_components"] = cred["components"]  # 프론트 더보기 토글용
 
     # 출처 구성 — 분석에 사용된 영상 전체 포함 (필터 없음)
     # 광고 여부는 ad_detected 필드로 전달, 프론트에서 뱃지로 표시
