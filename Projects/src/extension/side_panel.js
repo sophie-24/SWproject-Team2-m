@@ -313,7 +313,7 @@ function renderVideoSummary(videoTitle, aiData) {
       cards.forEach(function(card) {
         var bodyContent = card.bodyHtml
           ? card.bodyHtml
-          : '<p class="section-body-text">' + esc(card.body || "") + '</p>';
+          : '<p class="section-body-text">' + esc(card.body || "").replace(/\n/g, '<br>') + '</p>';
         html += '<div class="section-block border-red">'
           + '<div class="section-header">'
           + '<div class="section-icon-box icon-red">' + SECTION_ICONS[card.icon] + '</div>'
