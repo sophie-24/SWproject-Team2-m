@@ -1875,11 +1875,17 @@ async def _full_analyze_single_video(
     semaphore = asyncio.Semaphore(1)
     result = await _analyze_single_video(keyword, video_info, transcript, semaphore)
 
-    # credibility_components 계산 — 단일 영상이므로 common_facts 없이 호출
+    # 신뢰도 컴포넌트 계산 (단일 영상은 정보 일관성 제외 — 비교 대상 없음)
     from agents.analyzer_ai import _calc_credibility
     cred = _calc_credibility(result, [])
-    result["credibility_score"]      = cred["score"]
-    result["credibility_components"] = cred["components"]
+    comp = {k: v for k, v in cred["components"].items() if k != "consistency"}
+    score = (
+        0.20 * comp.get("transcript_quality", 0)
+        + 0.35 * comp.get("ad_free", 0)
+        + 0.25 * comp.get("channel_credibility", 0)
+    ) / 0.80
+    result["credibility_score"]      = round(min(1.0, score), 4)
+    result["credibility_components"] = comp
 
     return result
 
