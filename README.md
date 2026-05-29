@@ -11,9 +11,9 @@ Tubify는 사용자가 직접 하트한 관심 토픽을 AI가 분석해 광고�
 
 | 이름 | 전공 | 역할 | 주요 기여 내용 | GitHub |
 |------|------|------|---------------|--------|
-| 김규리 | 컴퓨터공학 | 백엔드 리드 & 시스템 아키텍처 | 데이터베이스 물리 설계(ERD 작성) 및 SQL 최적화, DB 변수명 표준화(Naming Convention) 수립, 백엔드 주요 API 로직 구현 및 시스템 구조 설계 | [@sophie-24](https://github.com/sophie-24) |
-| 김이준 | 컴퓨터공학 | 프론트엔드 개발 & API 연동 | 클라이언트 UI 개발, 백엔드 API 데이터 연동, 구글 OAuth 2.0 로그인 구현, 영상 자막 전처리 모듈 개발 지원 | [@yijuuuun](https://github.com/yijuuuun) |
-| 조민선 | 경영정보학 | 팀장 & 서비스 기획 | 프로젝트 일정 관리 및 커뮤니케이션, DB 논리 모델링 및 요구사항 정의, 데이터 스키마 리서치 및 SQL 초안 작성 | [@chomincho](https://github.com/chomincho) |
+| 김규리 | 컴퓨터공학 | 백엔드 리드 & 시스템 아키텍처 | 데이터베이스 물리 설계(ERD 작성) 및 SQL 최적화, DB 논리 모델 정의, 백엔드 주요 API 로직 구현 및 시스템 구조 설계 | [@sophie-24](https://github.com/sophie-24) |
+| 김이준 | 컴퓨터공학 | 프론트엔드 개발 & API 연동 | 클라이언트 UI 개발, 백엔드 API 데이터 연동, 구글 OAuth 2.0 로그인 구현, 영상 자막 전처리 모듈 개발 | [@yijuuuun](https://github.com/yijuuuun) |
+| 조민선 | 경영정보학 | 팀장 & 서비스 기획 | 프로젝트 일정 관리 및 커뮤니케이션, 데이터 스키마 리서치 및 SQL 초안 작성, 프롬프트 엔지니어링 지원 | [@chomincho](https://github.com/chomincho) |
 | 최유민 | 데이터사이언스 | UI/UX 디자인 | 서비스 와이어프레임 설계, 사용자 경험(UX) 중심의 인터페이스 디자인(Figma), 프론트엔드 디자인 가이드 제공 | [@yumin-53](https://github.com/yumin-53) |
 
 ---

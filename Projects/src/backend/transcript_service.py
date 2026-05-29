@@ -1,4 +1,4 @@
-# youtube-transcript-api(1순위) + yt-dlp(fallback) 자막 수집 모듈
+# youtube-transcript-api(1순위) + yt-dlp(2순위) + Supadata API(3순위) 자막 수집 모듈
 # 외부 공개 함수: get_transcript / format_transcript_with_timestamps / list_available_transcripts
 
 import os
@@ -18,7 +18,9 @@ from youtube_transcript_api import (
 from logger import get_logger
 logger = get_logger(__name__)
 
-COOKIES_PATH = os.path.join(os.path.dirname(__file__), "cookies.txt")
+COOKIES_PATH        = os.path.join(os.path.dirname(__file__), "cookies.txt")
+SUPADATA_API_KEY    = os.getenv("SUPADATA_API_KEY", "")
+SUPADATA_ENDPOINT   = "https://api.supadata.ai/v1/youtube/transcript"
 
 # YOUTUBE_COOKIES_B64 환경변수에 cookies.txt를 base64 인코딩한 값을 넣으면
 # 서버 시작 시 자동으로 cookies.txt로 복원 — Cloudtype 배포 환경에서 YouTube 429 우회용
@@ -74,7 +76,7 @@ def _cache_set(video_id: str, data: list) -> None:
 
 def get_transcript(video_id: str) -> Optional[list]:
     """
-    자막 수집. 캐시 확인 -> youtube-transcript-api -> yt-dlp fallback 순.
+    자막 수집. 캐시 → youtube-transcript-api → yt-dlp → Supadata API 순.
     반환: [{"text": str, "start": float, "duration": float}, ...] or None
     """
     cached = _cache_get(video_id)
@@ -91,6 +93,13 @@ def get_transcript(video_id: str) -> Optional[list]:
     result = _fetch_via_ytdlp(video_id)
     if result is not None:
         _cache_set(video_id, result)
+        return result
+
+    if SUPADATA_API_KEY:
+        logger.info("[transcript] %s: yt-dlp 실패 -> Supadata fallback", video_id)
+        result = _fetch_via_supadata(video_id)
+        if result is not None:
+            _cache_set(video_id, result)
     return result
 
 
@@ -286,6 +295,41 @@ def _parse_json3(filepath: str) -> Optional[list]:
 
         return result if result else None
     except Exception:
+        return None
+
+
+def _fetch_via_supadata(video_id: str) -> Optional[list]:
+    """Supadata API fallback — youtube-transcript-api + yt-dlp 모두 실패 시 사용."""
+    try:
+        resp = requests.get(
+            SUPADATA_ENDPOINT,
+            params={"videoId": video_id, "lang": "ko", "text": "false"},
+            headers={"x-api-key": SUPADATA_API_KEY},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            logger.warning("[transcript] %s: Supadata %d", video_id, resp.status_code)
+            return None
+
+        data = resp.json()
+        segments = data.get("content", [])
+        if not segments:
+            return None
+
+        result = []
+        for seg in segments:
+            text = str(seg.get("text", "")).replace("\n", " ").strip()
+            if text:
+                result.append({
+                    "text":     text,
+                    "start":    round(float(seg.get("offset", 0)) / 1000, 2),   # ms → 초
+                    "duration": round(float(seg.get("duration", 0)) / 1000, 2), # ms → 초
+                })
+        if result:
+            logger.info("[transcript] %s: Supadata 성공 %d개", video_id, len(result))
+        return result or None
+    except Exception as e:
+        logger.warning("[transcript] %s: Supadata 예외 - %s", video_id, e)
         return None
 
 

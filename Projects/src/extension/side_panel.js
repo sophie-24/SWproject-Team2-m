@@ -342,16 +342,63 @@ function renderVideoSummary(videoTitle, aiData) {
 // ── 결과 렌더링 ───────────────────────────────────────────────────────────────
 
 function renderResults(data, watchMode) {
-  var keyword      = data.keyword || currentKeyword;
-  var videos       = data.recommended_videos || data.videos || [];
-  var commonFacts  = data.common_facts || [];
+  var keyword       = data.keyword || currentKeyword;
+  var videos        = data.recommended_videos || data.videos || [];
+  var commonFacts   = data.common_facts || [];
   var controversies = data.controversies || [];
-  var summaryLines = data.summary_lines || [];
-  var category     = data.category || "";
-  var cached       = data.cached || false;
+  var summaryLines  = data.summary_lines || [];
+  var category      = data.category || "";
+  var layout        = data.layout || "summary_focus";
+  var pros          = data.pros || [];
+  var cons          = data.cons || [];
+  var cached        = data.cached || false;
 
-  var SUMMARY_TITLE = { "정보탐색형": "핵심 인사이트", "유희탐색형": "화제 포인트", "구매탐색형": "장점 요약" };
+  var SUMMARY_TITLE = { "정보탐색형": "핵심 인사이트", "유희탐색형": "화제 포인트", "구매탐색형": "핵심 요약" };
   var FACTS_TITLE   = { "정보탐색형": "전문가 분석", "유희탐색형": "반응 및 의견", "구매탐색형": "전문가 평가" };
+
+  // ── 레이아웃별 인사이트 섹션 조립 ─────────────────────────────────────────
+  function _makeBullets(items, dotColor) {
+    return items.map(function(item) {
+      return '<div class="bullet-item"><span class="bullet-dot ' + dotColor + '"></span><span>' + esc(item) + '</span></div>';
+    }).join("");
+  }
+  function _makeSection(borderCls, iconCls, iconIdx, title, bulletsHTML) {
+    return '<div class="section-block ' + borderCls + '"><div class="section-header">'
+      + '<div class="section-icon-box ' + iconCls + '">' + SECTION_ICONS[iconIdx] + '</div>'
+      + '<div class="section-title-text">' + title + '</div></div>'
+      + '<div class="bullet-list">' + bulletsHTML + '</div></div>';
+  }
+
+  function buildInsightsSections() {
+    var html = cached ? '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>' : "";
+
+    if (layout === "comparison") {
+      // 구매형: 장점 → 단점 → 요약 → 공통사실 순
+      if (pros.length)
+        html += _makeSection("border-green", "icon-green", 1, "장점", _makeBullets(pros, "dot-blue"));
+      if (cons.length)
+        html += _makeSection("border-yellow", "icon-yellow", 2, "단점 / 주의사항", _makeBullets(cons, "dot-yellow"));
+      if (summaryLines.length)
+        html += _makeSection("border-red", "icon-red", 0, SUMMARY_TITLE[category] || "핵심 요약", _makeBullets(summaryLines, "dot-red"));
+      if (commonFacts.length)
+        html += _makeSection("border-gray", "icon-gray", 1, FACTS_TITLE[category] || "공통 사실", _makeBullets(commonFacts, "dot-blue"));
+
+    } else if (layout === "card_highlight") {
+      // 유희형: 요약 → 쟁점 인라인 (공통사실 생략)
+      if (summaryLines.length)
+        html += _makeSection("border-red", "icon-red", 0, SUMMARY_TITLE[category] || "화제 포인트", _makeBullets(summaryLines, "dot-red"));
+      if (controversies.length)
+        html += _makeSection("border-yellow", "icon-yellow", 2, "반응이 갈리는 부분", _makeBullets(controversies, "dot-yellow"));
+
+    } else {
+      // summary_focus (지식형, 기본): 요약 → 공통사실
+      if (summaryLines.length)
+        html += _makeSection("border-red", "icon-red", 0, SUMMARY_TITLE[category] || "주요 요약", _makeBullets(summaryLines, "dot-red"));
+      if (commonFacts.length)
+        html += _makeSection("border-gray", "icon-gray", 1, FACTS_TITLE[category] || "공통 사실", _makeBullets(commonFacts, "dot-blue"));
+    }
+    return html;
+  }
 
   // SUMMARY 탭 버튼: watch=보임, search=숨김
   var summaryTabBtn = document.querySelector('[data-tab="summary"]');
@@ -366,26 +413,13 @@ function renderResults(data, watchMode) {
 
   if (watchMode) {
     // watch 모드: SUMMARY 탭은 renderVideoSummary가 처리 → 여기선 INSIGHTS 탭만 채움
-    var insightsHTML = cached ? '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>' : "";
-    if (summaryLines.length) {
-      var bullets = summaryLines.map(function (l) {
-        return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
-      }).join("");
-      insightsHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">' + SECTION_ICONS[0] + '</div><div class="section-title-text">' + (SUMMARY_TITLE[category] || "주요 요약") + '</div></div><div class="bullet-list">' + bullets + '</div></div>';
-    }
-    if (commonFacts.length) {
-      var factBullets = commonFacts.map(function (f) {
-        return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
-      }).join("");
-      insightsHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">' + SECTION_ICONS[1] + '</div><div class="section-title-text">' + (FACTS_TITLE[category] || "공통 사실") + '</div></div><div class="bullet-list">' + factBullets + '</div></div>';
-    }
-    document.getElementById("insights-sections").innerHTML = insightsHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">관련 영상 분석 정보가 없습니다.</div>';
+    document.getElementById("insights-sections").innerHTML =
+      buildInsightsSections() || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">관련 영상 분석 정보가 없습니다.</div>';
   } else {
     // search 모드: INSIGHTS 탭에 내용, SUMMARY 탭은 비움
     document.getElementById("kw-title-insights").textContent = keyword;
     document.getElementById("insights-kw-header").style.display = "";
     document.getElementById("insights-kw-underline").style.display = "";
-    // SUMMARY 탭 헤더/내용 숨김
     document.getElementById("kw-header-row").style.display = "none";
     document.getElementById("kw-underline").style.display = "none";
     document.getElementById("summary-content").innerHTML = "";
@@ -396,31 +430,19 @@ function renderResults(data, watchMode) {
     heartedTopic = "";
     checkHeartState(keyword);
 
-    var insightsHTML = cached ? '<div class="cache-notice">⚡ 기존 분석 결과입니다</div>' : "";
-    if (summaryLines.length) {
-      var sBullets = summaryLines.map(function (l) {
-        return '<div class="bullet-item"><span class="bullet-dot dot-red"></span><span>' + esc(l) + '</span></div>';
-      }).join("");
-      insightsHTML += '<div class="section-block border-red"><div class="section-header"><div class="section-icon-box icon-red">' + SECTION_ICONS[0] + '</div><div class="section-title-text">' + (SUMMARY_TITLE[category] || "주요 요약") + '</div></div><div class="bullet-list">' + sBullets + '</div></div>';
-    }
-    if (commonFacts.length) {
-      var fBullets = commonFacts.map(function (f) {
-        return '<div class="bullet-item"><span class="bullet-dot dot-blue"></span><span>' + esc(f) + '</span></div>';
-      }).join("");
-      insightsHTML += '<div class="section-block border-gray"><div class="section-header"><div class="section-icon-box icon-gray">' + SECTION_ICONS[1] + '</div><div class="section-title-text">' + (FACTS_TITLE[category] || "공통 사실") + '</div></div><div class="bullet-list">' + fBullets + '</div></div>';
-    }
-    document.getElementById("insights-sections").innerHTML = insightsHTML || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">요약 정보가 없습니다.</div>';
+    document.getElementById("insights-sections").innerHTML =
+      buildInsightsSections() || '<div style="color:#555;font-size:0.82rem;padding:10px 0;">요약 정보가 없습니다.</div>';
 
-    // INSIGHTS 탭으로 자동 전환
     switchTab("insights");
   }
 
+  // 쟁점: card_highlight는 인라인에 포함했으므로 별도 섹션 비움
   var controversyHTML = "";
-  if (controversies.length) {
-    var cBullets = controversies.map(function (c) {
-      return '<div class="bullet-item"><span class="bullet-dot dot-yellow"></span><span>' + esc(c) + '</span></div>';
-    }).join("");
-    controversyHTML = '<div class="section-block border-yellow"><div class="section-header"><div class="section-icon-box icon-yellow">' + SECTION_ICONS[2] + '</div><div class="section-title-text">주요 쟁점</div></div><div class="bullet-list">' + cBullets + '</div></div>';
+  if (controversies.length && layout !== "card_highlight") {
+    controversyHTML = '<div class="section-block border-yellow"><div class="section-header">'
+      + '<div class="section-icon-box icon-yellow">' + SECTION_ICONS[2] + '</div>'
+      + '<div class="section-title-text">주요 쟁점</div></div>'
+      + '<div class="bullet-list">' + _makeBullets(controversies, "dot-yellow") + '</div></div>';
   }
   document.getElementById("controversy-section").innerHTML = controversyHTML;
 
