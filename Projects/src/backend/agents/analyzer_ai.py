@@ -55,8 +55,9 @@ def _collect_transcript(video_id: str) -> Optional[str]:
 
 _ANALYZE_SEMAPHORE_SIZE    = 5  # 토픽당 최대 동시 Gemini 호출 수
 _MAX_CLAIMS_PER_VIDEO      = 3  # 교차분석 프롬프트에 넘길 영상당 최대 핵심주장 수 (토큰 절감)
-_TRANSCRIPT_SEMAPHORE_SIZE = 2  # YouTube 429 방지: 동시 자막 요청 수 제한
-_TRANSCRIPT_FAIL_DELAY     = 1.5  # 자막 수집 실패 시 다음 요청 전 대기 시간 (초)
+_TRANSCRIPT_SEMAPHORE_SIZE = 1  # YouTube 429 방지: 자막 요청 순차화 (동시 1개)
+_TRANSCRIPT_FAIL_DELAY     = 5.0  # 자막 수집 실패 시 다음 요청 전 대기 시간 (초)
+_TRANSCRIPT_SUCCESS_DELAY  = 2.0  # 자막 수집 성공 시에도 다음 요청 전 대기 (429 예방)
 
 
 async def _analyze_single_video(
@@ -194,8 +195,9 @@ async def _analyze_videos_parallel(
     async def _collect_with_throttle(video_id: str) -> Optional[str]:
         async with _transcript_sem:
             result = await asyncio.to_thread(_collect_transcript, video_id)
-            if result is None:
-                await asyncio.sleep(_TRANSCRIPT_FAIL_DELAY)  # 실패 시 대기 후 다음 진입
+            # 성공/실패 모두 딜레이 — YouTube가 연속 요청을 감지하지 못하게
+            delay = _TRANSCRIPT_FAIL_DELAY if result is None else _TRANSCRIPT_SUCCESS_DELAY
+            await asyncio.sleep(delay)
             return result
 
     transcripts: List[Optional[str]] = list(await asyncio.gather(

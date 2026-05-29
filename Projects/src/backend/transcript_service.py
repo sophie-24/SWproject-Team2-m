@@ -128,43 +128,57 @@ def list_available_transcripts(video_id: str) -> list:
 
 # ── Strategy A: youtube-transcript-api ───────────────────────────────────────
 
+_RETRY_DELAYS = [3, 8, 20]  # 429 시 재시도 대기 시간 (초) — 3회 retry
+
+
 def _fetch_via_api(video_id: str) -> Optional[list]:
     """
     youtube-transcript-api 로 자막 수집.
     수동 자막(ko->en) 우선, 없으면 자동생성(ko->en) 시도.
+    429 발생 시 최대 3회 retry (3s → 8s → 20s backoff).
     """
-    try:
-        transcript_list = _api.list(video_id)
+    for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+        if delay:
+            logger.info("[transcript] %s: 429 재시도 %d회차 (%ds 대기)", video_id, attempt, delay)
+            time.sleep(delay)
+        try:
+            transcript_list = _api.list(video_id)
 
-        # 수동 자막 우선
-        for lang in _LANG_PRIORITY:
-            try:
-                t = transcript_list.find_manually_created_transcript([lang])
-                entries = t.fetch()
-                logger.info("[transcript] %s: 수동자막(%s) %d개", video_id, lang, len(entries))
-                return _normalize_entries(entries)
-            except NoTranscriptFound:
-                continue
+            # 수동 자막 우선
+            for lang in _LANG_PRIORITY:
+                try:
+                    t = transcript_list.find_manually_created_transcript([lang])
+                    entries = t.fetch()
+                    logger.info("[transcript] %s: 수동자막(%s) %d개", video_id, lang, len(entries))
+                    return _normalize_entries(entries)
+                except NoTranscriptFound:
+                    continue
 
-        # 자동생성 자막
-        for lang in _LANG_PRIORITY:
-            try:
-                t = transcript_list.find_generated_transcript([lang])
-                entries = t.fetch()
-                logger.info("[transcript] %s: 자동자막(%s) %d개", video_id, lang, len(entries))
-                return _normalize_entries(entries)
-            except NoTranscriptFound:
-                continue
+            # 자동생성 자막
+            for lang in _LANG_PRIORITY:
+                try:
+                    t = transcript_list.find_generated_transcript([lang])
+                    entries = t.fetch()
+                    logger.info("[transcript] %s: 자동자막(%s) %d개", video_id, lang, len(entries))
+                    return _normalize_entries(entries)
+                except NoTranscriptFound:
+                    continue
 
-        logger.info("[transcript] %s: 지원 언어 없음", video_id)
-        return None
+            logger.info("[transcript] %s: 지원 언어 없음", video_id)
+            return None
 
-    except (TranscriptsDisabled, VideoUnavailable) as e:
-        logger.info("[transcript] %s: 자막 비활성화 - %s", video_id, e)
-        return None
-    except Exception as e:
-        logger.warning("[transcript] %s: API 예외 - %s", video_id, e)
-        return None
+        except (TranscriptsDisabled, VideoUnavailable) as e:
+            logger.info("[transcript] %s: 자막 비활성화 - %s", video_id, e)
+            return None
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str and attempt < len(_RETRY_DELAYS):
+                logger.warning("[transcript] %s: API 예외 - %s", video_id, e)
+                continue  # retry
+            logger.warning("[transcript] %s: API 예외 - %s", video_id, e)
+            return None
+
+    return None
 
 
 def _normalize_entries(entries) -> Optional[list]:
