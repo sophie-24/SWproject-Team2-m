@@ -176,17 +176,17 @@ function toggleCredDetail(id) {
 }
 
 function buildAdBanner(adScore, adSignals) {
-  function layerLabel(rule) {
-    if (!rule) return "";
-    if (rule === "paid_flag")             return "Layer 3";
-    if (rule.indexOf("gemini") === 0)     return "Layer 4";
-    if (rule.indexOf("transcript") === 0) return "Layer 2";
-    if (rule.indexOf("description") === 0) return "Layer 1";
+  function layerLabel(layer) {
+    if (!layer) return "";
+    if (layer === "paid_flag")   return "Layer 3";
+    if (layer === "gemini")      return "Layer 4";
+    if (layer === "transcript")  return "Layer 2";
+    if (layer === "description") return "Layer 1";
     return "";
   }
   var signals = Array.isArray(adSignals) ? adSignals.filter(function(s) { return s.score > 0; }).slice(0, 3) : [];
   var signalRows = signals.map(function(s, idx) {
-    var lbl = layerLabel(s.rule);
+    var lbl = layerLabel(s.layer);
     var prefix = idx === signals.length - 1 ? '└' : '├';
     return '<div style="font-size:10px;color:#c2410c;margin-top:3px;font-family:monospace;">'
       + '<span style="color:#f97316;">' + prefix + ' </span>'
@@ -208,8 +208,11 @@ function buildCredibilityCard(credScore, components, uniqId) {
     { key: "transcript_quality",  label: "자막 품질" },
     { key: "ad_free",             label: "광고 없음" },
     { key: "channel_credibility", label: "채널 신뢰도" },
-    { key: "consistency",         label: "정보 일관성" },
   ];
+  // 단일 영상(watch)이 아닐 때만 정보 일관성 표시 (단일 영상은 교차 비교 없어 항상 0)
+  if (uniqId !== "watch") {
+    compMap.push({ key: "consistency", label: "정보 일관성" });
+  }
   var hasComponents = components && Object.keys(components).length > 0;
   var summaryHtml =
     '<div style="display:flex;align-items:center;gap:8px;">'
@@ -638,7 +641,7 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
       summary_lines:       ka.summary_lines || [],
       common_facts:        ka.common_facts || [],
       controversies:       ka.controversies || [],
-      recommended_videos:  data.sources || ka.recommended_videos || [],
+      recommended_videos:  ka.recommended_videos || data.sources || [],
       category:            ka.category || "",
       cached:              data.cached || false,
     }, true);

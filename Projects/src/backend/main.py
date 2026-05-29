@@ -1873,7 +1873,15 @@ async def _full_analyze_single_video(
 
     # 단일 영상 분석 (Semaphore 1 — 단독 호출이므로 제한 불필요)
     semaphore = asyncio.Semaphore(1)
-    return await _analyze_single_video(keyword, video_info, transcript, semaphore)
+    result = await _analyze_single_video(keyword, video_info, transcript, semaphore)
+
+    # credibility_components 계산 — 단일 영상이므로 common_facts 없이 호출
+    from agents.analyzer_ai import _calc_credibility
+    cred = _calc_credibility(result, [])
+    result["credibility_score"]      = cred["score"]
+    result["credibility_components"] = cred["components"]
+
+    return result
 
 
 def _collect_transcript_for_summary(video_id: str) -> Optional[str]:

@@ -93,7 +93,7 @@ async def _analyze_single_video(
             "ad_score":            ad_score,
             "ad_detected":         ad_score >= 60,
             "ad_signals":          [
-                {"rule": s.rule, "evidence": s.evidence, "score": s.score}
+                {"layer": s.layer, "rule": s.rule, "evidence": s.evidence, "score": s.score}
                 for s in rule_result.signals
             ],
             "summary":             "자막 없음",
@@ -162,7 +162,7 @@ async def _analyze_single_video(
         "ad_score":            ad_score,
         "ad_detected":         ad_score >= 60,
         "ad_signals":          [
-            {"rule": s.rule, "evidence": s.evidence, "score": s.score}
+            {"layer": s.layer, "rule": s.rule, "evidence": s.evidence, "score": s.score}
             for s in rule_result.signals
         ],
         "summary":             summary or "분석 실패",
