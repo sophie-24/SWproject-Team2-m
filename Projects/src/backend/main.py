@@ -1822,9 +1822,9 @@ async def analyze_video(
             "key_claims":        single_result.get("key_claims", []),
             "ad_score":               single_result.get("ad_score", 0),
             "ad_detected":            single_result.get("ad_detected", False),
-            "ad_signals":             single_result.get("ad_signals", []),
-            "credibility_score":      single_result.get("credibility_score", 0.5),
-            "credibility_components": single_result.get("credibility_components", {}),
+            "ad_signals":             single_result.get("ad_signals") or [],
+            "credibility_score":      single_result.get("credibility_score") or 0.5,
+            "credibility_components": single_result.get("credibility_components") or {},
         },
         "keyword_analysis": {
             "keyword":            pipeline_result.get("keyword", extracted_topic),
