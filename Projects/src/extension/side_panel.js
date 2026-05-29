@@ -95,6 +95,15 @@ async function toggleHeart() {
   }
 }
 
+function stripMd(str) {
+  if (!str) return str;
+  return str
+    .replace(/\*{1,3}([^*\n]+?)\*{1,3}/g, '$1')
+    .replace(/\*+/g, '')
+    .replace(/^#{1,6}\s*/gm, '')
+    .trim();
+}
+
 function esc(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -296,7 +305,7 @@ function renderVideoSummary(videoTitle, aiData) {
     if (summaryText && summaryText !== "분석 실패") {
       var summaryBody = (summaryText === "자막 없음")
         ? "이 영상은 자막 정보를 가져올 수 없어 AI 요약을 제공하기 어렵습니다."
-        : summaryText;
+        : stripMd(summaryText);
       cards.push({ title: "영상 요약", body: summaryBody, icon: 0 });
     }
 
