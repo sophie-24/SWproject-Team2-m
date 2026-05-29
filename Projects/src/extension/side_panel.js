@@ -8,6 +8,12 @@ let currentJwt = "";
 let currentVideoId = "";
 let heartedTopic = "";
 let currentMode = "search"; // "search" | "watch"
+let _abortController = null; // 진행 중인 분석 요청 취소용
+
+// 패널 닫힐 때 진행 중인 요청 abort
+window.addEventListener("unload", function () {
+  if (_abortController) _abortController.abort();
+});
 
 // ── 유틸 ──────────────────────────────────────────────────────────────────────
 
@@ -521,8 +527,10 @@ async function analyze(keyword, jwt) {
     await new Promise(function (r) { setTimeout(r, 500); });
     setStep(2, "done"); setStep(3, "active");
 
+    _abortController = new AbortController();
     var res = await fetch(API_BASE + "/analyze_search?keyword=" + encodeURIComponent(keyword), {
-      headers: { "Authorization": "Bearer " + jwt }
+      headers: { "Authorization": "Bearer " + jwt },
+      signal: _abortController.signal,
     });
     if (res.status === 401) {
       chrome.storage.local.remove(["jwt", "loggedIn"]);
@@ -541,6 +549,7 @@ async function analyze(keyword, jwt) {
     await new Promise(function (r) { setTimeout(r, 300); });
     renderResults(data, false);
   } catch (e) {
+    if (e && e.name === "AbortError") return; // 패널 닫혀서 취소된 경우 무시
     document.getElementById("err-msg").textContent = "백엔드에 연결할 수 없습니다.";
     document.getElementById("err-sub").textContent = "서버가 실행 중인지 확인하세요.";
     showScreen("screen-error");
@@ -571,13 +580,15 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
   try {
     // /analyze_video 단일 호출 (영상 요약 + 관련 영상 인사이트 통합)
     setStep(1, "active");
+    _abortController = new AbortController();
     var res = await fetch(API_BASE + "/analyze_video", {
       method: "POST",
       headers: {
         "Authorization": "Bearer " + jwt,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ video_id: videoId, title: videoTitle })
+      body: JSON.stringify({ video_id: videoId, title: videoTitle }),
+      signal: _abortController.signal,
     });
 
     if (res.status === 401) {
@@ -635,6 +646,7 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
     switchTab("summary");
 
   } catch (e) {
+    if (e && e.name === "AbortError") return; // 패널 닫혀서 취소된 경우 무시
     document.getElementById("err-msg").textContent = "백엔드에 연결할 수 없습니다.";
     document.getElementById("err-sub").textContent = "서버가 실행 중인지 확인하세요.";
     showScreen("screen-error");
