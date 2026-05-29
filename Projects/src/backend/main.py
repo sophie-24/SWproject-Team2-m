@@ -393,6 +393,10 @@ def terms():
 def intro():
     return FileResponse(os.path.join(FRONTEND_DIR, "intro.html"))
 
+@app.get("/google4e4f8b2b24380b5d.html", tags=["프론트엔드"], summary="Google 도메인 소유권 확인", response_class=FileResponse, include_in_schema=False)
+def google_site_verification():
+    return FileResponse(os.path.join(FRONTEND_DIR, "google4e4f8b2b24380b5d.html"))
+
 @app.get("/app.js", tags=["프론트엔드"], summary="공통 앱 스크립트 제공 ✅", response_class=FileResponse)
 def serve_app_js():
     return FileResponse(os.path.join(FRONTEND_DIR, "app.js"), media_type="application/javascript")
