@@ -460,13 +460,16 @@ function renderResults(data, watchMode) {
       var thumb = thumbSrc
         ? '<div class="video-thumb-wrap"><a href="' + url + '" target="_blank"><img class="video-thumb" src="' + esc(thumbSrc) + '" alt="" loading="lazy"></a></div>'
         : '<div class="video-thumb-placeholder">▶</div>';
-      var adBadge   = v.ad_detected ? '<span class="badge badge-ad">광고 포함</span>' : '<span class="badge badge-noad">광고 없음</span>';
-      var credBadge = v.credibility_score != null ? '<span class="badge badge-cred">신뢰도 ' + Math.round(v.credibility_score * 100) + '%</span>' : "";
-      var chBadge   = v.channel_title ? '<span class="channel-badge">' + esc(v.channel_title).toUpperCase() + '</span>' : "";
-      var tagBadges = (v.selection_tags || []).map(function(t) {
-        return '<span style="font-size:10px;color:#475569;background:#f1f5f9;padding:2px 6px;border-radius:4px;white-space:nowrap;">' + esc(t) + '</span>';
-      }).join('');
-      return '<div class="video-card"><div class="video-card-inner">' + thumb + '<div class="video-info"><a class="video-title-text" href="' + url + '" target="_blank">' + esc(v.title) + '</a>' + (v.summary ? '<div class="video-subtitle">' + esc(v.summary) + '</div>' : "") + '<div class="video-meta-row">' + chBadge + adBadge + credBadge + tagBadges + '</div></div></div></div>';
+      var adBadge = v.ad_detected ? '<span class="badge badge-ad">광고 포함</span>' : '<span class="badge badge-noad">광고 없음</span>';
+      var chBadge = v.channel_title ? '<span class="channel-badge">' + esc(v.channel_title).toUpperCase() + '</span>' : "";
+      // 신뢰도 + selection_tags를 "신뢰도 85% · ViewRate 기반 선정 · 구독 채널" 형태로 합치기
+      var credParts = [];
+      if (v.credibility_score != null) credParts.push('신뢰도 ' + Math.round(v.credibility_score * 100) + '%');
+      (v.selection_tags || []).forEach(function(t) { credParts.push(esc(t)); });
+      var credLine = credParts.length
+        ? '<div style="font-size:10px;color:#2563eb;margin-top:2px;">' + credParts.join(' · ') + '</div>'
+        : "";
+      return '<div class="video-card"><div class="video-card-inner">' + thumb + '<div class="video-info"><a class="video-title-text" href="' + url + '" target="_blank">' + esc(v.title) + '</a>' + (v.summary ? '<div class="video-subtitle">' + esc(v.summary) + '</div>' : "") + '<div class="video-meta-row">' + chBadge + adBadge + '</div>' + credLine + '</div></div></div>';
     }
   }
 

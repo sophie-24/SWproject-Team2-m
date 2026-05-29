@@ -176,8 +176,8 @@ def select_top_videos(
     if clicked_channel_ids is None:
         clicked_channel_ids = []
 
-    subscribed_set   = set(subscribed_channel_ids)
-    clicked_set      = set(clicked_channel_ids)
+    subscribed_set = set(subscribed_channel_ids)
+    clicked_set    = set(clicked_channel_ids)
 
     # 1. 후보 영상 수집
     candidates = search_videos(topic, max_results=max_fetch)

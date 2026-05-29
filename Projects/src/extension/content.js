@@ -178,17 +178,10 @@ function isWatchPage() {
 // ── 초기화 ────────────────────────────────────────────────────────────────────
 
 function init() {
-  if (isSearchPage()) {
-    createFloatBtn();
-    maybeCollectSearch();
-  } else if (isWatchPage()) {
-    createFloatBtn();
-    maybeCollectWatch();
-  } else {
-    /* 검색/시청 페이지 아니면 버튼 제거 */
-    const existing = document.getElementById(BTN_ID);
-    if (existing) existing.remove();
-  }
+  // 유튜브 모든 페이지에서 플로팅 버튼 표시
+  createFloatBtn();
+  if (isSearchPage())  maybeCollectSearch();
+  if (isWatchPage())   maybeCollectWatch();
 }
 
 // ── YouTube SPA 네비게이션 감지 ───────────────────────────────────────────────
