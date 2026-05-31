@@ -119,18 +119,21 @@ def _build_dashboard(
     ]
 
     return {
-        "keyword":            keyword,
-        "category":           cat_map["category"],
-        "layout":             cat_map["layout"],
-        "intent_type":        intent_type,
-        "summary_lines":      summary_lines,
-        "common_conclusion":  summary_lines[-1] if summary_lines else "",
-        "controversies":      analyzer_result.get("controversies", []),
-        "recommended_videos": recommended_videos,
-        "common_facts":       analyzer_result.get("common_facts", []),
-        "pros":               analyzer_result.get("pros", []),
-        "cons":               analyzer_result.get("cons", []),
-        "sources":            analyzer_result.get("sources", []),
+        "keyword":                   keyword,
+        "category":                  cat_map["category"],
+        "layout":                    cat_map["layout"],
+        "intent_type":               intent_type,
+        "summary_lines":             summary_lines,
+        "summary_citations":         analyzer_result.get("summary_citations", []),
+        "common_conclusion":         summary_lines[-1] if summary_lines else "",
+        "controversies":             analyzer_result.get("controversies", []),
+        "controversies_citations":   analyzer_result.get("controversies_citations", []),
+        "recommended_videos":        recommended_videos,
+        "common_facts":              analyzer_result.get("common_facts", []),
+        "common_facts_citations":    analyzer_result.get("common_facts_citations", []),
+        "pros":                      analyzer_result.get("pros", []),
+        "cons":                      analyzer_result.get("cons", []),
+        "sources":                   analyzer_result.get("sources", []),
     }
 
 

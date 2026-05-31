@@ -366,6 +366,12 @@ async def _cross_and_generate(
         f"[{sec}]\n{_SECTION_GUIDE[sec]}" for sec in sections
     )
 
+    # 출처 마커용 영상 번호 → 채널명 매핑 안내
+    video_index_guide = "\n".join(
+        f"  영상{i+1} = {v.get('channel_title', '채널'+ str(i+1))}"
+        for i, v in enumerate(valid)
+    )
+
     prompt = (
         f"검색 주제: {keyword}\n"
         f"사용자 검색 의도: {intent_type}\n"
@@ -379,6 +385,12 @@ async def _cross_and_generate(
         f"작성 스타일: {tone}\n"
         f"분석 방향: {focus}\n"
         f"{length_guide} 작성하세요.\n"
+        f"\n"
+        f"[출처 표기 규칙]\n"
+        f"각 항목 끝에 반드시 해당 내용의 출처 영상 번호를 붙이세요.\n"
+        f"형식: - 항목 내용 [영상1] 또는 - 항목 내용 [영상1, 영상3]\n"
+        f"영상 번호 매핑:\n{video_index_guide}\n"
+        f"2개 이상 영상에서 확인된 내용이면 모두 표기하세요.\n"
         f"\n"
         f"{section_prompts}\n"
     )
@@ -395,29 +407,71 @@ async def _cross_and_generate(
             "cons": [],
         }
 
+    # 출처 마커 파싱 헬퍼 — "[영상1, 영상3]" → citations 리스트 + 마커 제거
+    def _parse_with_citations(section_name: str) -> tuple:
+        """(texts: list[str], citations_list: list[list[dict]]) 반환"""
+        from gemini_client import parse_section as _ps
+        import re as _re
+        section = _ps(text, section_name)
+        raw_items = _re.findall(r"^-\s+(.+)", section, _re.MULTILINE)
+        texts, citations_list = [], []
+        for item in raw_items:
+            item = item.strip()
+            cite_match = _re.search(r'\[영상([\d,\s]+)\]', item)
+            cites = []
+            if cite_match:
+                indices = [int(x.strip()) - 1 for x in cite_match.group(1).split(',') if x.strip().isdigit()]
+                for idx in indices:
+                    if 0 <= idx < len(valid):
+                        v = valid[idx]
+                        cites.append({
+                            "video_id":     v.get("video_id", ""),
+                            "channel_title": v.get("channel_title", ""),
+                            "title":        v.get("title", ""),
+                        })
+                item = _re.sub(r'\s*\[영상[\d,\s]+\]', '', item).strip()
+            # 마크다운 기호 제거
+            item = _re.sub(r'\*+', '', item).strip()
+            if item and item != "없음":
+                texts.append(item)
+                citations_list.append(cites)
+        return texts, citations_list
+
     # 요청한 섹션만 파싱 (요청 안 한 섹션은 빈 리스트)
-    common_facts  = (
-        [f for f in parse_bullet_list(text, "공통사실") if f != "없음"]
-        if "공통사실" in sections else []
-    )
-    controversies = (
-        [c for c in parse_bullet_list(text, "쟁점") if c != "없음"]
-        if "쟁점" in sections else []
-    )
-    summary = parse_bullet_list(text, "요약") if "요약" in sections else []
-    pros    = parse_bullet_list(text, "장점") if "장점" in sections else []
-    cons    = parse_bullet_list(text, "단점") if "단점" in sections else []
+    if "공통사실" in sections:
+        common_facts, common_facts_citations = _parse_with_citations("공통사실")
+    else:
+        common_facts, common_facts_citations = [], []
+
+    if "쟁점" in sections:
+        controversies, controversies_citations = _parse_with_citations("쟁점")
+    else:
+        controversies, controversies_citations = [], []
+
+    if "요약" in sections:
+        summary, summary_citations = _parse_with_citations("요약")
+    else:
+        summary, summary_citations = [], []
+
+    pros = parse_bullet_list(text, "장점") if "장점" in sections else []
+    cons = parse_bullet_list(text, "단점") if "단점" in sections else []
 
     while len(summary) < 3:
         summary.append("")
     summary = summary[:3]
+    while len(summary_citations) < 3:
+        summary_citations.append([])
+    summary_citations = summary_citations[:3]
 
     return {
-        "common_facts":  common_facts,
-        "controversies": controversies,
-        "summary":       summary,
-        "pros":          pros,
-        "cons":          cons,
+        "common_facts":             common_facts,
+        "common_facts_citations":   common_facts_citations,
+        "controversies":            controversies,
+        "controversies_citations":  controversies_citations,
+        "summary":                  summary,
+        "summary_citations":        summary_citations,
+        "pros":                     pros,
+        "cons":                     cons,
     }
 
 
@@ -571,12 +625,15 @@ async def analyze_videos(
     )
 
     return {
-        "keyword":       keyword,
-        "videos":        video_results,
-        "common_facts":  common_facts,
-        "controversies": content["controversies"],
-        "summary":       content["summary"],
-        "pros":          content["pros"],
-        "cons":          content["cons"],
-        "sources":       sources,
+        "keyword":                   keyword,
+        "videos":                    video_results,
+        "common_facts":              common_facts,
+        "common_facts_citations":    content.get("common_facts_citations", []),
+        "controversies":             content["controversies"],
+        "controversies_citations":   content.get("controversies_citations", []),
+        "summary":                   content["summary"],
+        "summary_citations":         content.get("summary_citations", []),
+        "pros":                      content["pros"],
+        "cons":                      content["cons"],
+        "sources":                   sources,
     }

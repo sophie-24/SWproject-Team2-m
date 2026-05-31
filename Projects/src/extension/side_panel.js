@@ -363,8 +363,11 @@ function renderResults(data, watchMode) {
   var keyword       = data.keyword || currentKeyword;
   var videos        = data.recommended_videos || data.videos || [];
   var commonFacts   = data.common_facts || [];
+  var commonFactsCitations   = data.common_facts_citations || [];
   var controversies = data.controversies || [];
+  var controversiesCitations = data.controversies_citations || [];
   var summaryLines  = data.summary_lines || [];
+  var summaryCitations       = data.summary_citations || [];
   var category      = data.category || "";
   var layout        = data.layout || "summary_focus";
   var pros          = data.pros || [];
@@ -374,10 +377,36 @@ function renderResults(data, watchMode) {
   var SUMMARY_TITLE = { "정보탐색형": "핵심 인사이트", "유희탐색형": "화제 포인트", "구매탐색형": "핵심 요약" };
   var FACTS_TITLE   = { "정보탐색형": "전문가 분석", "유희탐색형": "반응 및 의견", "구매탐색형": "전문가 평가" };
 
+  // ── 출처 뱃지 렌더링 헬퍼 ──────────────────────────────────────────────────
+  function _citationBadges(cites) {
+    if (!Array.isArray(cites) || cites.length === 0) return "";
+    // 채널명 중복 제거
+    var seen = {};
+    var unique = cites.filter(function(c) {
+      if (!c.channel_title || seen[c.channel_title]) return false;
+      seen[c.channel_title] = true;
+      return true;
+    });
+    return unique.map(function(c, idx) {
+      var url = c.video_id ? "https://youtube.com/watch?v=" + esc(c.video_id) : "#";
+      var label = esc(c.channel_title || "출처");
+      var extra = unique.length > 1 && idx === 0 ? ' +' + (unique.length - 1) : '';
+      // 첫 번째만 표시, 나머지는 +N 으로 표기
+      if (idx > 0) return "";
+      return '<a href="' + url + '" target="_blank" class="citation-badge" '
+        + 'title="' + esc(c.title || c.channel_title) + '">'
+        + label + extra
+        + '</a>';
+    }).join("");
+  }
+
   // ── 레이아웃별 인사이트 섹션 조립 ─────────────────────────────────────────
-  function _makeBullets(items, dotColor) {
-    return items.map(function(item) {
-      return '<div class="bullet-item"><span class="bullet-dot ' + dotColor + '"></span><span>' + esc(item) + '</span></div>';
+  function _makeBullets(items, dotColor, citations) {
+    return items.map(function(item, idx) {
+      var cites = (citations && citations[idx]) ? citations[idx] : [];
+      var badges = _citationBadges(cites);
+      return '<div class="bullet-item"><span class="bullet-dot ' + dotColor + '"></span>'
+        + '<span>' + esc(item) + (badges ? '&nbsp;' + badges : '') + '</span></div>';
     }).join("");
   }
   function _makeSection(borderCls, iconCls, iconIdx, title, bulletsHTML) {
@@ -397,23 +426,23 @@ function renderResults(data, watchMode) {
       if (cons.length)
         html += _makeSection("border-yellow", "icon-yellow", 2, "단점 / 주의사항", _makeBullets(cons, "dot-yellow"));
       if (summaryLines.length)
-        html += _makeSection("border-red", "icon-red", 0, SUMMARY_TITLE[category] || "핵심 요약", _makeBullets(summaryLines, "dot-red"));
+        html += _makeSection("border-red", "icon-red", 0, SUMMARY_TITLE[category] || "핵심 요약", _makeBullets(summaryLines, "dot-red", summaryCitations));
       if (commonFacts.length)
-        html += _makeSection("border-gray", "icon-gray", 1, FACTS_TITLE[category] || "공통 사실", _makeBullets(commonFacts, "dot-blue"));
+        html += _makeSection("border-gray", "icon-gray", 1, FACTS_TITLE[category] || "공통 사실", _makeBullets(commonFacts, "dot-blue", commonFactsCitations));
 
     } else if (layout === "card_highlight") {
       // 유희형: 요약 → 쟁점 인라인 (공통사실 생략)
       if (summaryLines.length)
-        html += _makeSection("border-red", "icon-red", 0, SUMMARY_TITLE[category] || "화제 포인트", _makeBullets(summaryLines, "dot-red"));
+        html += _makeSection("border-red", "icon-red", 0, SUMMARY_TITLE[category] || "화제 포인트", _makeBullets(summaryLines, "dot-red", summaryCitations));
       if (controversies.length)
-        html += _makeSection("border-yellow", "icon-yellow", 2, "반응이 갈리는 부분", _makeBullets(controversies, "dot-yellow"));
+        html += _makeSection("border-yellow", "icon-yellow", 2, "반응이 갈리는 부분", _makeBullets(controversies, "dot-yellow", controversiesCitations));
 
     } else {
       // summary_focus (지식형, 기본): 요약 → 공통사실
       if (summaryLines.length)
-        html += _makeSection("border-red", "icon-red", 0, SUMMARY_TITLE[category] || "주요 요약", _makeBullets(summaryLines, "dot-red"));
+        html += _makeSection("border-red", "icon-red", 0, SUMMARY_TITLE[category] || "주요 요약", _makeBullets(summaryLines, "dot-red", summaryCitations));
       if (commonFacts.length)
-        html += _makeSection("border-gray", "icon-gray", 1, FACTS_TITLE[category] || "공통 사실", _makeBullets(commonFacts, "dot-blue"));
+        html += _makeSection("border-gray", "icon-gray", 1, FACTS_TITLE[category] || "공통 사실", _makeBullets(commonFacts, "dot-blue", commonFactsCitations));
     }
     return html;
   }
@@ -460,7 +489,7 @@ function renderResults(data, watchMode) {
     controversyHTML = '<div class="section-block border-yellow"><div class="section-header">'
       + '<div class="section-icon-box icon-yellow">' + SECTION_ICONS[2] + '</div>'
       + '<div class="section-title-text">주요 쟁점</div></div>'
-      + '<div class="bullet-list">' + _makeBullets(controversies, "dot-yellow") + '</div></div>';
+      + '<div class="bullet-list">' + _makeBullets(controversies, "dot-yellow", controversiesCitations) + '</div></div>';
   }
   document.getElementById("controversy-section").innerHTML = controversyHTML;
 
