@@ -408,6 +408,39 @@ function renderResults(data, watchMode) {
   var SUMMARY_TITLE = { "정보탐색형": "핵심 인사이트", "유희탐색형": "화제 포인트", "구매탐색형": "핵심 요약" };
   var FACTS_TITLE   = { "정보탐색형": "전문가 분석", "유희탐색형": "반응 및 의견", "구매탐색형": "전문가 평가" };
 
+  function _sourceFromVideo(v) {
+    var vid = v.video_id || v.id || "";
+    return {
+      video_id: vid,
+      channel_title: v.channel_title || "출처",
+      title: v.title || v.summary || "영상 소스",
+    };
+  }
+
+  function _fallbackCitations(item) {
+    if (!Array.isArray(videos) || videos.length === 0) return [];
+    var tokens = String(item || "").toLowerCase().match(/[가-힣a-z0-9]{2,}/g) || [];
+    var scored = videos.map(function(v) {
+      var haystack = [
+        v.title || "",
+        v.summary || "",
+        (v.key_claims || []).join(" ")
+      ].join(" ").toLowerCase();
+      var score = tokens.reduce(function(sum, tok) {
+        return sum + (haystack.indexOf(tok) >= 0 ? 1 : 0);
+      }, 0);
+      return { score: score, video: v };
+    }).filter(function(row) {
+      return row.score > 0;
+    }).sort(function(a, b) {
+      return b.score - a.score;
+    });
+    var picked = scored.length
+      ? scored.slice(0, 3).map(function(row) { return row.video; })
+      : videos.slice(0, Math.min(2, videos.length));
+    return picked.map(_sourceFromVideo);
+  }
+
   // ── 출처 뱃지 렌더링 헬퍼 ──────────────────────────────────────────────────
   function _citationBadges(cites) {
     if (!Array.isArray(cites) || cites.length === 0) return "";
@@ -442,6 +475,7 @@ function renderResults(data, watchMode) {
   function _makeBullets(items, dotColor, citations) {
     return items.map(function(item, idx) {
       var cites = (citations && citations[idx]) ? citations[idx] : [];
+      if (!Array.isArray(cites) || cites.length === 0) cites = _fallbackCitations(item);
       var badges = _citationBadges(cites);
       return '<div class="bullet-item"><span class="bullet-dot ' + dotColor + '"></span>'
         + '<span>' + esc(item) + (badges ? '&nbsp;' + badges : '') + '</span></div>';
