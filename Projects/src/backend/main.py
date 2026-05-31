@@ -1635,7 +1635,9 @@ class SingleVideoTab(BaseModel):
     key_claims:        list[str]
     ad_score:          int
     ad_detected:       bool
+    ad_signals:        list[Any] = Field(default_factory=list)
     credibility_score: float
+    credibility_components: dict[str, Any] = Field(default_factory=dict)
 
 
 class KeywordAnalysisTab(BaseModel):
@@ -1645,8 +1647,11 @@ class KeywordAnalysisTab(BaseModel):
     layout:             str
     intent_type:        str
     summary_lines:      list[str]
+    summary_citations:  list[Any] = Field(default_factory=list)
     common_facts:       list[str]
+    common_facts_citations: list[Any] = Field(default_factory=list)
     controversies:      list[str]
+    controversies_citations: list[Any] = Field(default_factory=list)
     recommended_videos: list[Any]
     pros:               list[Any]
     cons:               list[Any]
@@ -1833,6 +1838,8 @@ async def analyze_video(
         "keyword_analysis": {
             "keyword":                  pipeline_result.get("keyword", extracted_topic),
             "category":                 pipeline_result.get("category", "정보탐색형"),
+            "layout":                   pipeline_result.get("layout", "summary_focus"),
+            "intent_type":              pipeline_result.get("intent_type", "지식형"),
             "summary_lines":            pipeline_result.get("summary_lines", []),
             "summary_citations":        pipeline_result.get("summary_citations", []),
             "common_facts":             pipeline_result.get("common_facts", []),
@@ -1840,6 +1847,8 @@ async def analyze_video(
             "controversies":            pipeline_result.get("controversies", []),
             "controversies_citations":  pipeline_result.get("controversies_citations", []),
             "recommended_videos": pipeline_result.get("recommended_videos", []),
+            "pros":               pipeline_result.get("pros", []),
+            "cons":               pipeline_result.get("cons", []),
         },
         "sources": merged_sources,
     })
