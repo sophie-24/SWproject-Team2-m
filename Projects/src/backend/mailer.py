@@ -54,71 +54,126 @@ def _inline_source_tag(source: Dict[str, Any]) -> str:
     )
 
 
-def _controversy_bullets(controversies: List[str], sources: List[Dict[str, Any]]) -> str:
-    if not controversies:
+def _bullet_list_with_citations(
+    items: List[str],
+    citations_list: List[List[Dict[str, Any]]],
+    sources: List[Dict[str, Any]],
+    dot_color: str = "#3b82f6",
+) -> str:
+    """bullet 목록 + 인라인 출처 뱃지 렌더링.
+    citations_list[i]가 있으면 사용, 없으면 sources에서 순환 fallback."""
+    if not items:
         return ""
-    items = []
-    for i, c in enumerate(controversies):
-        if not c:
+    rows = []
+    for i, text in enumerate(items):
+        if not text:
             continue
-        tag_html = _inline_source_tag(sources[i % len(sources)]) if sources else ""
-        items.append(
-            f'<li style="margin-bottom:12px;font-size:16px;color:#1e293b;'
-            f'line-height:1.8;font-family:{_FONT};">'
-            f'{c}{tag_html}'
+        # citations 결정
+        cites = (citations_list[i] if i < len(citations_list) else []) or []
+        if not cites and sources:
+            # fallback: sources 순환
+            cites = [sources[i % len(sources)]]
+
+        tags_html = "".join(_inline_source_tag(c) for c in cites[:2])
+        rows.append(
+            f'<li style="margin-bottom:14px;font-size:16px;color:#1e293b;'
+            f'line-height:1.8;font-family:{_FONT};list-style:none;'
+            f'padding-left:0;display:flex;align-items:flex-start;gap:8px;">'
+            f'<span style="flex-shrink:0;width:7px;height:7px;border-radius:50%;'
+            f'background:{dot_color};margin-top:9px;display:inline-block;"></span>'
+            f'<span>{text}{tags_html}</span>'
             f'</li>'
         )
-    return (
-        f'<ul style="margin:0;padding-left:20px;list-style-type:disc;">'
-        + "".join(items)
-        + '</ul>'
+    return f'<ul style="margin:0;padding:0;">' + "".join(rows) + '</ul>'
+
+
+def _controversy_bullets(controversies: List[str], sources: List[Dict[str, Any]]) -> str:
+    """하위 호환용 — citations 없이 순환 fallback만 사용."""
+    return _bullet_list_with_citations(
+        controversies,
+        citations_list=[],
+        sources=sources,
+        dot_color="#f59e0b",
     )
 
 
-def _source_video_cards(sources: List[Dict[str, Any]]) -> str:
+def _source_video_cards(sources: List[Dict[str, Any]], max_cards: int = 3) -> str:
     if not sources:
         return ""
     cards = []
-    for s in sources:
-        title         = s.get("title", "")
-        url           = s.get("url", "#")
-        thumbnail_url = s.get("thumbnail_url", "")
-        channel_title = s.get("channel_title", "")
-        summary       = s.get("summary", "")
+    for s in sources[:max_cards]:
+        title             = s.get("title", "")
+        url               = s.get("url", "#")
+        thumbnail_url     = s.get("thumbnail_url", "")
+        channel_title     = s.get("channel_title", "")
+        summary           = s.get("summary", "")
+        credibility_score = s.get("credibility_score")
+        ad_detected       = s.get("ad_detected", False)
 
         thumb_html = (
             f'<a href="{url}" target="_blank" style="display:block;text-decoration:none;">'
-            f'<img src="{thumbnail_url}" width="220" height="124" '
-            f'style="width:220px;height:124px;object-fit:cover;border-radius:10px;display:block;" '
+            f'<img src="{thumbnail_url}" width="200" height="112" '
+            f'style="width:200px;height:112px;object-fit:cover;border-radius:10px;display:block;" '
             f'alt="" /></a>'
         ) if thumbnail_url else (
             f'<a href="{url}" target="_blank" '
-            f'style="display:block;width:220px;height:124px;background:#e2e8f0;border-radius:10px;"></a>'
+            f'style="display:block;width:200px;height:112px;background:#e2e8f0;border-radius:10px;"></a>'
         )
 
         insight_html = (
-            f'<p style="margin:8px 0 0;font-size:14px;color:#64748b;line-height:1.7;'
+            f'<p style="margin:6px 0 0;font-size:13px;color:#64748b;line-height:1.65;'
             f'font-family:{_FONT};">{summary}</p>'
         ) if summary else ""
 
         channel_tag = (
             f'<span style="display:inline-block;background:#eff6ff;border-radius:9999px;'
-            f'padding:4px 12px;font-size:11px;color:#3b82f6;font-weight:600;'
-            f'letter-spacing:0.3px;">{channel_title}</span>'
+            f'padding:3px 10px;font-size:11px;color:#3b82f6;font-weight:600;">'
+            f'{channel_title}</span>'
         ) if channel_title else ""
+
+        # 신뢰도 뱃지
+        if credibility_score is not None:
+            score_pct = round(credibility_score * 100)
+            if score_pct >= 75:
+                cred_color, cred_bg = "#16a34a", "#f0fdf4"
+            elif score_pct >= 50:
+                cred_color, cred_bg = "#d97706", "#fffbeb"
+            else:
+                cred_color, cred_bg = "#dc2626", "#fef2f2"
+            cred_badge = (
+                f'<span style="display:inline-block;background:{cred_bg};border-radius:9999px;'
+                f'padding:3px 10px;font-size:11px;color:{cred_color};font-weight:600;margin-left:6px;">'
+                f'신뢰도 {score_pct}%</span>'
+            )
+        else:
+            cred_badge = ""
+
+        # 광고 뱃지
+        if ad_detected:
+            ad_badge = (
+                f'<span style="display:inline-block;background:#fef2f2;border-radius:9999px;'
+                f'padding:3px 10px;font-size:11px;color:#dc2626;font-weight:600;margin-left:6px;">'
+                f'광고 포함</span>'
+            )
+        else:
+            ad_badge = (
+                f'<span style="display:inline-block;background:#f0fdf4;border-radius:9999px;'
+                f'padding:3px 10px;font-size:11px;color:#16a34a;font-weight:600;margin-left:6px;">'
+                f'광고 없음</span>'
+            )
 
         cards.append(
             f'<table cellpadding="0" cellspacing="0" width="100%"'
             f' style="background:#f8fafc;border-radius:14px;margin-bottom:14px;'
             f'border-collapse:separate;border:1.5px solid #eef0f3;">'
             f'<tr>'
-            f'<td style="padding:18px;vertical-align:middle;width:220px;">{thumb_html}</td>'
-            f'<td style="padding:18px 20px 18px 4px;vertical-align:middle;">'
+            f'<td style="padding:16px;vertical-align:middle;width:200px;">{thumb_html}</td>'
+            f'<td style="padding:16px 18px 16px 4px;vertical-align:middle;">'
             f'<a href="{url}" target="_blank" style="text-decoration:none;">'
-            f'<p style="margin:0 0 8px;font-size:17px;line-height:1.5;color:#1a202c;'
+            f'<p style="margin:0 0 6px;font-size:16px;line-height:1.5;color:#1a202c;'
             f'font-weight:600;font-family:{_FONT};">{title}</p></a>'
             f'{insight_html}'
-            f'<div style="margin-top:16px;">{channel_tag}</div>'
+            f'<div style="margin-top:12px;">{channel_tag}{cred_badge}{ad_badge}</div>'
             f'</td>'
             f'</tr>'
             f'</table>'
@@ -126,20 +181,36 @@ def _source_video_cards(sources: List[Dict[str, Any]]) -> str:
     return "".join(cards)
 
 
+def _topic_heading(topic: str) -> str:
+    return (
+        f'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:28px;">'
+        f'<tr><td style="padding-bottom:16px;border-bottom:2px solid #ff0000;">'
+        f'<span style="font-size:11px;color:#ff0000;letter-spacing:2px;'
+        f'text-transform:uppercase;font-weight:700;font-family:{_FONT};">TOPIC</span><br>'
+        f'<span style="font-size:32px;font-weight:800;color:#0f172a;letter-spacing:-1px;'
+        f'line-height:1.25;font-family:{_FONT};">{topic}</span>'
+        f'</td></tr></table>'
+    )
+
+
+def _section_label(text: str, color: str = "#ff0000") -> str:
+    return (
+        f'<p style="margin:0 0 12px;font-size:11px;color:{color};letter-spacing:1.5px;'
+        f'text-transform:uppercase;font-weight:700;font-family:{_FONT};">{text}</p>'
+    )
+
+
 def _build_topic_section(topic_data: Dict[str, Any], unsubscribe_url: str = "") -> str:
-    topic         = topic_data.get("topic", "")
-    summary       = topic_data.get("summary", [])
-    pros          = topic_data.get("pros", [])
-    cons          = topic_data.get("cons", [])
-    common_facts  = topic_data.get("common_facts", [])
-    controversies = topic_data.get("controversies", [])
-    sources       = topic_data.get("sources", [])
-
-    left_items = [s for s in summary if s] or [p for p in pros if p] or [f for f in common_facts if f]
-    left_text  = " ".join(left_items) if left_items else "분석 중입니다."
-
-    right_items  = [c for c in controversies if c] or [c for c in cons if c]
-    sources_html = _source_video_cards(sources)
+    topic                   = topic_data.get("topic", "")
+    summary                 = [s for s in topic_data.get("summary", []) if s]
+    summary_citations       = topic_data.get("summary_citations", [])
+    pros                    = topic_data.get("pros", [])
+    cons                    = topic_data.get("cons", [])
+    common_facts            = topic_data.get("common_facts", [])
+    controversies           = [c for c in topic_data.get("controversies", []) if c]
+    controversies_citations = topic_data.get("controversies_citations", [])
+    sources                 = topic_data.get("sources", [])
+    intent_type             = topic_data.get("intent_type", "지식형")
 
     unsubscribe_html = (
         f'<p style="text-align:right;margin:8px 0 0;">'
@@ -147,53 +218,99 @@ def _build_topic_section(topic_data: Dict[str, Any], unsubscribe_url: str = "") 
         f'이 주제 구독 취소</a></p>'
     ) if unsubscribe_url else ""
 
-    right_col_html = (
-        f'<td style="width:46%;vertical-align:top;padding-left:28px;'
-        f'border-left:2px solid #f1f5f9;">'
-        f'<p style="margin:0 0 12px;font-size:11px;color:#3b82f6;letter-spacing:1.5px;'
-        f'text-transform:uppercase;font-weight:700;font-family:{_FONT};">주요 쟁점</p>'
-        + _controversy_bullets(right_items, sources)
-        + f'</td>'
-    ) if right_items else '<td style="width:46%;"></td>'
+    sources_section = (
+        _section_label("참고 영상", "#94a3b8")
+        + _source_video_cards(sources, max_cards=3)
+    ) if sources else ""
+
+    heading = _topic_heading(topic)
+
+    # ── 유희형: 요약 한 줄 + 영상 카드 크게 + 쟁점 ──────────────────────────────
+    if intent_type == "유희형":
+        summary_text = summary[0] if summary else ""
+        summary_html = (
+            f'<p style="margin:0 0 28px;font-size:17px;color:#1e293b;line-height:1.8;'
+            f'font-family:{_FONT};">{summary_text}</p>'
+        ) if summary_text else ""
+
+        controversy_html = ""
+        if controversies:
+            controversy_html = (
+                _section_label("화제 포인트", "#f59e0b")
+                + _bullet_list_with_citations(
+                    controversies, controversies_citations, sources, dot_color="#f59e0b"
+                )
+            )
+
+        body = summary_html + sources_section + controversy_html
+
+    # ── 구매형: 핵심 요약 + 장단점 비교 테이블 + 영상 ────────────────────────────
+    elif intent_type == "구매형":
+        summary_html = (
+            _section_label("핵심 요약", "#ff0000")
+            + _bullet_list_with_citations(summary, summary_citations, sources, dot_color="#ef4444")
+        ) if summary else ""
+
+        pros_html = (
+            _section_label("장점", "#16a34a")
+            + _bullet_list_with_citations(pros, [], sources, dot_color="#16a34a")
+        ) if pros else ""
+
+        cons_html = (
+            _section_label("단점 / 주의사항", "#d97706")
+            + _bullet_list_with_citations(cons, [], sources, dot_color="#f59e0b")
+        ) if cons else ""
+
+        compare_html = (
+            f'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:32px;">'
+            f'<tr>'
+            f'<td style="width:50%;vertical-align:top;padding-right:16px;">{pros_html}</td>'
+            f'<td style="width:50%;vertical-align:top;padding-left:16px;'
+            f'border-left:2px solid #f1f5f9;">{cons_html}</td>'
+            f'</tr></table>'
+        ) if (pros or cons) else ""
+
+        body = summary_html + compare_html + sources_section
+
+    # ── 지식형 (기본): 핵심 내용 bullet + 쟁점 2열 + 영상 ────────────────────────
+    else:
+        summary_bullets = _bullet_list_with_citations(
+            summary, summary_citations, sources, dot_color="#ef4444"
+        ) if summary else f'<p style="margin:0;font-size:16px;color:#1e293b;line-height:1.85;font-family:{_FONT};">분석 중입니다.</p>'
+
+        left_col = (
+            f'<td style="width:54%;vertical-align:top;padding-right:28px;">'
+            + _section_label("핵심 내용", "#ff0000")
+            + summary_bullets
+            + f'</td>'
+        )
+
+        if controversies:
+            right_col = (
+                f'<td style="width:46%;vertical-align:top;padding-left:28px;'
+                f'border-left:2px solid #f1f5f9;">'
+                + _section_label("주요 쟁점", "#3b82f6")
+                + _bullet_list_with_citations(
+                    controversies, controversies_citations, sources, dot_color="#f59e0b"
+                )
+                + f'</td>'
+            )
+        else:
+            right_col = '<td style="width:46%;"></td>'
+
+        body = (
+            f'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:36px;">'
+            f'<tr>{left_col}{right_col}</tr></table>'
+            + sources_section
+        )
 
     return (
         f'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:80px;">'
         f'<tr><td>'
-
-        # 토픽 헤딩
-        f'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:28px;">'
-        f'<tr>'
-        f'<td style="padding-bottom:16px;border-bottom:2px solid #ff0000;">'
-        f'<span style="font-size:11px;color:#ff0000;letter-spacing:2px;'
-        f'text-transform:uppercase;font-weight:700;font-family:{_FONT};">TOPIC</span><br>'
-        f'<span style="font-size:32px;font-weight:800;color:#0f172a;letter-spacing:-1px;'
-        f'line-height:1.25;font-family:{_FONT};">{topic}</span>'
-        f'</td>'
-        f'</tr>'
-        f'</table>'
-
-        # 2열 콘텐츠
-        f'<table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:36px;">'
-        f'<tr>'
-        f'<td style="width:54%;vertical-align:top;padding-right:28px;">'
-        f'<p style="margin:0 0 12px;font-size:11px;color:#ff0000;letter-spacing:1.5px;'
-        f'text-transform:uppercase;font-weight:700;font-family:{_FONT};">핵심 내용</p>'
-        f'<p style="margin:0;font-size:16px;color:#1e293b;line-height:1.85;'
-        f'font-family:{_FONT};">{left_text}</p>'
-        f'</td>'
-        f'{right_col_html}'
-        f'</tr>'
-        f'</table>'
-
-        # 주요 소스
-        f'<p style="margin:0 0 18px;font-size:11px;color:#94a3b8;letter-spacing:2px;'
-        f'text-transform:uppercase;font-weight:700;font-family:{_FONT};'
-        f'padding-top:28px;border-top:1px solid #f1f5f9;">참고 영상</p>'
-        f'{sources_html}'
-        f'{unsubscribe_html}'
-
-        f'</td></tr>'
-        f'</table>'
+        + heading
+        + body
+        + unsubscribe_html
+        + f'</td></tr></table>'
     )
 
 

@@ -62,10 +62,12 @@ async def generate_newsletter(
         topic_block = _build_topic_block(
             topic=topic,
             summary=summary,
+            summary_citations=analysis.get("summary_citations", [])[:max_summary],
             pros=analysis.get("pros", []),
             cons=analysis.get("cons", []),
             common_facts=analysis.get("common_facts", []),
             controversies=analysis.get("controversies", []),
+            controversies_citations=analysis.get("controversies_citations", []),
             sources=analysis.get("sources", []),
             intent_type=topic_intent,
         )
@@ -82,35 +84,46 @@ async def generate_newsletter(
 def _build_topic_block(
     topic: str,
     summary: List[str],
+    summary_citations: List[List[Dict]],
     pros: List[str],
     cons: List[str],
     common_facts: List[str],
     controversies: List[str],
+    controversies_citations: List[List[Dict]],
     sources: List[Dict[str, str]],
     intent_type: str,
 ) -> Dict[str, Any]:
     """의도 타입에 따라 포함할 필드를 결정해 topic 블록 반환."""
-    base = {"topic": topic, "summary": summary, "sources": sources}
+    base = {
+        "topic":                  topic,
+        "summary":                summary,
+        "summary_citations":      summary_citations,
+        "sources":                sources,
+        "intent_type":            intent_type,
+    }
 
     if intent_type == "유희형":
         # 가볍고 재밌게 -- 쟁점/화제만 부각
-        base["controversies"] = controversies
-        base["pros"]         = []
-        base["cons"]         = []
-        base["common_facts"] = []
+        base["controversies"]            = controversies
+        base["controversies_citations"]  = controversies_citations
+        base["pros"]                     = []
+        base["cons"]                     = []
+        base["common_facts"]             = []
 
     elif intent_type == "구매형":
         # 실용적 비교 -- pros/cons + 객관적 근거
-        base["pros"]          = pros
-        base["cons"]          = cons
-        base["common_facts"]  = common_facts
-        base["controversies"] = []
+        base["pros"]                    = pros
+        base["cons"]                    = cons
+        base["common_facts"]            = common_facts
+        base["controversies"]           = []
+        base["controversies_citations"] = []
 
     else:
         # 지식형 (기본) -- 모든 정보 포함
-        base["common_facts"]  = common_facts
-        base["controversies"] = controversies
-        base["pros"]          = pros
-        base["cons"]          = cons
+        base["common_facts"]             = common_facts
+        base["controversies"]            = controversies
+        base["controversies_citations"]  = controversies_citations
+        base["pros"]                     = pros
+        base["cons"]                     = cons
 
     return base
