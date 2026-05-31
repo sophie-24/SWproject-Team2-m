@@ -161,6 +161,15 @@ if (btnSettings) {
 }
 
 document.addEventListener("click", function (e) {
+  // 신뢰도 더 보기 토글 — onclick 인라인 핸들러 대신 이벤트 위임 (MV3 CSP 우회)
+  var credBtn = e.target.closest("[data-cred-id]");
+  if (credBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleCredDetail(credBtn.dataset.credId);
+    return;
+  }
+
   if (e.target && e.target.id === "btn-view-all") switchTab("sources");
 });
 
@@ -170,9 +179,14 @@ function toggleCredDetail(id) {
   var detail = document.getElementById("cred-detail-" + id);
   var btn    = document.getElementById("cred-btn-" + id);
   if (!detail || !btn) return;
-  var isOpen = detail.style.display !== "none";
-  detail.style.display = isOpen ? "none" : "block";
+  var isOpen = !detail.hasAttribute("hidden");
+  if (isOpen) {
+    detail.setAttribute("hidden", "");
+  } else {
+    detail.removeAttribute("hidden");
+  }
   btn.textContent = isOpen ? "더 보기 ▾" : "접기 ▴";
+  btn.setAttribute("aria-expanded", isOpen ? "false" : "true");
 }
 
 function buildAdBanner(adScore, adSignals) {
@@ -184,14 +198,23 @@ function buildAdBanner(adScore, adSignals) {
     if (layer === "description") return "Layer 1";
     return "";
   }
-  var signals = Array.isArray(adSignals) ? adSignals.filter(function(s) { return s.score > 0; }).slice(0, 3) : [];
+  var signals = Array.isArray(adSignals) ? adSignals.filter(function(s) {
+    return s && (Number(s.score || 0) > 0 || s.evidence || s.rule || s.reason);
+  }).slice(0, 3) : [];
+  if (signals.length === 0 && Number(adScore || 0) > 5) {
+    signals = [{
+      layer: "gemini",
+      evidence: "AI 분석에서 광고성 표현 또는 구매 유도 가능성이 감지됨",
+      score: adScore
+    }];
+  }
   var signalRows = signals.map(function(s, idx) {
     var lbl = layerLabel(s.layer);
     var prefix = idx === signals.length - 1 ? '└' : '├';
     return '<div style="font-size:10px;color:#c2410c;margin-top:3px;font-family:monospace;">'
       + '<span style="color:#f97316;">' + prefix + ' </span>'
       + (lbl ? '<span style="font-weight:700;">' + lbl + '</span>: ' : '')
-      + esc(s.evidence || s.rule)
+      + esc(s.evidence || s.rule || s.reason || "광고 의심 신호")
       + '</div>';
   }).join('');
   return '<div class="cache-notice" style="background:#fff7ed;border-color:#fed7aa;color:#ea580c;margin-bottom:12px;">'
@@ -200,10 +223,17 @@ function buildAdBanner(adScore, adSignals) {
     + '</div>';
 }
 
-function buildCredibilityCard(credScore, components, uniqId) {
+function buildCredibilityCard(credScore, components, uniqId, adScore) {
   var pct      = Math.round(credScore * 100);
   var label    = pct >= 70 ? "높음" : pct >= 40 ? "보통" : "낮음";
   var color    = pct >= 70 ? "#16a34a" : pct >= 40 ? "#d97706" : "#dc2626";
+  if (!components || Object.keys(components).length === 0) {
+    components = {
+      transcript_quality: Math.max(0, Math.min(1, credScore || 0)),
+      ad_free: Math.max(0, Math.min(1, 1 - ((adScore || 0) / 100))),
+      channel_credibility: Math.max(0, Math.min(1, credScore || 0)),
+    };
+  }
   var compMap  = [
     { key: "transcript_quality",  label: "자막 품질" },
     { key: "ad_free",             label: "광고 없음" },
@@ -221,7 +251,8 @@ function buildCredibilityCard(credScore, components, uniqId) {
     + '</div>'
     + '<span style="font-size:12px;font-weight:700;color:' + color + ';">' + pct + '% ' + label + '</span>'
     + (hasComponents
-      ? '<button id="cred-btn-' + uniqId + '" onclick="toggleCredDetail(\'' + uniqId + '\')" '
+      ? '<button id="cred-btn-' + uniqId + '" data-cred-id="' + uniqId + '" '
+        + 'type="button" aria-expanded="false" aria-controls="cred-detail-' + uniqId + '" '
         + 'style="font-size:10px;color:#888;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap;">'
         + '더 보기 ▾</button>'
       : '')
@@ -244,7 +275,7 @@ function buildCredibilityCard(credScore, components, uniqId) {
       + '</div>';
   }).join('') : '';
   var detailHtml = hasComponents
-    ? '<div id="cred-detail-' + uniqId + '" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid #e6e8ea;">'
+    ? '<div id="cred-detail-' + uniqId + '" hidden style="margin-top:8px;padding-top:8px;border-top:1px solid #e6e8ea;">'
       + detailRows + '</div>'
     : '';
   return summaryHtml + detailHtml;
@@ -329,7 +360,7 @@ function renderVideoSummary(videoTitle, aiData) {
     if (typeof aiData.credibility_score === "number") {
       cards.push({
         title: "신뢰도",
-        bodyHtml: buildCredibilityCard(aiData.credibility_score, aiData.credibility_components, "watch"),
+        bodyHtml: buildCredibilityCard(aiData.credibility_score, aiData.credibility_components, "watch", aiData.ad_score),
         icon: 2
       });
     }
@@ -387,6 +418,12 @@ function renderResults(data, watchMode) {
       seen[c.channel_title] = true;
       return true;
     });
+    var tooltip = unique.map(function(c) {
+      return '<div class="citation-tooltip-row">'
+        + '<div class="citation-tooltip-title">' + esc(c.title || "제목 없음") + '</div>'
+        + '<div class="citation-tooltip-channel">' + esc(c.channel_title || "출처") + '</div>'
+        + '</div>';
+    }).join("");
     return unique.map(function(c, idx) {
       var url = c.video_id ? "https://youtube.com/watch?v=" + esc(c.video_id) : "#";
       var label = esc(c.channel_title || "출처");
@@ -394,8 +431,9 @@ function renderResults(data, watchMode) {
       // 첫 번째만 표시, 나머지는 +N 으로 표기
       if (idx > 0) return "";
       return '<a href="' + url + '" target="_blank" class="citation-badge" '
-        + 'title="' + esc(c.title || c.channel_title) + '">'
+        + 'aria-label="' + esc(c.title || c.channel_title || "출처") + '">'
         + label + extra
+        + '<span class="citation-tooltip">' + tooltip + '</span>'
         + '</a>';
     }).join("");
   }
@@ -668,10 +706,16 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
     renderResults({
       keyword:             currentKeyword,
       summary_lines:       ka.summary_lines || [],
+      summary_citations:   ka.summary_citations || [],
       common_facts:        ka.common_facts || [],
+      common_facts_citations: ka.common_facts_citations || [],
       controversies:       ka.controversies || [],
+      controversies_citations: ka.controversies_citations || [],
       recommended_videos:  ka.recommended_videos || data.sources || [],
       category:            ka.category || "",
+      layout:              ka.layout || "summary_focus",
+      pros:                ka.pros || [],
+      cons:                ka.cons || [],
       cached:              data.cached || false,
     }, true);
 
