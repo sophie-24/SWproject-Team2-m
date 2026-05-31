@@ -390,6 +390,24 @@ function renderVideoSummary(videoTitle, aiData) {
 
 // ── 결과 렌더링 ───────────────────────────────────────────────────────────────
 
+// ── 인사이트 탭 로딩 placeholder ─────────────────────────────────────────────
+function renderInsightsLoading() {
+  // INSIGHTS 탭의 섹션 영역에 로딩 스피너 표시 — chunk2 도착 전 사용자가 탭 클릭할 때 보임
+  var el = document.getElementById("insights-sections");
+  if (el) {
+    el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;color:#888;font-size:0.82rem;padding:16px 0;">'
+      + '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>'
+      + '<span>관련 영상 분석 중…</span></div>';
+  }
+  var ct = document.getElementById("controversy-section");
+  if (ct) ct.innerHTML = "";
+  var si = document.getElementById("sources-in-insights");
+  if (si) si.classList.add("hidden");
+  var sl = document.getElementById("sources-list");
+  if (sl) sl.innerHTML = '<div style="color:#888;font-size:0.82rem;padding:10px 0;">관련 영상 분석 중…</div>';
+  showScreen("screen-results");
+}
+
 function renderResults(data, watchMode) {
   var keyword       = data.keyword || currentKeyword;
   var videos        = data.recommended_videos || data.videos || [];
@@ -709,51 +727,88 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
       return;
     }
 
-    var data = await res.json();
-    setStep(1, "done"); setStep(2, "active");
-    await new Promise(function (r) { setTimeout(r, 300); });
-    setStep(2, "done"); setStep(3, "active");
-    await new Promise(function (r) { setTimeout(r, 300); });
-    setStep(3, "done");
-    await new Promise(function (r) { setTimeout(r, 200); });
+    // ── NDJSON 스트림 읽기 — chunk1(summary) 즉시 렌더, chunk2(insights) 이후 채움 ──
+    var reader  = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer  = "";
+    var summaryRendered = false;
 
-    // 키워드: extracted_topic 우선, 없으면 제목
-    currentKeyword = data.extracted_topic || keyword;
-    setHeartState(false);
-    heartedTopic = "";
-    checkHeartState(currentKeyword);
+    while (true) {
+      var readResult = await reader.read();
+      if (readResult.done) break;
+      buffer += decoder.decode(readResult.value, { stream: true });
 
-    // SUMMARY 탭: 단일 영상 전체 분석 (single_video 중첩 또는 flat 구조 모두 대응)
-    var sv = data.single_video || data;
-    renderVideoSummary(videoTitle, {
-      summary:                sv.summary || sv.video_summary || "",
-      key_claims:             sv.key_claims || [],
-      credibility_score:      sv.credibility_score,
-      credibility_components: sv.credibility_components || {},
-      ad_score:               sv.ad_score,
-      ad_detected:            sv.ad_detected,
-      ad_signals:             sv.ad_signals || [],
-    });
+      // 개행 기준으로 완성된 JSON 라인 처리
+      var lines = buffer.split("\n");
+      buffer = lines.pop(); // 미완성 마지막 조각은 다음 루프로
 
-    // INSIGHTS + SOURCES 탭
-    var ka = data.keyword_analysis || {};
-    renderResults({
-      keyword:             currentKeyword,
-      summary_lines:       ka.summary_lines || [],
-      summary_citations:   ka.summary_citations || [],
-      common_facts:        ka.common_facts || [],
-      common_facts_citations: ka.common_facts_citations || [],
-      controversies:       ka.controversies || [],
-      controversies_citations: ka.controversies_citations || [],
-      recommended_videos:  ka.recommended_videos || data.sources || [],
-      category:            ka.category || "",
-      layout:              ka.layout || "summary_focus",
-      pros:                ka.pros || [],
-      cons:                ka.cons || [],
-      cached:              data.cached || false,
-    }, true);
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line) continue;
 
-    switchTab("summary");
+        var chunk;
+        try { chunk = JSON.parse(line); } catch (e) { continue; }
+
+        if (chunk.type === "summary") {
+          // ── chunk 1: 단일 영상 요약 즉시 렌더링 ────────────────────────────
+          currentKeyword = chunk.extracted_topic || keyword;
+          setHeartState(false);
+          heartedTopic = "";
+          checkHeartState(currentKeyword);
+
+          setStep(1, "done");
+          setStep(2, "active");
+
+          var sv = chunk.single_video || {};
+          renderVideoSummary(videoTitle, {
+            summary:                sv.summary || "",
+            key_claims:             sv.key_claims || [],
+            credibility_score:      sv.credibility_score,
+            credibility_components: sv.credibility_components || {},
+            ad_score:               sv.ad_score,
+            ad_detected:            sv.ad_detected,
+            ad_signals:             sv.ad_signals || [],
+          });
+
+          // INSIGHTS 탭은 로딩 스피너 placeholder로 미리 표시
+          renderInsightsLoading();
+
+          switchTab("summary");
+          summaryRendered = true;
+
+        } else if (chunk.type === "insights") {
+          // ── chunk 2: 관련 영상 인사이트 + 소스 채워넣기 ──────────────────
+          setStep(2, "done"); setStep(3, "active");
+          await new Promise(function (r) { setTimeout(r, 200); });
+          setStep(3, "done");
+
+          var ka = chunk.keyword_analysis || {};
+          // recommended_videos: 신뢰도·selection_tags 포함된 pipeline 분석 영상 우선
+          // fallback: sources (merged_sources, 현재 영상 포함)
+          renderResults({
+            keyword:                 currentKeyword,
+            summary_lines:           ka.summary_lines || [],
+            summary_citations:       ka.summary_citations || [],
+            common_facts:            ka.common_facts || [],
+            common_facts_citations:  ka.common_facts_citations || [],
+            controversies:           ka.controversies || [],
+            controversies_citations: ka.controversies_citations || [],
+            recommended_videos:      ka.recommended_videos || chunk.sources || [],
+            category:                ka.category || "",
+            layout:                  ka.layout || "summary_focus",
+            pros:                    ka.pros || [],
+            cons:                    ka.cons || [],
+            cached:                  false,
+          }, true);
+        }
+      }
+    }
+
+    // 스트림이 summary chunk 없이 끝난 경우 대비 (비정상 응답)
+    if (!summaryRendered) {
+      showScreen("screen-error");
+      document.getElementById("err-msg").textContent = "응답 파싱에 실패했습니다.";
+    }
 
   } catch (e) {
     if (e && e.name === "AbortError") return; // 패널 닫혀서 취소된 경우 무시

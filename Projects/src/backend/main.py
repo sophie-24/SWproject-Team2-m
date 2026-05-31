@@ -2,7 +2,7 @@ import os
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Depends, BackgroundTasks, Cookie
-from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 from fastapi.staticfiles import StaticFiles
@@ -1679,7 +1679,6 @@ class AnalyzeVideoResponse(BaseModel):
 
 @app.post(
     "/analyze_video",
-    response_model=AnalyzeVideoResponse,
     tags=["AI 분석"],
     summary="🔑 영상 진입 분석 — 현재 영상 요약 + 제목 기반 인사이트 ✅",
 )
@@ -1740,14 +1739,18 @@ async def analyze_video(
         except Exception:
             clicked_channel_ids = []
 
-    # ── Step 3: 단일 영상 풀 분석 + Pipeline A 병렬 실행 ─────────────────────
+    # ── Step 3: 단일 영상 풀 분석 + Pipeline A — 2단계 스트리밍 반환 ──────────
+    # chunk 1: single_video 완료 즉시 emit → 프론트가 SUMMARY 탭 먼저 렌더링
+    # chunk 2: pipeline 완료 후 emit    → INSIGHTS / SOURCES 탭 채워짐
     single_cache_key   = f"single_video_full:{video_id}"
     pipeline_cache_key = f"{user_id}:video:{normalized_topic}"
 
     async def _run_single():
         cached = _cache_get(single_cache_key)
         if cached is not None:
-            return cached
+            # 캐시 결과에 credibility_components 없으면 무효화 (배포 전 구버전 캐시 대응)
+            if cached.get("credibility_components"):
+                return cached
         result = await _full_analyze_single_video(video_id, title, extracted_topic)
         _cache_set(single_cache_key, result)
         return result
@@ -1773,85 +1776,114 @@ async def analyze_video(
         _cache_set(pipeline_cache_key, result)
         return result
 
-    single_result, pipeline_result = await asyncio.gather(_run_single(), _run_pipeline())
+    # pipeline을 백그라운드 태스크로 먼저 시작
+    pipeline_task = asyncio.create_task(_run_pipeline())
+    # single은 먼저 await (pipeline과 실질적으로 병렬 진행)
+    single_result = await _run_single()
 
-    # ── Step 3.5: 시청 채널 ID 누적 저장 (selector_ai ω₄ click_score용) ───────
+    # ── Step 3.5: 시청 채널 ID 누적 저장 ───────────────────────────────────────
     watched_channel_id = single_result.get("channel_id")
     if db_user and watched_channel_id:
         try:
             current = clicked_channel_ids[:]
             if watched_channel_id not in current:
                 current.append(watched_channel_id)
-            db_user.watched_channels = _json.dumps(current[-50:], ensure_ascii=False)  # 최대 50개 유지
+            db_user.watched_channels = _json.dumps(current[-50:], ensure_ascii=False)
             await db.commit()
         except Exception as e:
             logger.warning(f"[analyze_video] watched_channels 저장 실패: {e}")
 
-    # ── Step 4: 소스 통합 — video_id 기준 중복 제거 ──────────────────────────
-    seen_ids: set[str] = set()
-    merged_sources = []
-
-    seen_ids.add(video_id)
-    merged_sources.append({
-        "video_id":         video_id,
-        "title":            title,
-        "url":              f"https://youtube.com/watch?v={video_id}",
-        "channel_title":    single_result.get("channel_title", ""),
-        "thumbnail_url":    f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
-        "ad_detected":      single_result.get("ad_detected", False),
-        "is_current_video": True,
-    })
-
-    for src in pipeline_result.get("sources", []):
-        src_vid = src.get("video_id") or src.get("url", "").split("v=")[-1].split("&")[0]
-        if src_vid and src_vid not in seen_ids:
-            seen_ids.add(src_vid)
-            merged_sources.append({
-                "video_id":         src_vid,
-                "title":            src.get("title", ""),
-                "url":              src.get("url", f"https://youtube.com/watch?v={src_vid}"),
-                "channel_title":    src.get("channel_title", ""),
-                "thumbnail_url":    src.get("thumbnail_url",
-                                        f"https://img.youtube.com/vi/{src_vid}/mqdefault.jpg"),
-                "ad_detected":      src.get("ad_detected", False),
-                "is_current_video": False,
-            })
-
-    return JSONResponse({
+    # ── chunk 1 데이터 조립 ────────────────────────────────────────────────────
+    chunk1_data = {
+        "type":             "summary",
         "video_id":         video_id,
         "extracted_topic":  extracted_topic,
         "normalized_topic": normalized_topic,
         "single_video": {
-            "video_id":          video_id,
-            "title":             title,
-            "channel_title":     single_result.get("channel_title", ""),
-            "thumbnail_url":     f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
-            "url":               f"https://youtube.com/watch?v={video_id}",
-            "summary":           single_result.get("summary", ""),
-            "key_claims":        single_result.get("key_claims", []),
+            "video_id":               video_id,
+            "title":                  title,
+            "channel_title":          single_result.get("channel_title", ""),
+            "thumbnail_url":          f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+            "url":                    f"https://youtube.com/watch?v={video_id}",
+            "summary":                single_result.get("summary", ""),
+            "key_claims":             single_result.get("key_claims", []),
             "ad_score":               single_result.get("ad_score", 0),
             "ad_detected":            single_result.get("ad_detected", False),
             "ad_signals":             single_result.get("ad_signals") or [],
             "credibility_score":      single_result.get("credibility_score") or 0.5,
             "credibility_components": single_result.get("credibility_components") or {},
         },
-        "keyword_analysis": {
-            "keyword":                  pipeline_result.get("keyword", extracted_topic),
-            "category":                 pipeline_result.get("category", "정보탐색형"),
-            "layout":                   pipeline_result.get("layout", "summary_focus"),
-            "intent_type":              pipeline_result.get("intent_type", "지식형"),
-            "summary_lines":            pipeline_result.get("summary_lines", []),
-            "summary_citations":        pipeline_result.get("summary_citations", []),
-            "common_facts":             pipeline_result.get("common_facts", []),
-            "common_facts_citations":   pipeline_result.get("common_facts_citations", []),
-            "controversies":            pipeline_result.get("controversies", []),
-            "controversies_citations":  pipeline_result.get("controversies_citations", []),
-            "recommended_videos": pipeline_result.get("recommended_videos", []),
-            "pros":               pipeline_result.get("pros", []),
-            "cons":               pipeline_result.get("cons", []),
-        },
-        "sources": merged_sources,
-    })
+    }
+
+    async def _stream():
+        # ── chunk 1: single_video 분석 완료 즉시 전송 ────────────────────────
+        yield _json.dumps(chunk1_data, ensure_ascii=False) + "\n"
+
+        # ── chunk 2: pipeline 완료 대기 후 전송 ──────────────────────────────
+        try:
+            pipeline_result = await pipeline_task
+        except Exception as e:
+            logger.error(f"[analyze_video] pipeline 실패: {e}")
+            pipeline_result = {
+                "keyword": extracted_topic, "category": "정보탐색형",
+                "layout": "summary_focus", "intent_type": "지식형",
+                "summary_lines": [], "common_facts": [], "controversies": [],
+                "recommended_videos": [], "pros": [], "cons": [], "sources": [],
+            }
+
+        # 소스 통합 (single 영상 + pipeline 소스 중복 제거)
+        seen_ids: set = set()
+        merged_sources = []
+        seen_ids.add(video_id)
+        merged_sources.append({
+            "video_id":         video_id,
+            "title":            title,
+            "url":              f"https://youtube.com/watch?v={video_id}",
+            "channel_title":    single_result.get("channel_title", ""),
+            "thumbnail_url":    f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+            "ad_detected":      single_result.get("ad_detected", False),
+            "is_current_video": True,
+        })
+        for src in pipeline_result.get("sources", []):
+            src_vid = src.get("video_id") or src.get("url", "").split("v=")[-1].split("&")[0]
+            if src_vid and src_vid not in seen_ids:
+                seen_ids.add(src_vid)
+                merged_sources.append({
+                    "video_id":         src_vid,
+                    "title":            src.get("title", ""),
+                    "url":              src.get("url", f"https://youtube.com/watch?v={src_vid}"),
+                    "channel_title":    src.get("channel_title", ""),
+                    "thumbnail_url":    src.get("thumbnail_url",
+                                            f"https://img.youtube.com/vi/{src_vid}/mqdefault.jpg"),
+                    "ad_detected":      src.get("ad_detected", False),
+                    "is_current_video": False,
+                })
+
+        chunk2_data = {
+            "type": "insights",
+            "keyword_analysis": {
+                "keyword":                  pipeline_result.get("keyword", extracted_topic),
+                "category":                 pipeline_result.get("category", "정보탐색형"),
+                "layout":                   pipeline_result.get("layout", "summary_focus"),
+                "intent_type":              pipeline_result.get("intent_type", "지식형"),
+                "summary_lines":            pipeline_result.get("summary_lines", []),
+                "summary_citations":        pipeline_result.get("summary_citations", []),
+                "common_facts":             pipeline_result.get("common_facts", []),
+                "common_facts_citations":   pipeline_result.get("common_facts_citations", []),
+                "controversies":            pipeline_result.get("controversies", []),
+                "controversies_citations":  pipeline_result.get("controversies_citations", []),
+                "recommended_videos":       pipeline_result.get("recommended_videos", []),
+                "pros":                     pipeline_result.get("pros", []),
+                "cons":                     pipeline_result.get("cons", []),
+            },
+            "sources": merged_sources,
+        }
+        yield _json.dumps(chunk2_data, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        _stream(),
+        media_type="application/x-ndjson",
+    )
 
 
 async def _full_analyze_single_video(
