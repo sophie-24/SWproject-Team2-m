@@ -408,6 +408,35 @@ async def _cross_and_generate(
         }
 
     # 출처 마커 파싱 헬퍼 — "[영상1, 영상3]" → citations 리스트 + 마커 제거
+    def _infer_citations(item: str) -> list:
+        """Gemini가 출처 마커를 빠뜨린 경우 claims/summary/title 겹침으로 출처를 보완."""
+        import re as _re
+        tokens = [
+            tok for tok in _re.findall(r"[가-힣A-Za-z0-9]{2,}", item.lower())
+            if tok not in {"영상", "내용", "분석", "주요", "관련", "있습니다", "합니다"}
+        ]
+        scored = []
+        for v in valid:
+            haystack = " ".join(
+                [v.get("title", ""), v.get("summary", "")]
+                + [str(c) for c in v.get("key_claims", [])]
+            ).lower()
+            score = sum(1 for tok in tokens if tok in haystack)
+            if score > 0:
+                scored.append((score, v))
+        scored.sort(key=lambda pair: pair[0], reverse=True)
+        picked = [v for _, v in scored[:3]]
+        if not picked:
+            picked = valid[: min(2, len(valid))]
+        return [
+            {
+                "video_id":      v.get("video_id", ""),
+                "channel_title": v.get("channel_title", ""),
+                "title":         v.get("title", ""),
+            }
+            for v in picked
+        ]
+
     def _parse_with_citations(section_name: str) -> tuple:
         """(texts: list[str], citations_list: list[list[dict]]) 반환"""
         from gemini_client import parse_section as _ps
@@ -417,7 +446,7 @@ async def _cross_and_generate(
         texts, citations_list = [], []
         for item in raw_items:
             item = item.strip()
-            cite_match = _re.search(r'\[영상([\d,\s]+)\]', item)
+            cite_match = _re.search(r'\[영상\s*([\d,\s,]+)\]', item)
             cites = []
             if cite_match:
                 indices = [int(x.strip()) - 1 for x in cite_match.group(1).split(',') if x.strip().isdigit()]
@@ -429,12 +458,12 @@ async def _cross_and_generate(
                             "channel_title": v.get("channel_title", ""),
                             "title":        v.get("title", ""),
                         })
-                item = _re.sub(r'\s*\[영상[\d,\s]+\]', '', item).strip()
+                item = _re.sub(r'\s*\[영상\s*[\d,\s,]+\]', '', item).strip()
             # 마크다운 기호 제거
             item = _re.sub(r'\*+', '', item).strip()
             if item and item != "없음":
                 texts.append(item)
-                citations_list.append(cites)
+                citations_list.append(cites or _infer_citations(item))
         return texts, citations_list
 
     # 요청한 섹션만 파싱 (요청 안 한 섹션은 빈 리스트)
