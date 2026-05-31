@@ -58,6 +58,7 @@ _MAX_CLAIMS_PER_VIDEO      = 3  # 교차분석 프롬프트에 넘길 영상당 
 _TRANSCRIPT_SEMAPHORE_SIZE = 1  # YouTube 429 방지: 자막 요청 순차화 (동시 1개)
 _TRANSCRIPT_FAIL_DELAY     = 5.0  # 자막 수집 실패 시 다음 요청 전 대기 시간 (초)
 _TRANSCRIPT_SUCCESS_DELAY  = 2.0  # 자막 수집 성공 시에도 다음 요청 전 대기 (429 예방)
+_TRANSCRIPT_SUPADATA_DELAY = 0.5  # YouTube 차단 중 Supadata 사용 시 짧은 대기 (Supadata는 rate limit 낮음)
 
 
 async def _analyze_single_video(
@@ -193,10 +194,15 @@ async def _analyze_videos_parallel(
     _transcript_sem = asyncio.Semaphore(_TRANSCRIPT_SEMAPHORE_SIZE)
 
     async def _collect_with_throttle(video_id: str) -> Optional[str]:
+        from transcript_service import is_youtube_blocked
         async with _transcript_sem:
             result = await asyncio.to_thread(_collect_transcript, video_id)
-            # 성공/실패 모두 딜레이 — YouTube가 연속 요청을 감지하지 못하게
-            delay = _TRANSCRIPT_FAIL_DELAY if result is None else _TRANSCRIPT_SUCCESS_DELAY
+            # YouTube 차단 중이면 Supadata를 사용했으므로 짧은 딜레이
+            # 차단 아닌 경우: 성공 2초 / 실패 5초 (YouTube 429 예방)
+            if is_youtube_blocked():
+                delay = _TRANSCRIPT_SUPADATA_DELAY
+            else:
+                delay = _TRANSCRIPT_FAIL_DELAY if result is None else _TRANSCRIPT_SUCCESS_DELAY
             await asyncio.sleep(delay)
             return result
 

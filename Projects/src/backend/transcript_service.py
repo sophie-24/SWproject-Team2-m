@@ -35,6 +35,27 @@ if _cookies_b64 and not os.path.exists(COOKIES_PATH):
         logger.warning("[transcript] cookies.txt 복원 실패: %s", _e)
 
 _LANG_PRIORITY = ["ko", "en"]
+
+# ── YouTube IP 차단 상태 (서버 전역) ──────────────────────────────────────────
+# 첫 번째 429 감지 시 _youtube_blocked_until을 현재 시각 + TTL로 설정.
+# 이후 모든 get_transcript() 호출이 YouTube를 건너뛰고 Supadata로 직행.
+_youtube_blocked_until: float = 0.0
+_YOUTUBE_BLOCK_TTL: float = 300.0  # 5분 (초)
+
+
+def is_youtube_blocked() -> bool:
+    """YouTube IP 차단 중이면 True — analyzer_ai 딜레이 단축 판단에도 사용."""
+    return time.time() < _youtube_blocked_until
+
+
+def _set_youtube_blocked() -> None:
+    global _youtube_blocked_until
+    _youtube_blocked_until = time.time() + _YOUTUBE_BLOCK_TTL
+    logger.warning(
+        "[transcript] YouTube IP 차단 감지 → %.0f초간 Supadata 우선 모드 (%.0f까지)",
+        _YOUTUBE_BLOCK_TTL,
+        _youtube_blocked_until,
+    )
 # 쿠키 파일이 있으면 인증된 요청으로 YouTube 429 우회 (v1.2.4: http_client로 전달)
 if os.path.exists(COOKIES_PATH):
     try:
@@ -77,7 +98,9 @@ def _cache_set(video_id: str, data: list) -> None:
 def get_transcript(video_id: str) -> Optional[list]:
     """
     자막 수집. 캐시 → youtube-transcript-api → yt-dlp → Supadata API 순.
-    429(IP 차단) 감지 시 retry·yt-dlp 생략하고 Supadata로 즉시 점프.
+    429(IP 차단) 감지 시:
+      - 해당 요청: yt-dlp 생략하고 Supadata 즉시 시도
+      - 이후 요청: 서버 전역 차단 상태(_youtube_blocked_until) 설정 → Supadata 직행
     반환: [{"text": str, "start": float, "duration": float}, ...] or None
     """
     cached = _cache_get(video_id)
@@ -85,18 +108,33 @@ def get_transcript(video_id: str) -> Optional[list]:
         logger.info("[transcript] %s: 캐시 히트 (%d개)", video_id, len(cached))
         return cached
 
+    # ── YouTube IP 차단 중이면 Supadata 직행 ────────────────────────────────
+    if is_youtube_blocked():
+        if SUPADATA_API_KEY:
+            logger.info("[transcript] %s: YouTube 차단 중 → Supadata 직행", video_id)
+            result = _fetch_via_supadata(video_id)
+            if result is not None:
+                _cache_set(video_id, result)
+            return result
+        else:
+            logger.warning("[transcript] %s: YouTube 차단 중이나 Supadata 키 없음", video_id)
+            return None
+
     result, ip_blocked = _fetch_via_api(video_id)
     if result is not None:
         _cache_set(video_id, result)
         return result
 
-    if ip_blocked and SUPADATA_API_KEY:
-        # IP 차단 확인 → retry·yt-dlp 생략, Supadata로 즉시
-        logger.info("[transcript] %s: IP 차단 감지 -> Supadata 즉시 시도", video_id)
-        result = _fetch_via_supadata(video_id)
-        if result is not None:
-            _cache_set(video_id, result)
-        return result
+    if ip_blocked:
+        # 서버 전역 차단 상태 기록 → 이후 모든 요청 Supadata 직행
+        _set_youtube_blocked()
+        if SUPADATA_API_KEY:
+            logger.info("[transcript] %s: IP 차단 → Supadata 즉시 시도", video_id)
+            result = _fetch_via_supadata(video_id)
+            if result is not None:
+                _cache_set(video_id, result)
+            return result
+        return None
 
     logger.info("[transcript] %s: API 실패 -> yt-dlp fallback", video_id)
     result = _fetch_via_ytdlp(video_id)
