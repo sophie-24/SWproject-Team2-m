@@ -348,6 +348,7 @@
       display: inline-flex;
       align-items: center;
       gap: 3px;
+      position: relative;
       font-size: 10px;
       color: #2563eb;
       background: #eff6ff;
@@ -363,6 +364,49 @@
     .citation-badge:hover {
       background: #dbeafe;
       text-decoration: none;
+    }
+
+    .citation-tooltip {
+      display: none;
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + 6px);
+      width: 220px;
+      max-width: 70vw;
+      z-index: 50;
+      background: #191c1e;
+      color: #fff;
+      border-radius: 6px;
+      padding: 8px 9px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+      white-space: normal;
+      text-align: left;
+      pointer-events: none;
+    }
+
+    .citation-badge:hover .citation-tooltip,
+    .citation-badge:focus .citation-tooltip {
+      display: block;
+    }
+
+    .citation-tooltip-row + .citation-tooltip-row {
+      margin-top: 7px;
+      padding-top: 7px;
+      border-top: 1px solid rgba(255,255,255,0.14);
+    }
+
+    .citation-tooltip-title {
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.35;
+      color: #fff;
+    }
+
+    .citation-tooltip-channel {
+      margin-top: 3px;
+      font-size: 10px;
+      color: #cbd5e1;
+      line-height: 1.25;
     }
 
     .bullet-dot {
