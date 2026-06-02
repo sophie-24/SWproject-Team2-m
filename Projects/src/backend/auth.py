@@ -149,3 +149,36 @@ def verify_jwt(token: str) -> dict | None:
         return None  # 만료
     except jwt.InvalidTokenError:
         return None  # 위조
+
+
+# ── Admin JWT ────────────────────────────────────────────────────────────────
+
+ADMIN_JWT_EXPIRE_HOURS = 24
+
+
+def create_admin_jwt(username: str) -> str:
+    """
+    Admin 전용 JWT 발급 — role: "admin" 클레임 포함
+    """
+    payload = {
+        "sub":  username,
+        "role": "admin",
+        "exp":  datetime.datetime.utcnow() + datetime.timedelta(hours=ADMIN_JWT_EXPIRE_HOURS),
+        "iat":  datetime.datetime.utcnow(),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def verify_admin_jwt(token: str) -> dict | None:
+    """
+    Admin JWT 검증 → role == "admin" 확인
+    """
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("role") != "admin":
+            return None
+        return {"username": payload["sub"], "role": "admin"}
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None

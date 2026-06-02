@@ -21,13 +21,15 @@
 
   "externally_connectable": {
     "matches": [
-      "https://port-0-swproject-team2-m-mpdo8rl036709628.sel3.cloudtype.app/*"
+      "https://port-0-swproject-team2-m-mpdo8rl036709628.sel3.cloudtype.app/*",
+    "http://localhost/*"
     ]
   },
 
   "host_permissions": [
     "https://www.youtube.com/*",
-    "https://port-0-swproject-team2-m-mpdo8rl036709628.sel3.cloudtype.app/*"
+    "https://port-0-swproject-team2-m-mpdo8rl036709628.sel3.cloudtype.app/*",
+    "http://localhost/*"
   ],
 
   "content_scripts": [
