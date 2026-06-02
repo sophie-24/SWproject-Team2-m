@@ -13,13 +13,13 @@ from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from auth import create_auth_url, exchange_code_for_tokens, create_jwt, verify_jwt
+from auth import create_auth_url, exchange_code_for_tokens, create_jwt, verify_jwt, create_admin_jwt, verify_admin_jwt
 from youtube_search import search_videos, get_subscriptions
 from transcript_service import get_transcript, format_transcript_with_timestamps, list_available_transcripts
 from preprocessing import chunk_transcript
 from gemini_client import call_gemini_async
 from shared_cache import search_analysis_cache as _search_analysis_cache_shared, get_cached as _cache_get, set_cached as _cache_set
-from database import init_db, get_db, Newsletter, UserInterest, UserInterestVideo
+from database import init_db, get_db, Newsletter, UserInterest, UserInterestVideo, AnalysisRun, AsyncSessionLocal
 from agents.pipeB_orchestrator import run_pipeline
 from scheduler import start_scheduler, stop_scheduler
 
@@ -42,9 +42,216 @@ EXTENSION_STORE_URL = os.getenv("EXTENSION_STORE_URL", "")
 async def lifespan(app: FastAPI):
     """서버 시작/종료 시 실행 (on_event 대체)"""
     await init_db()
+    await _seed_demo_gallery()
+    await _ensure_demo_cache_table()
+    asyncio.create_task(_warm_demo_cache())   # 백그라운드에서 캐시 워밍
     start_scheduler()
     yield
     stop_scheduler()
+
+
+async def _seed_demo_gallery():
+    """demo_gallery_samples 테이블 생성 및 초기 데이터 삽입"""
+    from sqlalchemy import text as _text
+    async with AsyncSessionLocal() as _db:
+        try:
+            await _db.execute(_text("""
+                CREATE TABLE IF NOT EXISTS demo_gallery_samples (
+                    id            SERIAL PRIMARY KEY,
+                    video_id      VARCHAR(100) NOT NULL,
+                    title         TEXT         NOT NULL,
+                    channel       VARCHAR(100),
+                    intent        VARCHAR(50),
+                    trust_score   INTEGER      DEFAULT 0,
+                    ad_detected   VARCHAR(10)  DEFAULT 'No',
+                    summary       TEXT,
+                    keywords      TEXT,
+                    thumbnail_url TEXT,
+                    views         VARCHAR(20),
+                    display_order INTEGER      DEFAULT 0,
+                    is_featured   BOOLEAN      DEFAULT false,
+                    created_at    TIMESTAMP    DEFAULT NOW()
+                )
+            """))
+            # 기존 더미 video_id 행 제거 후 실제 ID로 재삽입
+            await _db.execute(_text("""
+                DELETE FROM demo_gallery_samples
+                WHERE video_id IN ('abc123xyz01','py_tutorial_01','tech_news_2026',
+                                   'product_review_01','web_dev_adv','finance_daily','startup_story')
+            """))
+            await _db.execute(_text("""
+                INSERT INTO demo_gallery_samples
+                    (video_id,title,channel,intent,trust_score,ad_detected,summary,keywords,thumbnail_url,views,display_order,is_featured)
+                VALUES
+                    ('dQw4w9WgXcQ','AI 기술 입문 강의','Tech School','Learning',89,'No',
+                     'AI의 기본 개념을 쉽게 설명하는 고품질 교육 콘텐츠입니다.',
+                     '["AI","머신러닝","딥러닝","교육"]',
+                     'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg','123K',1,true),
+                    ('M7lc1UVf-VE','마케팅 전략 분석 2026','Marketing Pro','News',76,'Partial',
+                     '최신 디지털 마케팅 트렌드와 데이터 기반 전략을 분석합니다.',
+                     '["마케팅","디지털","SNS","전략"]',
+                     'https://img.youtube.com/vi/M7lc1UVf-VE/mqdefault.jpg','87K',2,false),
+                    ('rfscVS0vtbw','Python 완전정복 튜토리얼','Code Master','Learning',92,'No',
+                     '파이썬 초급부터 중급까지 체계적으로 배울 수 있는 완성도 높은 튜토리얼입니다.',
+                     '["Python","프로그래밍","코딩","튜토리얼"]',
+                     'https://img.youtube.com/vi/rfscVS0vtbw/mqdefault.jpg','456K',3,true),
+                    ('aircAruvnKk','최신 기술 뉴스 브리핑','Tech News Daily','News',72,'No',
+                     '이번 주 주요 기술 뉴스를 빠르게 정리합니다.',
+                     '["테크뉴스","AI칩","LLM","뉴스"]',
+                     'https://img.youtube.com/vi/aircAruvnKk/mqdefault.jpg','34K',4,false),
+                    ('bSXGpESB1YI','갤럭시 S 울트라 완벽 리뷰','Product Reviews','Review',68,'Yes',
+                     '갤럭시 울트라의 카메라, 성능, 배터리를 심층 리뷰합니다.',
+                     '["갤럭시","리뷰","스마트폰","카메라"]',
+                     'https://img.youtube.com/vi/bSXGpESB1YI/mqdefault.jpg','201K',5,false),
+                    ('w7ejDZ8SWv8','웹 개발 심화: React 완전 가이드','Dev Academy','Learning',88,'No',
+                     'React의 새로운 기능을 실전 프로젝트와 함께 학습합니다.',
+                     '["React","웹개발","프론트엔드","JavaScript"]',
+                     'https://img.youtube.com/vi/w7ejDZ8SWv8/mqdefault.jpg','78K',6,true),
+                    ('EumXnQfQGME','경제 뉴스 분석 — 금리 전망','Finance Daily','News',81,'No',
+                     '금리 전망과 주요국 통화정책 변화를 분석합니다.',
+                     '["경제","금리","투자","통화정책"]',
+                     'https://img.youtube.com/vi/EumXnQfQGME/mqdefault.jpg','52K',7,false),
+                    ('Ke90Tje7VS0','스타트업 창업 이야기 — 0에서 100억까지','Startup Stories','Other',75,'No',
+                     '국내 스타트업 창업자의 생생한 경험담입니다.',
+                     '["스타트업","창업","투자","성장"]',
+                     'https://img.youtube.com/vi/Ke90Tje7VS0/mqdefault.jpg','95K',8,false)
+                ON CONFLICT DO NOTHING
+            """))
+            await _db.commit()
+        except Exception as e:
+            import logging as _log
+            _log.getLogger(__name__).warning(f"[seed] demo_gallery_samples 시드 실패 (무시): {e}")
+
+
+# ── Demo 분석/뉴스레터 DB 캐시 ────────────────────────────────────────────────
+DEMO_DEFAULT_VIDEO_ID = "5sfFGbo6YNs"
+
+async def _ensure_demo_cache_table():
+    """demo_analysis_cache 테이블 생성 (없으면)"""
+    from sqlalchemy import text as _text
+    async with AsyncSessionLocal() as _db:
+        await _db.execute(_text("""
+            CREATE TABLE IF NOT EXISTS demo_analysis_cache (
+                video_id     VARCHAR(50) PRIMARY KEY,
+                analysis_json TEXT,
+                newsletter_json TEXT,
+                cached_at    TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        await _db.commit()
+
+
+async def _warm_demo_cache():
+    """서버 시작 후 백그라운드에서 기본 영상 분석+뉴스레터 캐싱"""
+    import logging as _log
+    logger = _log.getLogger(__name__)
+    import json as _json
+    from sqlalchemy import text as _text
+
+    async with AsyncSessionLocal() as _db:
+        try:
+            row = await _db.execute(
+                _text("SELECT analysis_json, newsletter_json FROM demo_analysis_cache WHERE video_id = :vid"),
+                {"vid": DEMO_DEFAULT_VIDEO_ID}
+            )
+            existing = row.fetchone()
+            if existing and existing[0] and existing[1]:
+                logger.info("[demo_cache] 기본 영상 캐시 이미 존재 — 스킵")
+                return
+        except Exception:
+            pass
+
+    logger.info("[demo_cache] 기본 영상 캐시 워밍 시작…")
+
+    # 1) 분석
+    analysis_data = {}
+    try:
+        from youtube_search import fetch_video_by_id
+        meta = await asyncio.to_thread(fetch_video_by_id, DEMO_DEFAULT_VIDEO_ID)
+        title = meta.get("title", f"Video {DEMO_DEFAULT_VIDEO_ID}")
+        transcript = await asyncio.to_thread(_collect_transcript_for_summary_traced, DEMO_DEFAULT_VIDEO_ID)
+        transcript_text = transcript.get("text")
+        transcript_source = transcript.get("source", "none")
+        from agents.analyzer_ai import _analyze_single_video, _calc_credibility
+        video_info = {
+            "video_id": DEMO_DEFAULT_VIDEO_ID, "title": title,
+            "channel_id": meta.get("channel_id", ""),
+            "channel_title": meta.get("channel_title", ""),
+            "subscriber_count": meta.get("subscriber_count", 0),
+            "description": meta.get("description", ""),
+            "has_paid_placement": meta.get("has_paid_placement"),
+        }
+        semaphore = asyncio.Semaphore(1)
+        result = await _analyze_single_video(title, video_info, transcript_text, semaphore)
+        comp = _calc_credibility(result, meta)
+        trust_score = round(
+            comp.get("transcript_quality", 0) * 0.20 +
+            comp.get("ad_free", 0) * 0.35 +
+            comp.get("channel_credibility", 0) * 0.25 +
+            comp.get("information_consistency", 0) * 0.20
+        )
+        from youtube_search import search_videos
+        topic_for_search = result.get("extracted_topic") or title[:40]
+        raw_sources = await asyncio.to_thread(search_videos, topic_for_search, max_results=6)
+        sources = [
+            {"video_id": v.get("video_id", ""), "title": v.get("title", ""), "channel_title": v.get("channel_title", "")}
+            for v in (raw_sources or []) if v.get("video_id") != DEMO_DEFAULT_VIDEO_ID
+        ][:5]
+        topic = result.get("extracted_topic") or result.get("topic") or title[:30]
+        analysis_data = {
+            "video_id": DEMO_DEFAULT_VIDEO_ID, "title": title, "topic": topic,
+            "trust_score": trust_score, "ad_score": result.get("ad_score", 0),
+            "transcript_source": transcript_source,
+            "summary": result.get("summary", ""),
+            "key_claims": (result.get("key_claims") or [])[:4],
+            "sources": sources,
+        }
+        logger.info(f"[demo_cache] 분석 완료: trust={trust_score}")
+    except Exception as e:
+        logger.warning(f"[demo_cache] 분석 실패: {e}")
+
+    # 2) 뉴스레터
+    newsletter_data = {}
+    try:
+        topic_kw = analysis_data.get("topic") or "AI 학습"
+        newsletter_data = await asyncio.wait_for(
+            run_pipeline(user_id="demo_cache", raw_keywords=[topic_kw], skip_clustering=True),
+            timeout=120
+        )
+        logger.info("[demo_cache] 뉴스레터 완료")
+    except Exception as e:
+        logger.warning(f"[demo_cache] 뉴스레터 실패: {e}")
+        try:
+            from gemini_client import call_gemini_async
+            kw = analysis_data.get("topic") or "AI 학습"
+            prompt = f'"{kw}"에 대한 간결한 뉴스레터를 JSON으로 작성해주세요. 형식: {{"subject":"제목","intent_type":"지식형","topics":[{{"topic":"{kw}","summary":["문장1","문장2","문장3"],"pros":["장점"],"cons":["주의"],"sources":[]}}]}}'
+            raw = await call_gemini_async(prompt, temperature=0.4, json_mode=True)
+            import json as _json2
+            newsletter_data = _json2.loads(raw)
+            newsletter_data["_fallback"] = True
+        except Exception as e2:
+            logger.warning(f"[demo_cache] 뉴스레터 폴백도 실패: {e2}")
+
+    # 3) DB 저장
+    if analysis_data or newsletter_data:
+        try:
+            async with AsyncSessionLocal() as _db:
+                await _db.execute(_text("""
+                    INSERT INTO demo_analysis_cache (video_id, analysis_json, newsletter_json, cached_at)
+                    VALUES (:vid, :aj, :nj, NOW())
+                    ON CONFLICT (video_id) DO UPDATE
+                        SET analysis_json=EXCLUDED.analysis_json,
+                            newsletter_json=EXCLUDED.newsletter_json,
+                            cached_at=NOW()
+                """), {
+                    "vid": DEMO_DEFAULT_VIDEO_ID,
+                    "aj": _json.dumps(analysis_data, ensure_ascii=False) if analysis_data else None,
+                    "nj": _json.dumps(newsletter_data, ensure_ascii=False) if newsletter_data else None,
+                })
+                await _db.commit()
+            logger.info("[demo_cache] DB 저장 완료")
+        except Exception as e:
+            logger.warning(f"[demo_cache] DB 저장 실패: {e}")
 
 
 app = FastAPI(
@@ -1593,6 +1800,7 @@ async def analyze_search(
                 subscribed_channel_ids = []
         clicked_channel_ids = []
 
+        _search_start = time.time()
         try:
             result = await run_pipeline_a(
                 keyword=keyword,
@@ -1604,6 +1812,18 @@ async def analyze_search(
             result = {"keyword": keyword, "videos": [], "common_facts": [], "controversies": []}
 
         _cache_set(cache_key, result)
+        _search_elapsed_ms = int((time.time() - _search_start) * 1000)
+
+        # analysis_runs 로깅
+        try:
+            from sqlalchemy import text as _t2
+            await db.execute(_t2(
+                "INSERT INTO analysis_runs (request_type, keyword, user_id, status, finished_at, total_latency_ms, cache_hit) "
+                "VALUES (:rt, :kw, :uid, 'completed', NOW(), :ms, false)"
+            ), {"rt": "search", "kw": keyword, "uid": user_id, "ms": _search_elapsed_ms})
+            await db.commit()
+        except Exception:
+            pass
 
     return JSONResponse(result)
 
@@ -1879,6 +2099,33 @@ async def analyze_video(
             "sources": merged_sources,
         }
         yield _json.dumps(chunk2_data, ensure_ascii=False) + "\n"
+
+        # analysis_runs 로깅 (스트리밍 완료 시점)
+        try:
+            _elapsed_ms = int((time.time() - run_start) * 1000)
+            _ad_score = single_result.get("ad_score", 0) or 0
+            _cred = single_result.get("credibility_score", 0) or 0
+            _cred_int = int(round(_cred * 100)) if _cred <= 1 else int(_cred)
+            _tsrc = single_result.get("transcript_source") or "none"
+            _tlen = single_result.get("transcript_len") or 0
+            from sqlalchemy import text as _t3
+            async with AsyncSessionLocal() as _log_db:
+                await _log_db.execute(_t3(
+                    "INSERT INTO analysis_runs "
+                    "(request_type, video_id, keyword, user_id, status, finished_at, "
+                    "total_latency_ms, cache_hit, transcript_source, transcript_len, "
+                    "ad_score, credibility_score) "
+                    "VALUES (:rt, :vid, :kw, :uid, 'completed', NOW(), :ms, false, "
+                    ":tsrc, :tlen, :ad, :cred)"
+                ), {
+                    "rt": "watch", "vid": video_id, "kw": extracted_topic,
+                    "uid": user_id, "ms": _elapsed_ms,
+                    "tsrc": _tsrc, "tlen": _tlen,
+                    "ad": _ad_score, "cred": _cred_int,
+                })
+                await _log_db.commit()
+        except Exception as _log_err:
+            logger.warning(f"[analyze_video] analysis_runs 로깅 실패: {_log_err}")
 
     return StreamingResponse(
         _stream(),
@@ -2183,3 +2430,1004 @@ async def admin_run_pipeline(
     await db.commit()
 
     return JSONResponse(newsletter)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── Admin Dashboard API (JWT 기반) ────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_admin_user(
+    token=Depends(optional_security),
+    admin_token: Optional[str] = Cookie(None),
+):
+    t = token.credentials if token else admin_token
+    if t and t.startswith("Bearer "):
+        t = t.removeprefix("Bearer ").strip()
+    user = verify_admin_jwt(t) if t else None
+    if not user:
+        raise HTTPException(status_code=403, detail="Admin 권한이 필요합니다")
+    return user
+
+
+@app.get("/dashboard", tags=["Admin Dashboard"], include_in_schema=False, response_class=HTMLResponse)
+def dashboard_page():
+    dashboard_path = os.path.join(FRONTEND_DIR, "admin_dashboard.html")
+    if not os.path.exists(dashboard_path):
+        raise HTTPException(status_code=404, detail="dashboard.html not found")
+    with open(dashboard_path, "r", encoding="utf-8") as f:
+        html = f.read()
+    return HTMLResponse(content=html)
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+    model_config = ConfigDict(json_schema_extra={"example": {"username": "admin", "password": "admin1234"}})
+
+
+@app.post("/api/auth/admin-login", tags=["Admin Dashboard"], summary="Admin 로그인")
+async def admin_login(data: AdminLoginRequest):
+    if data.password != ADMIN_SECRET:
+        raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다")
+    token = create_admin_jwt(data.username)
+    response = JSONResponse({"access_token": token, "expires_in": 86400, "token_type": "bearer"})
+    response.set_cookie(key="admin_token", value=token, httponly=True, samesite="lax", secure=False, max_age=86400)
+    logger.info(f"[admin-login] {data.username}")
+    return response
+
+
+@app.post("/api/auth/admin-logout", tags=["Admin Dashboard"], summary="Admin 로그아웃")
+async def admin_logout():
+    response = JSONResponse({"message": "로그아웃 완료"})
+    response.delete_cookie("admin_token")
+    return response
+
+
+@app.get("/api/auth/admin-me", tags=["Admin Dashboard"], summary="Admin 토큰 검증")
+async def admin_me(admin=Depends(get_admin_user)):
+    return {"username": admin["username"], "role": admin["role"]}
+
+
+@app.get("/api/admin/stats", tags=["Admin Dashboard"], summary="시스템 통계")
+async def admin_stats(admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text as _t
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - timedelta(days=1)
+    week_ago = now - timedelta(days=7)
+
+    def _s(res): v = res.scalar(); return v if v else 0
+
+    total_analysis = _s(await db.execute(_t("SELECT COUNT(*) FROM newsletters")))
+    today_count    = _s(await db.execute(_t("SELECT COUNT(*) FROM newsletters WHERE delivered_at >= :d"), {"d": today_start}))
+    yest_count     = _s(await db.execute(_t("SELECT COUNT(*) FROM newsletters WHERE delivered_at >= :a AND delivered_at < :b"), {"a": yesterday_start, "b": today_start})) or 1
+    total_users    = _s(await db.execute(_t("SELECT COUNT(*) FROM users")))
+    sent_count     = _s(await db.execute(_t("SELECT COUNT(*) FROM newsletters WHERE delivery_status = 'sent'")))
+    delivery_rate  = round((sent_count / total_analysis * 100) if total_analysis > 0 else 0, 1)
+    trend_pct      = round(((today_count - yest_count) / yest_count) * 100, 1)
+
+    # 오늘 신규 가입자 (users.created_at)
+    try:
+        from sqlalchemy import text as _ts
+        nu_res = await db.execute(_ts("SELECT COUNT(*) FROM users WHERE created_at >= :d"), {"d": today_start})
+        today_users = nu_res.scalar() or 0
+    except Exception:
+        today_users = 0
+
+    return JSONResponse({
+        "total_analysis": total_analysis, "total_users": total_users,
+        "delivery_rate": delivery_rate,
+        "trends": {"today_count": today_count, "yesterday_count": yest_count,
+                   "change_pct": trend_pct, "today_users": today_users}
+    })
+
+
+@app.get("/api/admin/metrics", tags=["Admin Dashboard"], summary="메트릭 차트 데이터")
+async def admin_metrics(period: str = Query("7d"), admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text as _t
+    from datetime import datetime, timezone, timedelta
+
+    days = 1 if period == "24h" else (30 if period == "30d" else 7)
+    start = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+
+    # 일별 발송 추이
+    daily = {}
+    try:
+        rows = (await db.execute(_t(
+            "SELECT DATE(delivered_at) AS d, COUNT(*) FROM newsletters "
+            "WHERE delivered_at >= :s GROUP BY DATE(delivered_at) ORDER BY d"), {"s": start}
+        )).fetchall()
+        daily = {str(r[0]): r[1] for r in rows}
+    except Exception:
+        pass
+
+    # 발송 상태 분포
+    status_counts = {"sent": 0, "generated": 0, "prepared": 0}
+    try:
+        rows = (await db.execute(_t(
+            "SELECT delivery_status, COUNT(*) FROM newsletters "
+            "WHERE delivery_status != 'failed' GROUP BY delivery_status")
+        )).fetchall()
+        for r in rows:
+            if r[0]:
+                status_counts[r[0]] = r[1]
+    except Exception:
+        pass
+
+    # 관심 토픽 TOP 10 (is_active fallback)
+    topic_dist = []
+    for col in ("normalized_topic", "category", "topic"):
+        try:
+            rows = (await db.execute(_t(
+                f"SELECT {col}, COUNT(*) cnt FROM user_interests "
+                f"WHERE is_active = TRUE AND {col} IS NOT NULL AND {col} != '' "
+                f"GROUP BY {col} ORDER BY cnt DESC LIMIT 10")
+            )).fetchall()
+            topic_dist = [{"topic": r[0], "count": r[1]} for r in rows]
+            break
+        except Exception:
+            continue
+    if not topic_dist:
+        try:
+            rows = (await db.execute(_t(
+                "SELECT topic, COUNT(*) cnt FROM user_interests "
+                "WHERE topic IS NOT NULL GROUP BY topic ORDER BY cnt DESC LIMIT 10")
+            )).fetchall()
+            topic_dist = [{"topic": r[0], "count": r[1]} for r in rows]
+        except Exception:
+            pass
+
+    return JSONResponse({
+        "daily_analysis": [{"date": k, "count": v} for k, v in sorted(daily.items())],
+        "delivery_status": [{"status": k, "count": v} for k, v in status_counts.items()],
+        "topic_distribution": topic_dist,
+    })
+
+
+@app.get("/api/admin/users", tags=["Admin Dashboard"], summary="사용자 목록 (페이지네이션)")
+async def admin_dashboard_users(
+    page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100),
+    status: str = Query("all"), search: str = Query(""),
+    admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db),
+):
+    from database import User, Newsletter
+
+    stmt = select(User)
+    if status == "active":
+        stmt = stmt.where(User.is_subscribed == True)
+    elif status == "inactive":
+        stmt = stmt.where(User.is_subscribed == False)
+    if search:
+        stmt = stmt.where(User.email.ilike(f"%{search}%"))
+
+    total_r = await db.execute(select(func.count()).select_from(stmt.subquery()))
+    total_count = total_r.scalar() or 0
+
+    paged = stmt.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit)
+    result = await db.execute(paged)
+    users = result.scalars().all()
+
+    user_list = []
+    for u in users:
+        cnt_r = await db.execute(select(func.count()).select_from(Newsletter).where(Newsletter.user_id == u.google_id))
+        user_list.append({
+            "user_id": str(u.id), "google_id": u.google_id, "email": u.email or "",
+            "created_at": u.created_at.strftime("%Y-%m-%d") if u.created_at else "",
+            "status": "Active" if u.is_subscribed else "Inactive",
+            "analysis_count": cnt_r.scalar() or 0,
+            "delivery_type": u.delivery_type or "email",
+        })
+
+    return JSONResponse({"users": user_list, "total_count": total_count, "page": page, "limit": limit,
+                         "total_pages": max(1, (total_count + limit - 1) // limit)})
+
+
+@app.delete("/api/admin/users/{google_id}", tags=["Admin Dashboard"], summary="사용자 비활성화")
+async def admin_delete_user(google_id: str, admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    from database import User
+    result = await db.execute(select(User).where(User.google_id == google_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    user.is_subscribed = False
+    await db.commit()
+    logger.info(f"[admin] 사용자 비활성화: {google_id} by {admin['username']}")
+    return JSONResponse({"message": "사용자가 비활성화되었습니다", "google_id": google_id})
+
+
+@app.get("/api/admin/users/{google_id}", tags=["Admin Dashboard"], summary="사용자 상세")
+async def admin_user_detail(google_id: str, admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    from database import User, Newsletter, UserInterest
+    result = await db.execute(select(User).where(User.google_id == google_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    cnt_r = await db.execute(select(func.count()).select_from(Newsletter).where(Newsletter.user_id == google_id))
+    int_r = await db.execute(select(UserInterest).where(UserInterest.user_id == google_id, UserInterest.is_active == True))
+    return JSONResponse({
+        "google_id": user.google_id, "email": user.email or "",
+        "created_at": user.created_at.isoformat() if user.created_at else "",
+        "is_subscribed": user.is_subscribed, "delivery_type": user.delivery_type or "email",
+        "analysis_count": cnt_r.scalar() or 0,
+        "interests": [i.category for i in int_r.scalars().all()],
+    })
+
+
+@app.get("/api/admin/analysis", tags=["Admin Dashboard"], summary="분석 이력 (뉴스레터 로그)")
+async def admin_analysis(
+    page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
+    user_id: str = Query(""), date_from: str = Query(""), date_to: str = Query(""), status: str = Query(""),
+    admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import text as _t
+
+    # 2026-05-15 failed 잔여 레코드 자동 삭제 (1회성 정리)
+    try:
+        await db.execute(_t(
+            "DELETE FROM newsletters WHERE delivery_status='failed' "
+            "AND delivered_at < '2026-06-02 13:47:00'"
+        ))
+        await db.commit()
+    except Exception:
+        pass
+
+    # 2026-06-02 13:47 이후 + failed 제외 기본 조건
+    conditions = ["delivery_status != 'failed'", "delivered_at >= '2026-06-02 13:47:00'"]
+    params: dict = {}
+
+    if user_id:
+        conditions.append("user_id = :uid")
+        params["uid"] = user_id
+    if date_from:
+        conditions.append("delivered_at >= :dfrom")
+        params["dfrom"] = date_from
+    if date_to:
+        conditions.append("delivered_at <= :dto")
+        params["dto"] = date_to + " 23:59:59"
+    if status:
+        conditions.append("delivery_status = :st")
+        params["st"] = status
+
+    where = " AND ".join(conditions)
+
+    try:
+        cnt = (await db.execute(_t(f"SELECT COUNT(*) FROM newsletters WHERE {where}"), params)).scalar() or 0
+        rows = (await db.execute(_t(
+            f"SELECT n.id, n.delivered_at, n.user_id, n.subject, n.delivery_status, u.email "
+            f"FROM newsletters n LEFT JOIN users u ON u.google_id = n.user_id "
+            f"WHERE {where} ORDER BY n.delivered_at DESC LIMIT :lim OFFSET :off"
+        ), {**params, "lim": limit, "off": (page - 1) * limit})).fetchall()
+    except Exception:
+        return JSONResponse({"logs": [], "total_count": 0, "page": page, "limit": limit})
+
+    logs = [{
+        "id": str(r[0]),
+        "timestamp": r[1].strftime("%Y-%m-%d %H:%M:%S") if r[1] else "",
+        "user": r[5] or r[2] or "",
+        "user_id": r[2] or "",
+        "subject": r[3] or "",
+        "delivery_status": r[4] or "generated",
+    } for r in rows]
+
+    return JSONResponse({"logs": logs, "total_count": cnt, "page": page, "limit": limit})
+
+
+@app.get("/api/admin/analysis/{analysis_id}", tags=["Admin Dashboard"], summary="분석 상세")
+async def admin_analysis_detail(analysis_id: str, admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    from database import Newsletter
+    import json as _json
+    result = await db.execute(select(Newsletter).where(Newsletter.id == analysis_id))
+    n = result.scalar_one_or_none()
+    if not n:
+        raise HTTPException(status_code=404, detail="분석 이력을 찾을 수 없습니다")
+    content = {}
+    if n.content_json:
+        try: content = _json.loads(n.content_json)
+        except Exception: pass
+    return JSONResponse({"id": str(n.id), "user_id": n.user_id, "subject": n.subject or "",
+                         "delivery_status": n.delivery_status or "generated",
+                         "delivered_at": n.delivered_at.isoformat() if n.delivered_at else "", "content": content})
+
+
+@app.get("/api/admin/pipeline-stats", tags=["Admin Dashboard"], summary="파이프라인 통계 (System Overview용)")
+async def admin_pipeline_stats(admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    import datetime as _dt
+    today_start = _dt.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 오늘 분석 수
+    total_res = await db.execute(
+        select(func.count(AnalysisRun.id)).where(AnalysisRun.started_at >= today_start)
+    )
+    today_count = total_res.scalar() or 0
+
+    # 평균 레이턴시
+    lat_res = await db.execute(
+        select(func.avg(AnalysisRun.total_latency_ms)).where(
+            AnalysisRun.total_latency_ms.isnot(None),
+            AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
+        )
+    )
+    avg_latency = int(lat_res.scalar() or 0)
+
+    # 캐시 히트율 (최근 7일)
+    cache_res = await db.execute(
+        select(func.count(AnalysisRun.id)).where(
+            AnalysisRun.cache_hit == True,
+            AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
+        )
+    )
+    total_res7 = await db.execute(
+        select(func.count(AnalysisRun.id)).where(
+            AnalysisRun.started_at >= today_start - _dt.timedelta(days=7)
+        )
+    )
+    cache_hits = cache_res.scalar() or 0
+    total7 = total_res7.scalar() or 1
+    cache_hit_rate = round(cache_hits / total7 * 100)
+
+    # 자막 성공률 (최근 7일, source != 'none')
+    transcript_ok_res = await db.execute(
+        select(func.count(AnalysisRun.id)).where(
+            AnalysisRun.transcript_source.notin_(["none", None]),
+            AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
+        )
+    )
+    transcript_ok = transcript_ok_res.scalar() or 0
+    transcript_success_rate = round(transcript_ok / total7 * 100)
+
+    # 자막 소스 분포 (최근 7일)
+    src_res = await db.execute(
+        select(AnalysisRun.transcript_source, func.count(AnalysisRun.id))
+        .where(AnalysisRun.started_at >= today_start - _dt.timedelta(days=7))
+        .group_by(AnalysisRun.transcript_source)
+    )
+    transcript_source_distribution = {row[0] or "none": row[1] for row in src_res.fetchall()}
+
+    # 광고 의심 비율 (ad_score >= 30, 최근 7일)
+    ad_res = await db.execute(
+        select(func.count(AnalysisRun.id)).where(
+            AnalysisRun.ad_score >= 30,
+            AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
+        )
+    )
+    ad_suspect = ad_res.scalar() or 0
+    ad_suspect_rate = round(ad_suspect / total7 * 100)
+
+    # 전체 분석 수 (analysis_runs 전체)
+    total_all_res = await db.execute(select(func.count(AnalysisRun.id)))
+    total_all = total_all_res.scalar() or 0
+
+    # 오늘 신규 가입자
+    try:
+        from sqlalchemy import text as _t4
+        new_users_res = await db.execute(_t4(
+            "SELECT COUNT(*) FROM users WHERE created_at >= :d"
+        ), {"d": today_start})
+        today_new_users = new_users_res.scalar() or 0
+    except Exception:
+        today_new_users = 0
+
+    # 평균 신뢰도 점수 (최근 7일, credibility_score IS NOT NULL)
+    avg_cred_res = await db.execute(
+        select(func.avg(AnalysisRun.credibility_score)).where(
+            AnalysisRun.credibility_score.isnot(None),
+            AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
+        )
+    )
+    avg_cred_raw = avg_cred_res.scalar()
+    avg_credibility_score = round(avg_cred_raw) if avg_cred_raw else None
+
+    # 최근 실행 50건 — users 조인으로 이메일 표시
+    from sqlalchemy import text as _t5
+    recent_rows = (await db.execute(_t5(
+        "SELECT a.id, a.request_type, a.video_id, a.keyword, a.user_id, "
+        "a.status, a.started_at, a.total_latency_ms, a.cache_hit, "
+        "a.transcript_source, a.ad_score, a.credibility_score, u.email "
+        "FROM analysis_runs a "
+        "LEFT JOIN users u ON u.google_id = a.user_id "
+        "ORDER BY a.started_at DESC LIMIT 50"
+    ))).fetchall()
+    recent_runs = []
+    for r in recent_rows:
+        recent_runs.append({
+            "id": str(r[0]),
+            "request_type": r[1] or "watch",
+            "video_id": r[2] or "",
+            "keyword": r[3] or "",
+            "user_id": r[12] or r[4] or "",   # email 우선, 없으면 google_id
+            "status": r[5] or "completed",
+            "started_at": r[6].isoformat() if r[6] else "",
+            "latency_ms": r[7],
+            "cache_hit": r[8],
+            "transcript_source": r[9] or "none",
+            "ad_score": r[10],
+            "credibility_score": r[11],
+        })
+
+    return JSONResponse({
+        "today_analysis_count": today_count,
+        "total_analysis_count": total_all,
+        "today_new_users": today_new_users,
+        "avg_latency_ms": avg_latency,
+        "cache_hit_rate": cache_hit_rate,
+        "transcript_success_rate": transcript_success_rate,
+        "transcript_source_distribution": transcript_source_distribution,
+        "ad_suspect_rate": ad_suspect_rate,
+        "avg_credibility_score": avg_credibility_score,
+        "recent_runs": recent_runs,
+    })
+
+
+@app.get("/api/admin/scheduler-status", tags=["Admin Dashboard"], summary="스케줄러 상태")
+async def admin_scheduler_status(admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text as _text
+    from scheduler import scheduler as _sched
+
+    running = _sched.running
+    jobs = []
+    try:
+        for job in _sched.get_jobs():
+            next_run = job.next_run_time
+            jobs.append({
+                "id": job.id,
+                "name": job.name or job.id,
+                "next_run": next_run.isoformat() if next_run else None,
+            })
+    except Exception:
+        pass
+
+    # 뉴스레터 발송 상태 분포 — raw SQL로 ORM 컬럼 이슈 회피
+    newsletter_status_distribution = {}
+    try:
+        sd_res = await db.execute(_text(
+            "SELECT delivery_status, COUNT(*) FROM newsletters GROUP BY delivery_status"
+        ))
+        newsletter_status_distribution = {row[0]: row[1] for row in sd_res.fetchall()}
+    except Exception:
+        pass
+
+    # prepared 대기 큐
+    prepared_queue = 0
+    try:
+        pq = await db.execute(_text("SELECT COUNT(*) FROM newsletters WHERE delivery_status = 'prepared'"))
+        prepared_queue = pq.scalar() or 0
+    except Exception:
+        pass
+
+    # 활성 토픽 수 / 토픽 보유 사용자 수 (is_active 컬럼 없을 때 fallback)
+    active_topics = 0
+    users_with_topics = 0
+    try:
+        at = await db.execute(_text("SELECT COUNT(*) FROM user_interests WHERE is_active = TRUE"))
+        active_topics = at.scalar() or 0
+        uw = await db.execute(_text("SELECT COUNT(DISTINCT user_id) FROM user_interests WHERE is_active = TRUE"))
+        users_with_topics = uw.scalar() or 0
+    except Exception:
+        try:
+            at = await db.execute(_text("SELECT COUNT(*) FROM user_interests"))
+            active_topics = at.scalar() or 0
+            uw = await db.execute(_text("SELECT COUNT(DISTINCT user_id) FROM user_interests"))
+            users_with_topics = uw.scalar() or 0
+        except Exception:
+            pass
+
+    # 최근 실패 뉴스레터 5건
+    recent_failures = []
+    try:
+        fail_res = await db.execute(_text(
+            "SELECT id, user_id, error_message, delivered_at FROM newsletters "
+            "WHERE delivery_status = 'failed' ORDER BY delivered_at DESC LIMIT 5"
+        ))
+        recent_failures = [
+            {"id": str(r[0]), "user_id": r[1], "error": r[2] or "", "at": r[3].isoformat() if r[3] else ""}
+            for r in fail_res.fetchall()
+        ]
+    except Exception:
+        pass
+
+    return JSONResponse({
+        "scheduler_running": running,
+        "jobs": jobs,
+        "newsletter_status_distribution": newsletter_status_distribution,
+        "prepared_queue": prepared_queue,
+        "active_topics": active_topics,
+        "users_with_topics": users_with_topics,
+        "recent_failures": recent_failures,
+    })
+
+
+class AdminTestAnalysisRequest(BaseModel):
+    youtube_url: str
+    model_config = ConfigDict(json_schema_extra={"example": {"youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}})
+
+
+@app.post("/api/admin/test-analysis", tags=["Admin Dashboard"], summary="Admin 라이브 분석 테스트 (Pipeline Trace)")
+async def admin_test_analysis(
+    data: AdminTestAnalysisRequest,
+    admin=Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    import re as _re, time, datetime as _dt
+    match = _re.search(r"(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})", data.youtube_url)
+    if not match:
+        # video_id 직접 입력 허용 (11자)
+        raw = data.youtube_url.strip()
+        if len(raw) == 11 and raw.replace("-","").replace("_","").isalnum():
+            video_id = raw
+        else:
+            raise HTTPException(status_code=400, detail="유효한 YouTube URL 또는 video ID가 아닙니다")
+    else:
+        video_id = match.group(1)
+
+    run_start = time.time()
+    trace = []   # pipeline trace steps
+
+    # ── Step 1: 메타데이터 조회 ────────────────────────────────────────────────
+    t0 = time.time()
+    try:
+        from youtube_search import fetch_video_by_id
+        meta = await asyncio.to_thread(fetch_video_by_id, video_id)
+        trace.append({"step": 1, "name": "메타데이터 조회", "provider": "YouTube Data API",
+                       "status": "ok", "latency_ms": int((time.time()-t0)*1000),
+                       "detail": f"제목: {meta.get('title','')[:50]} | 채널: {meta.get('channel_title','')} | 구독자: {meta.get('subscriber_count',0):,}"})
+    except Exception as e:
+        meta = {"video_id": video_id, "title": f"Video {video_id}", "channel_title": "Unknown"}
+        trace.append({"step": 1, "name": "메타데이터 조회", "provider": "YouTube Data API",
+                       "status": "error", "latency_ms": int((time.time()-t0)*1000), "detail": str(e)})
+
+    title = meta.get("title", f"Video {video_id}")
+
+    # ── Step 2: 자막 수집 (fallback chain) ────────────────────────────────────
+    t0 = time.time()
+    transcript = await asyncio.to_thread(_collect_transcript_for_summary_traced, video_id)
+    transcript_text = transcript.get("text")
+    transcript_source = transcript.get("source", "none")
+    transcript_len = len(transcript_text) if transcript_text else 0
+    trace.append({"step": 2, "name": "자막 수집", "provider": transcript_source,
+                   "status": "ok" if transcript_text else "fallback",
+                   "latency_ms": int((time.time()-t0)*1000),
+                   "detail": (f"수집 경로: {transcript_source} | 길이: {transcript_len:,}자" if transcript_text
+                               else "자막 없음 (모든 fallback 실패)")})
+
+    # ── Step 3~5: 분석 실행 ────────────────────────────────────────────────────
+    t0 = time.time()
+    try:
+        from agents.analyzer_ai import _analyze_single_video, _calc_credibility
+        video_info = {
+            "video_id": video_id, "title": title,
+            "channel_id": meta.get("channel_id",""), "channel_title": meta.get("channel_title",""),
+            "subscriber_count": meta.get("subscriber_count",0),
+            "description": meta.get("description",""), "has_paid_placement": meta.get("has_paid_placement"),
+        }
+        semaphore = asyncio.Semaphore(1)
+        result = await _analyze_single_video(title, video_info, transcript_text, semaphore)
+        analyze_latency = int((time.time()-t0)*1000)
+
+        # Ad signals from result
+        ad_signals_raw = result.get("ad_signals", [])
+        ad_score = result.get("ad_score", 0)
+
+        # Layer별 분해
+        layers = {"description": [], "transcript": [], "api": [], "gemini": []}
+        for sig in ad_signals_raw:
+            layer = sig.get("layer", "description")
+            if layer in layers:
+                layers[layer].append(sig)
+
+        ad_grade = "none"
+        if ad_score >= 70: ad_grade = "high"
+        elif ad_score >= 30: ad_grade = "medium"
+
+        # Credibility
+        comp = _calc_credibility(result, meta)
+        trust_score = round(
+            comp.get("transcript_quality", 0) * 0.20 +
+            comp.get("ad_free", 0) * 0.35 +
+            comp.get("channel_credibility", 0) * 0.25 +
+            comp.get("information_consistency", 0) * 0.20
+        )
+
+        trace.append({"step": 3, "name": "광고 탐지 (4-Layer)", "provider": "Rule+API+Gemini",
+                       "status": "ok", "latency_ms": analyze_latency,
+                       "detail": f"ad_score={ad_score} | layers: desc={len(layers['description'])}, transcript={len(layers['transcript'])}, api={len(layers['api'])}, gemini={len(layers['gemini'])}"})
+
+        trace.append({"step": 4, "name": "신뢰도 채점", "provider": "credibility_scorer",
+                       "status": "ok", "latency_ms": 0,
+                       "detail": f"trust={trust_score} | transcript_quality={round(comp.get('transcript_quality',0)*100)}, ad_free={round(comp.get('ad_free',0)*100)}, channel={round(comp.get('channel_credibility',0)*100)}"})
+
+        _summary_len = len(result.get("summary") or "")
+        _claims_count = len(result.get("key_claims") or [])
+        trace.append({"step": 5, "name": "Gemini 요약/핵심주장", "provider": "Gemini",
+                       "status": "ok", "latency_ms": 0,
+                       "detail": f"summary_len={_summary_len}, claims={_claims_count}"})
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"분석 실패: {str(e)}")
+
+    elapsed_ms = int((time.time() - run_start) * 1000)
+    logger.info(f"[admin-test] video_id={video_id} trust={trust_score} elapsed={elapsed_ms}ms by {admin['username']}")
+
+    # analysis_runs 로깅
+    try:
+        run = AnalysisRun(
+            request_type="admin_test", video_id=video_id, keyword=title,
+            user_id=admin["username"], status="completed",
+            finished_at=_dt.datetime.utcnow(), total_latency_ms=elapsed_ms,
+            cache_hit=False, transcript_source=transcript_source,
+            transcript_len=transcript_len, ad_score=ad_score, credibility_score=trust_score,
+        )
+        db.add(run)
+        await db.commit()
+    except Exception:
+        pass
+
+    return JSONResponse({
+        "video_id": video_id, "title": title,
+        "channel_title": meta.get("channel_title", ""),
+        "subscriber_count": meta.get("subscriber_count", 0),
+        "thumbnail_url": f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+        "trust_score": trust_score,
+        "ad_detected": result.get("ad_detected", False),
+        "ad_score": ad_score,
+        "ad_grade": ad_grade,
+        "ad_layers": {
+            "layer1_description": [{"rule": s.get("rule",""), "evidence": s.get("evidence","")[:80], "score": s.get("score",0)} for s in layers["description"]],
+            "layer2_transcript":  [{"rule": s.get("rule",""), "evidence": s.get("evidence","")[:80], "score": s.get("score",0)} for s in layers["transcript"]],
+            "layer3_api":         [{"rule": s.get("rule",""), "evidence": s.get("evidence","")[:80], "score": s.get("score",0)} for s in layers["api"]],
+            "layer4_gemini":      [{"rule": s.get("rule",""), "evidence": s.get("evidence","")[:80], "score": s.get("score",0)} for s in layers["gemini"]],
+        },
+        "summary": result.get("summary", ""),
+        "key_claims": result.get("key_claims", []),
+        "transcript_available": bool(transcript_text),
+        "transcript_len": transcript_len,
+        "transcript_source": transcript_source,
+        "credibility_components": {
+            "transcript_quality": round(comp.get("transcript_quality", 0) * 100),
+            "ad_free":            round(comp.get("ad_free", 0) * 100),
+            "channel_credibility": round(comp.get("channel_credibility", 0) * 100),
+            "weights": {"transcript_quality": 20, "ad_free": 35, "channel_credibility": 25},
+        },
+        "pipeline_trace": trace,
+        "processing_time_ms": elapsed_ms,
+        "processing_time": round(elapsed_ms / 1000, 2),
+    })
+
+
+def _collect_transcript_for_summary_traced(video_id: str) -> dict:
+    """자막 수집 - source 정보 포함 반환 (pipeline trace용)"""
+    import transcript_service as _ts
+
+    raw = None
+    source = "none"
+
+    # 1순위: youtube-transcript-api
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        langs = ["ko", "en", "ko-KR", "en-US"]
+        raw = YouTubeTranscriptApi.get_transcript(video_id, languages=langs)
+        source = "youtube-transcript-api"
+    except Exception:
+        pass
+
+    # 2순위: Supadata (youtube-transcript-api 429 감지 시 우선)
+    if not raw:
+        try:
+            raw = _ts._fetch_via_supadata(video_id)
+            if raw:
+                source = "supadata"
+        except Exception:
+            pass
+
+    # 3순위: yt-dlp
+    if not raw:
+        try:
+            raw = _ts._fetch_via_ytdlp(video_id)
+            if raw:
+                source = "yt-dlp"
+        except Exception:
+            pass
+
+    # 4순위: Supadata (최종 fallback)
+    if not raw:
+        try:
+            raw = _ts._fetch_via_supadata(video_id)
+            if raw:
+                source = "supadata-final"
+        except Exception:
+            pass
+
+    if not raw:
+        return {"text": None, "source": "none"}
+
+    entries = _ts.format_transcript_with_timestamps(raw)
+    if not entries:
+        return {"text": None, "source": "none"}
+    full_text = " ".join(e["text"] for e in entries)
+    from preprocessing import clean_transcript
+    cleaned = clean_transcript(full_text)
+    return {"text": cleaned[:15_000] if cleaned else None, "source": source}
+
+
+# ── Demo Gallery ─────────────────────────────────────────────────────────────
+
+@app.get("/api/gallery/samples", tags=["Demo Gallery"], summary="Demo Gallery 샘플 목록")
+async def gallery_samples(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text as _text
+    try:
+        result = await db.execute(
+            _text("SELECT video_id,title,channel,intent,trust_score,ad_detected,summary,keywords,thumbnail_url,views,display_order,is_featured FROM demo_gallery_samples ORDER BY display_order")
+        )
+        rows = result.fetchall()
+        keys = ["video_id","title","channel","intent","trust_score","ad_detected","summary","keywords","thumbnail_url","views","display_order","is_featured"]
+        samples = [dict(zip(keys, row)) for row in rows]
+    except Exception:
+        samples = []
+    return JSONResponse({"samples": samples, "total": len(samples)})
+
+
+# ── Health ────────────────────────────────────────────────────────────────────
+
+
+# ── Demo 탭 전용 API ──────────────────────────────────────────────────────────
+
+class DemoAnalyzeRequest(BaseModel):
+    video_id: str
+
+class DemoNewsletterRequest(BaseModel):
+    topic: str
+    video_id: str = ""
+
+
+@app.post("/api/admin/demo-analyze", tags=["Admin Dashboard"], summary="Demo 탭 영상 분석")
+async def demo_analyze(data: DemoAnalyzeRequest, admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    video_id = data.video_id.strip()
+    if not video_id:
+        raise HTTPException(status_code=400, detail="video_id 필수")
+
+    try:
+        from youtube_search import fetch_video_by_id
+        meta = await asyncio.to_thread(fetch_video_by_id, video_id)
+    except Exception:
+        meta = {"video_id": video_id, "title": f"Video {video_id}", "channel_title": "Unknown"}
+
+    title = meta.get("title", f"Video {video_id}")
+
+    transcript = await asyncio.to_thread(_collect_transcript_for_summary_traced, video_id)
+    transcript_text = transcript.get("text")
+    transcript_source = transcript.get("source", "none")
+
+    result = {}
+    trust_score = 0
+    ad_score = 0
+    sources = []
+    try:
+        from agents.analyzer_ai import _analyze_single_video, _calc_credibility
+        video_info = {
+            "video_id": video_id, "title": title,
+            "channel_id": meta.get("channel_id", ""),
+            "channel_title": meta.get("channel_title", ""),
+            "subscriber_count": meta.get("subscriber_count", 0),
+            "description": meta.get("description", ""),
+            "has_paid_placement": meta.get("has_paid_placement"),
+        }
+        semaphore = asyncio.Semaphore(1)
+        result = await _analyze_single_video(title, video_info, transcript_text, semaphore)
+        comp = _calc_credibility(result, meta)
+        trust_score = round(
+            comp.get("transcript_quality", 0) * 0.20 +
+            comp.get("ad_free", 0) * 0.35 +
+            comp.get("channel_credibility", 0) * 0.25 +
+            comp.get("information_consistency", 0) * 0.20
+        )
+        ad_score = result.get("ad_score", 0)
+    except Exception:
+        pass
+
+    try:
+        from youtube_search import search_videos
+        topic_for_search = result.get("extracted_topic") or title[:40]
+        raw_sources = await asyncio.to_thread(search_videos, topic_for_search, max_results=6)
+        sources = [
+            {"video_id": v.get("video_id", ""), "title": v.get("title", ""), "channel_title": v.get("channel_title", "")}
+            for v in (raw_sources or []) if v.get("video_id") != video_id
+        ][:5]
+    except Exception:
+        sources = []
+
+    topic = result.get("extracted_topic") or result.get("topic") or title[:30]
+
+    return JSONResponse({
+        "video_id": video_id,
+        "title": title,
+        "topic": topic,
+        "trust_score": trust_score,
+        "ad_score": ad_score,
+        "transcript_source": transcript_source,
+        "summary": result.get("summary", ""),
+        "key_claims": (result.get("key_claims") or [])[:4],
+        "sources": sources,
+    })
+
+
+@app.post("/api/admin/demo-newsletter", tags=["Admin Dashboard"], summary="Demo 탭 뉴스레터 생성")
+async def demo_newsletter(data: DemoNewsletterRequest, admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    topic = data.topic or "AI 트렌드"
+    video_id = data.video_id or ""
+
+    async def _gen():
+        return await run_pipeline(
+            user_id="demo_admin",
+            raw_keywords=[topic],
+            skip_clustering=True,
+        )
+
+    async def _gemini_fallback(reason: str):
+        try:
+            from gemini_client import call_gemini_async
+            prompt = f"""다음 토픽에 대한 간결한 뉴스레터를 작성해주세요: "{topic}"
+
+JSON 형식으로 반환:
+{{
+  "subject": "뉴스레터 제목",
+  "intent_type": "지식형",
+  "topics": [
+    {{
+      "topic": "{topic}",
+      "summary": ["핵심 내용 1문장", "핵심 내용 2문장", "핵심 내용 3문장"],
+      "pros": ["장점/긍정 포인트"],
+      "cons": ["주의사항"],
+      "sources": []
+    }}
+  ]
+}}"""
+            raw = await call_gemini_async(prompt, temperature=0.4, json_mode=True)
+            import json as _json
+            nl = _json.loads(raw)
+            nl["_fallback"] = True
+            nl["_fallback_reason"] = reason
+            return JSONResponse(nl)
+        except Exception as e2:
+            raise HTTPException(status_code=500, detail=f"뉴스레터 생성 실패({reason}). 폴백도 실패: {str(e2)}")
+
+    try:
+        newsletter = await asyncio.wait_for(_gen(), timeout=90)
+        return JSONResponse(newsletter)
+    except asyncio.TimeoutError:
+        return await _gemini_fallback("timeout")
+    except Exception as e:
+        import logging as _log
+        _log.getLogger(__name__).error(f"demo-newsletter pipeline error: {e}", exc_info=True)
+        # 파이프라인 자체 오류도 Gemini 폴백으로 처리
+        return await _gemini_fallback(str(e)[:120])
+
+
+
+@app.get("/api/admin/health", tags=["Admin Dashboard"], summary="헬스 체크")
+async def admin_health(admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text as _text
+    db_ok = False
+    try:
+        await db.execute(_text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        pass
+    from scheduler import scheduler as _sched
+    return JSONResponse({
+        "status": "ok" if db_ok else "degraded",
+        "db": "connected" if db_ok else "error",
+        "scheduler": "running" if _sched.running else "stopped",
+    })
+
+
+# ── Demo Cache API ────────────────────────────────────────────────────────────
+
+@app.get("/api/admin/demo-cache/{video_id}", tags=["Admin Dashboard"], summary="Demo 캐시 조회")
+async def demo_cache_get(video_id: str, admin=Depends(get_admin_user)):
+    import json as _json
+    from sqlalchemy import text as _text
+    async with AsyncSessionLocal() as _db:
+        try:
+            row = await _db.execute(
+                _text("SELECT analysis_json, newsletter_json FROM demo_analysis_cache WHERE video_id = :vid"),
+                {"vid": video_id}
+            )
+            r = row.fetchone()
+            if r and r[0]:
+                return JSONResponse({
+                    "hit": True,
+                    "analysis": _json.loads(r[0]) if r[0] else None,
+                    "newsletter": _json.loads(r[1]) if r[1] else None,
+                })
+        except Exception:
+            pass
+    return JSONResponse({"hit": False})
+
+
+@app.post("/api/admin/demo-cache/refresh", tags=["Admin Dashboard"], summary="Demo 캐시 강제 갱신")
+async def demo_cache_refresh(admin=Depends(get_admin_user)):
+    from sqlalchemy import text as _text
+    async with AsyncSessionLocal() as _db:
+        try:
+            await _db.execute(_text("DELETE FROM demo_analysis_cache WHERE video_id = :vid"), {"vid": DEMO_DEFAULT_VIDEO_ID})
+            await _db.commit()
+        except Exception:
+            pass
+    asyncio.create_task(_warm_demo_cache())
+    return JSONResponse({"status": "refreshing"})
+
+
+# ── Demo 탭 전용 API ──────────────────────────────────────────────────────────
+
+class DemoAnalyzeRequest(BaseModel):
+    video_id: str
+
+class DemoNewsletterRequest(BaseModel):
+    topic: str
+    video_id: str = ""
+
+
+@app.post("/api/admin/demo-analyze", tags=["Admin Dashboard"], summary="Demo 탭 영상 분석")
+async def demo_analyze(data: DemoAnalyzeRequest, admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
+    video_id = data.video_id.strip()
+    if not video_id:
+        raise HTTPException(status_code=400, detail="video_id 필수")
+
+    try:
+        from youtube_search import fetch_video_by_id
+        meta = await asyncio.to_thread(fetch_video_by_id, video_id)
+    except Exception:
+        meta = {"video_id": video_id, "title": f"Video {video_id}", "channel_title": "Unknown"}
+
+    title = meta.get("title", f"Video {video_id}")
+    transcript = await asyncio.to_thread(_collect_transcript_for_summary_traced, video_id)
+    transcript_text = transcript.get("text")
+    transcript_source = transcript.get("source", "none")
+
+    result = {}
+    trust_score = 0
+    ad_score = 0
+    sources = []
+    try:
+        from agents.analyzer_ai import _analyze_single_video, _calc_credibility
+        video_info = {
+            "video_id": video_id, "title": title,
+            "channel_id": meta.get("channel_id", ""),
+            "channel_title": meta.get("channel_title", ""),
+            "subscriber_count": meta.get("subscriber_count", 0),
+            "description": meta.get("description", ""),
+            "has_paid_placement": meta.get("has_paid_placement"),
+        }
+        semaphore = asyncio.Semaphore(1)
+        result = await _analyze_single_video(title, video_info, transcript_text, semaphore)
+        comp = _calc_credibility(result, meta)
+        trust_score = round(
+            comp.get("transcript_quality", 0) * 0.20 +
+            comp.get("ad_free", 0) * 0.35 +
+            comp.get("channel_credibility", 0) * 0.25 +
+            comp.get("information_consistency", 0) * 0.20
+        )
+        ad_score = result.get("ad_score", 0)
+    except Exception:
+        pass
+
+    try:
+        from youtube_search import search_videos
+        topic_for_search = result.get("extracted_topic") or title[:40]
+        raw_sources = await asyncio.to_thread(search_videos, topic_for_search, max_results=6)
+        sources = [
+            {"video_id": v.get("video_id", ""), "title": v.get("title", ""), "channel_title": v.get("channel_title", "")}
+            for v in (raw_sources or []) if v.get("video_id") != video_id
+        ][:5]
+    except Exception:
+        sources = []
+
+    topic = result.get("extracted_topic") or result.get("topic") or title[:30]
+    return JSONResponse({
+        "video_id": video_id, "title": title, "topic": topic,
+        "trust_score": trust_score, "ad_score": ad_score,
+        "transcript_source": transcript_source,
+        "summary": result.get("summary", ""),
+        "key_claims": (result.get("key_claims") or [])[:4],
+        "sources": sources,
+    })

@@ -168,15 +168,36 @@ class UserInterestVideo(Base):
     )
 
 
-# ── DB 초기화 (테이블 생성) ────────────────────────────────────────────────────
+class AnalysisRun(Base):
+    """분석 실행 1회 = 1 row — 파이프라인 관측 대시보드용"""
+    __tablename__ = "analysis_runs"
+
+    id             = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_type   = Column(String(20), default="watch")   # watch | search | admin_test | newsletter
+    video_id       = Column(String(50), nullable=True)
+    keyword        = Column(Text, nullable=True)
+    user_id        = Column(String(255), nullable=True)
+    status         = Column(String(20), default="completed")  # completed | failed
+    started_at     = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    finished_at    = Column(DateTime, nullable=True)
+    total_latency_ms = Column(Integer, nullable=True)
+    cache_hit      = Column(Boolean, default=False)
+    transcript_source = Column(String(20), nullable=True)
+    transcript_len = Column(Integer, nullable=True)
+    ad_score       = Column(Integer, nullable=True)
+    credibility_score = Column(Integer, nullable=True)
+    error_message  = Column(Text, nullable=True)
+
+    __table_args__ = (
+        Index("idx_analysis_runs_started", "started_at"),
+        Index("idx_analysis_runs_type", "request_type", "started_at"),
+    )
+
 
 async def init_db():
-    """서버 시작 시 호출 — 테이블 없으면 자동 생성"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-
-# ── 세션 의존성 (FastAPI Depends용) ───────────────────────────────────────────
 
 async def get_db():
     async with AsyncSessionLocal() as session:
