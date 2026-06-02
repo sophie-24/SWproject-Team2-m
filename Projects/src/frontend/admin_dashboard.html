@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tubify Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Noto Sans KR',sans-serif;background:#f7f9fb;color:#191c1e;min-height:100vh}
+
+    /* NAV */
+    nav{position:sticky;top:0;z-index:100;height:80px;display:flex;align-items:center;padding:0 28px;gap:4px;background:rgba(255,255,255,.88);backdrop-filter:blur(10px);border-bottom:1px solid #e6e8ea}
+    .nav-logo{color:red;font-size:22px;font-weight:800;text-decoration:none;margin-right:20px;flex-shrink:0}
+    .nav-tabs{display:flex;align-items:center;gap:2px;flex:1}
+    .nav-tab{padding:8px 16px;font-size:14px;font-weight:500;color:#555;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:color .15s,border-color .15s;white-space:nowrap;font-family:inherit}
+    .nav-tab:hover{color:#bc0100}
+    .nav-tab.active{color:#bc0100;border-bottom-color:#bc0100;font-weight:700}
+    .nav-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .nav-admin{font-size:13px;color:#555}
+    .btn-logout{background:#e6e8ea;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-family:inherit;cursor:pointer;color:#191c1e;font-weight:500}
+    .btn-logout:hover{background:#d0d2d4}
+
+    /* LOGIN */
+    #login-overlay{position:fixed;inset:0;z-index:200;background:#f7f9fb;display:flex;align-items:center;justify-content:center}
+    .login-card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.10);padding:48px 40px;width:380px;max-width:90vw;display:flex;flex-direction:column;align-items:center;gap:22px}
+    .login-logo{color:red;font-size:32px;font-weight:800}
+    .login-sub{font-size:13px;color:#888;margin-top:-10px}
+    .lf{width:100%;display:flex;flex-direction:column;gap:5px}
+    .lf label{font-size:13px;font-weight:500;color:#555}
+    .lf input{border:1px solid #d0d2d4;border-radius:8px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none;transition:border-color .15s}
+    .lf input:focus{border-color:#bc0100}
+    .btn-login{width:100%;padding:12px;border:none;border-radius:8px;background:#bc0100;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer}
+    .btn-login:hover{background:#9a0000}
+    #login-error{color:#bc0100;font-size:13px;display:none}
+
+    /* PANELS */
+    .tab-panel{display:none;height:calc(100vh - 80px)}
+    .tab-panel.active{display:flex;flex-direction:column}
+    #panel-service{padding:0}
+    #service-iframe{flex:1;width:100%;border:none}
+    .panel-content{flex:1;overflow-y:auto;padding:28px 32px}
+
+    /* COMMON */
+    .sec-title{font-size:18px;font-weight:700;margin-bottom:20px}
+    .sec-sub{font-size:15px;font-weight:700;margin:24px 0 14px;padding-top:16px;border-top:1px solid #e6e8ea}
+    .sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+    .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600}
+    .badge-green{background:#e6f4ea;color:#2e7d32}
+    .badge-red{background:#fdecea;color:#bc0100}
+    .badge-gray{background:#e6e8ea;color:#555}
+    .badge-yellow{background:#fff8e1;color:#b45309}
+    .badge-blue{background:#e3f2fd;color:#1565c0}
+    .btn-sm{padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid #d0d2d4;background:#fff;font-family:inherit;font-weight:500}
+    .btn-sm.red{border-color:#bc0100;color:#bc0100}
+    .btn-sm.red:hover{background:#fdecea}
+    .btn-primary{padding:10px 20px;border:none;border-radius:8px;background:#bc0100;color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}
+    .btn-primary:hover{background:#9a0000}
+    .btn-primary:disabled{background:#ccc;cursor:not-allowed}
+    select.ctrl{border:1px solid #d0d2d4;border-radius:8px;padding:6px 12px;font-family:inherit;font-size:13px;outline:none}
+
+    /* STATS */
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+    .stat-card{background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+    .stat-label{font-size:12px;color:#888;margin-bottom:5px}
+    .stat-value{font-size:24px;font-weight:800;color:#191c1e}
+    .stat-value.red{color:#bc0100}
+    .stat-sub{font-size:10px;color:#aaa;margin-top:2px}
+
+    /* CHARTS */
+    .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+    .chart-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+    .chart-title{font-size:13px;font-weight:700;margin-bottom:12px}
+    @media(max-width:768px){.chart-grid{grid-template-columns:1fr}}
+
+    /* TABLE */
+    .table-wrap{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.07);overflow:hidden}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{background:#f7f9fb;padding:10px 14px;text-align:left;font-weight:700;color:#555;font-size:12px}
+    td{padding:10px 14px;border-top:1px solid #f0f2f4}
+    tr:hover td{background:#fafbfc}
+    .filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+    .filter-bar input,.filter-bar select{border:1px solid #d0d2d4;border-radius:8px;padding:7px 12px;font-size:13px;font-family:inherit;outline:none}
+    .filter-bar input:focus,.filter-bar select:focus{border-color:#bc0100}
+    .pagination{display:flex;align-items:center;gap:6px;justify-content:flex-end;padding:10px 14px}
+    .page-btn{border:1px solid #d0d2d4;background:#fff;border-radius:6px;padding:3px 9px;cursor:pointer;font-size:12px}
+    .page-btn.active{background:#bc0100;color:#fff;border-color:#bc0100}
+
+    /* PIPELINE DIAGRAM */
+    .pipe-wrap{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+    .pipe-container{display:flex;flex-direction:column;align-items:center;gap:0;flex:1;min-width:300px}
+    .pipe-node{background:#fff;border:2px solid #e6e8ea;border-radius:12px;padding:12px 18px;min-width:300px;max-width:520px;width:100%;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+    .pipe-node.hl{border-color:#bc0100}
+    .pipe-node-title{font-size:13px;font-weight:700;color:#191c1e;margin-bottom:3px}
+    .pipe-node-tech{font-size:11px;color:#bc0100;font-weight:600;margin-bottom:3px}
+    .pipe-node-desc{font-size:11px;color:#666}
+    .pipe-arrow{width:2px;height:20px;background:#d0d2d4;margin:0 auto;position:relative}
+    .pipe-arrow::after{content:'▼';position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);font-size:9px;color:#aaa}
+    .pipe-branch{display:flex;gap:8px;justify-content:center;width:100%}
+    .pipe-branch-node{background:#fff;border:1.5px solid #e6e8ea;border-radius:10px;padding:9px 12px;flex:1;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .pipe-branch-title{font-weight:700;color:#191c1e;margin-bottom:1px;font-size:11px}
+    .pipe-branch-tech{font-size:10px;color:#bc0100;font-weight:600}
+    .pipe-branch-desc{font-size:10px;color:#666;margin-top:2px}
+    .pipe-section-label{font-size:10px;font-weight:700;color:#bc0100;text-transform:uppercase;letter-spacing:.06em;margin:6px 0 3px;text-align:center}
+    .pipe-sidebar{width:240px;flex-shrink:0}
+
+    /* LIVE TRACE */
+    .input-row{display:flex;gap:8px;margin-bottom:14px}
+    .input-row input{flex:1;border:1px solid #d0d2d4;border-radius:8px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none}
+    .input-row input:focus{border-color:#bc0100}
+    .trace-wrap{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+    .trace-step{border:1px solid #e6e8ea;border-radius:10px;overflow:hidden}
+    .trace-hdr{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f7f9fb;cursor:pointer}
+    .trace-num{width:20px;height:20px;border-radius:50%;background:#bc0100;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .trace-name{font-size:13px;font-weight:700;flex:1}
+    .trace-provider{font-size:11px;color:#888}
+    .trace-ms{font-size:11px;color:#bc0100;font-weight:700;margin-left:auto}
+    .trace-body{padding:10px 12px;font-size:12px;color:#555;line-height:1.7;display:none}
+    .trace-step.open .trace-body{display:block}
+
+    /* AD LAYERS */
+    .ad-layers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+    .ad-layer-card{border:1px solid #e6e8ea;border-radius:10px;padding:10px 12px}
+    .ad-layer-title{font-size:12px;font-weight:700;margin-bottom:6px}
+    .ad-layer-sub{font-size:10px;font-weight:400;color:#888;margin-left:4px}
+    .ad-signal{background:#f7f9fb;border-radius:6px;padding:5px 7px;margin-bottom:3px;font-size:11px;line-height:1.5}
+    .ad-signal-rule{font-weight:700;color:#bc0100}
+    .ad-bar{height:6px;border-radius:3px;background:#e6e8ea;margin-top:6px;overflow:hidden}
+    .ad-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+    .ad-no{font-size:11px;color:#aaa;font-style:italic}
+
+    /* CREDIBILITY */
+    .cred-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+    .cred-comp{border:1px solid #e6e8ea;border-radius:10px;padding:12px;text-align:center}
+    .cred-comp-label{font-size:11px;color:#888;margin-bottom:3px}
+    .cred-comp-val{font-size:20px;font-weight:800;color:#191c1e;margin-bottom:2px}
+    .cred-comp-w{font-size:10px;color:#bc0100;font-weight:700}
+    .cred-bar{height:5px;border-radius:3px;background:#e6e8ea;margin-top:6px;overflow:hidden}
+    .cred-bar-fill{height:100%;border-radius:3px;background:#bc0100;transition:width .4s}
+    .cred-final{background:#bc0100;border-radius:10px;padding:14px 18px;color:#fff;display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+
+    /* SCHEDULER */
+    .sched-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f2f4;font-size:13px}
+    .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .dot.green{background:#4caf50}.dot.red{background:#bc0100}.dot.gray{background:#aaa}
+
+    /* GALLERY */
+        /* DEMO */
+    .demo-layout{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:flex-start}
+    @media(max-width:900px){.demo-layout{grid-template-columns:1fr}}
+    .demo-video-wrap{background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9;width:100%}
+    .demo-video-wrap iframe{width:100%;height:100%;border:none;display:block}
+    .demo-url-row{display:flex;gap:8px;margin-bottom:14px}
+    .demo-url-row input{flex:1;border:1px solid #d0d2d4;border-radius:8px;padding:9px 13px;font-size:13px;font-family:inherit;outline:none}
+    .demo-url-row input:focus{border-color:#bc0100}
+    .demo-url-row button{padding:9px 16px;border:none;border-radius:8px;background:#bc0100;color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
+    .demo-url-row button:hover{background:#9a0000}
+    /* side panel replica */
+    .sp-wrap{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.10);overflow:hidden;display:flex;flex-direction:column;min-height:520px}
+    .sp-header{background:rgba(255,255,255,.95);border-bottom:1px solid #f2f4f6;height:52px;display:flex;align-items:center;padding:0 14px;gap:8px;flex-shrink:0}
+    .sp-logo{width:26px;height:26px;background:red;border-radius:6px;display:flex;align-items:center;justify-content:center}
+    .sp-logo svg{width:11px;height:11px;fill:#fff}
+    .sp-title{font-size:14px;font-weight:700}
+    .sp-body{flex:1;padding:14px;overflow-y:auto;max-height:500px}
+    .sp-loading{text-align:center;padding:40px 0;color:#aaa;font-size:13px}
+    .sp-kw-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .sp-kw{font-size:15px;font-weight:800;color:#191c1e}
+    .sp-heart{background:none;border:none;cursor:pointer;padding:4px;border-radius:50%;transition:transform .15s}
+    .sp-heart:hover{transform:scale(1.2)}
+    .sp-heart svg{width:20px;height:20px;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:fill .15s,stroke .15s}
+    .sp-heart.hearted svg{fill:red;stroke:red}
+    .sp-heart:not(.hearted) svg{fill:none;stroke:#aaa}
+    .sp-card{background:#f7f9fb;border-radius:10px;padding:12px 14px;margin-bottom:10px;font-size:12px;line-height:1.6;color:#333}
+    .sp-card-title{font-size:12px;font-weight:700;color:#555;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+    .sp-score-row{display:flex;gap:10px;margin-bottom:10px}
+    .sp-score{flex:1;background:#f7f9fb;border-radius:8px;padding:8px 10px;text-align:center}
+    .sp-score-val{font-size:18px;font-weight:800}
+    .sp-score-val.green{color:#2e7d32}.sp-score-val.red{color:#bc0100}.sp-score-val.orange{color:#b45309}
+    .sp-score-lbl{font-size:10px;color:#888;margin-top:2px}
+    .sp-source-item{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #f0f2f4;align-items:flex-start}
+    .sp-source-thumb{width:72px;height:42px;object-fit:cover;border-radius:5px;flex-shrink:0;background:#e6e8ea}
+    .sp-source-info{flex:1;min-width:0}
+    .sp-source-title{font-size:11px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .sp-source-ch{font-size:10px;color:#888;margin-top:2px}
+    .sp-toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:#191c1e;color:#fff;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+    .sp-toast.show{opacity:1}
+    /* newsletter */
+    .nl-wrap{background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-top:20px}
+    .nl-loading{text-align:center;padding:32px;color:#aaa;font-size:13px}
+    .nl-subject{font-size:17px;font-weight:800;margin-bottom:16px;color:#191c1e}
+    .nl-section{margin-bottom:18px}
+    .nl-section-title{font-size:13px;font-weight:700;color:#bc0100;margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px}
+    .nl-item{background:#f7f9fb;border-radius:8px;padding:11px 13px;margin-bottom:8px;font-size:12px;line-height:1.6}
+    .nl-item-title{font-weight:700;margin-bottom:3px;font-size:13px}
+    .nl-source-badge{display:inline-block;background:#e3f2fd;color:#1565c0;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;margin-right:4px}
+
+    /* OVERVIEW SECTION LABEL */
+    .ov-section-label{font-size:12px;font-weight:700;color:#bc0100;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;padding-left:2px}
+
+    /* RUN TYPE BADGE */
+    .rtype{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:700}
+    .rtype-admin_test{background:#fdecea;color:#bc0100}
+    .rtype-watch{background:#e3f2fd;color:#1565c0}
+    .rtype-newsletter{background:#e6f4ea;color:#2e7d32}
+    .rtype-search{background:#fff8e1;color:#b45309}
+
+    /* DEMO SIDE PANEL — 실제 익스텐션 UI */
+    .demo-sp-frame{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;min-height:560px;border:1px solid #f0f2f4}
+    .demo-sp-hdr{background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid #f2f4f6;height:64px;display:flex;align-items:center;padding:0 16px;flex-shrink:0}
+    .demo-sp-brand{display:flex;align-items:center;gap:10px}
+    .demo-sp-logo-box{width:32px;height:32px;background:red;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .demo-sp-title{font-size:15px;font-weight:700;color:#191c1e;letter-spacing:-0.3px;line-height:1}
+    .demo-sp-subtitle{font-size:9px;font-weight:500;color:#515f74;letter-spacing:1px;text-transform:uppercase;margin-top:3px}
+    .demo-sp-body-wrap{display:flex;flex:1;overflow:hidden}
+    .demo-sp-tab-nav{width:64px;background:#f8fafc;border-right:1px solid rgba(226,232,240,.6);display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:4px;flex-shrink:0}
+    .demo-tab-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;background:none;border:none;border-right:3px solid transparent;border-radius:2px 0 0 2px;cursor:pointer;width:100%;transition:background .15s,border-color .15s}
+    .demo-tab-btn:hover{background:rgba(0,0,0,.04)}
+    .demo-tab-btn.active{border-right-color:red;background:rgba(255,0,0,.06)}
+    .demo-tab-icon{display:flex;align-items:center;justify-content:center;color:#94a3b8;transition:color .15s}
+    .demo-tab-btn.active .demo-tab-icon{color:red}
+    .demo-tab-label{font-size:7px;font-weight:800;color:#94a3b8;letter-spacing:.8px;text-transform:uppercase;line-height:1;transition:color .15s}
+    .demo-tab-btn.active .demo-tab-label{color:red}
+    .demo-sp-content{flex:1;overflow-y:auto;overflow-x:hidden;background:#fff;padding:20px 16px}
+    .demo-sp-content::-webkit-scrollbar{width:4px}
+    .demo-sp-content::-webkit-scrollbar-thumb{background:#e6e8ea;border-radius:2px}
+    .demo-sp-state-screen{padding:28px 0;text-align:center;color:#94a3b8;font-size:13px;line-height:1.8}
+
+    /* SP: 키워드 타이틀 영역 */
+    .demo-kw-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px}
+    .demo-kw-title{font-size:24px;font-weight:900;color:#191c1e;letter-spacing:-0.6px;line-height:1.25;word-break:keep-all;flex:1}
+    .demo-kw-underline{width:48px;height:4px;background:red;border-radius:9999px;margin-bottom:20px}
+    .demo-btn-heart{background:none;border:none;cursor:pointer;padding:4px;border-radius:9999px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:4px;transition:transform .15s}
+    .demo-btn-heart:hover{transform:scale(1.15)}
+    .demo-btn-heart:active{transform:scale(.9)}
+    .demo-btn-heart svg{width:22px;height:22px;transition:fill .2s,stroke .2s}
+    .demo-btn-heart.hearted svg{fill:red;stroke:red}
+    .demo-btn-heart:not(.hearted) svg{fill:none;stroke:#aaa;stroke-width:2}
+
+    /* SP: 섹션 블록 */
+    .demo-section-block{background:#f2f4f6;border-radius:12px;padding:18px 18px 18px 22px;margin-bottom:12px;border-left:4px solid transparent}
+    .demo-section-block.brd-red{border-left-color:red}
+    .demo-section-block.brd-gray{border-left-color:#515f74}
+    .demo-section-block.brd-yellow{border-left-color:#f59e0b}
+    .demo-section-block.brd-green{border-left-color:#16a34a}
+    .demo-section-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+    .demo-section-icon{width:15px;height:15px;display:flex;align-items:center;justify-content:center;font-size:13px}
+    .demo-section-icon svg{width:15px;height:15px}
+    .demo-section-title{font-size:14px;font-weight:700;color:#191c1e}
+    .demo-bullet-list{display:flex;flex-direction:column;gap:10px}
+    .demo-bullet-item{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#603e39;line-height:1.65}
+    .demo-bullet-dot{width:5px;height:5px;border-radius:50%;margin-top:6px;flex-shrink:0}
+    .dot-red{background:red}.dot-gray{background:#515f74}.dot-yellow{background:#f59e0b}
+
+    /* SP: 소스 카드 */
+    .demo-source-card{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px}
+    .demo-source-card:last-child{margin-bottom:0}
+    .demo-source-thumb{width:96px;flex-shrink:0}
+    .demo-source-thumb img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;display:block;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+    .demo-source-info{flex:1;min-width:0}
+    .demo-source-title{font-size:12px;font-weight:500;color:#191c1e;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;text-decoration:none}
+    .demo-source-title:hover{color:red}
+    .demo-source-ch{font-size:9px;font-weight:500;color:#515f74;text-transform:uppercase;letter-spacing:-.25px}
+    .demo-source-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+    .demo-badge{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600}
+    .demo-badge-cred{background:#eff6ff;color:#2563eb}
+    .demo-badge-ad{background:#fee2e2;color:#dc2626}
+    .demo-badge-noad{background:#dcfce7;color:#16a34a}
+
+    /* SP: 로딩 */
+    @keyframes demo-spin{to{transform:rotate(360deg)}}
+    @keyframes demo-pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+    .demo-loading-wrap{padding:28px 0 20px}
+    .demo-loading-kw{font-size:20px;font-weight:700;color:#191c1e;letter-spacing:-.5px;margin-bottom:4px;line-height:1.3;word-break:keep-all}
+    .demo-loading-sub{font-size:12px;color:#94a3b8;margin-bottom:24px;display:flex;align-items:center;gap:6px}
+    .demo-loading-dots{display:flex;gap:3px;align-items:center}
+    .demo-loading-dots span{width:4px;height:4px;border-radius:50%;background:#94a3b8;display:inline-block;animation:demo-pulse 1.2s ease-in-out infinite}
+    .demo-loading-dots span:nth-child(2){animation-delay:.2s}
+    .demo-loading-dots span:nth-child(3){animation-delay:.4s}
+    .demo-step-list{display:flex;flex-direction:column;gap:8px}
+    .demo-step-item{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:12px;background:#f8fafc;border:1.5px solid #f0f2f5;transition:background .3s,border-color .3s}
+    .demo-step-item.active{background:#fff8f8;border-color:rgba(255,0,0,.12)}
+    .demo-step-item.done{background:#f0fdf4;border-color:rgba(22,163,74,.15)}
+    .demo-step-ind{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#e9ecef;transition:background .3s}
+    .demo-step-item.active .demo-step-ind{background:rgba(255,0,0,.08)}
+    .demo-step-item.done .demo-step-ind{background:rgba(22,163,74,.12)}
+    .demo-step-ring{width:18px;height:18px;border:2.5px solid rgba(255,0,0,.2);border-top-color:red;border-radius:50%;animation:demo-spin .75s linear infinite}
+    .demo-step-check{font-size:15px;color:#16a34a}
+    .demo-step-num{font-size:13px;font-weight:700;color:#b0b8c4}
+    .demo-step-content{flex:1}
+    .demo-step-label{font-size:13px;font-weight:600;color:#b0b8c4;transition:color .3s}
+    .demo-step-item.active .demo-step-label{color:red}
+    .demo-step-item.done .demo-step-label{color:#16a34a}
+    .demo-step-desc{font-size:11px;color:#c8d0da;margin-top:2px;transition:color .3s}
+    .demo-step-item.active .demo-step-desc{color:rgba(255,0,0,.45)}
+    .demo-step-item.done .demo-step-desc{color:rgba(22,163,74,.55)}
+
+    /* 뉴스레터 이메일 UI */
+    .demo-nl-email-wrap{background:#fff;border-radius:12px;border:1px solid #e6e8ea;overflow:hidden}
+    .demo-nl-email-header{background:#f7f9fb;border-bottom:1px solid #e6e8ea;padding:14px 18px}
+    .demo-nl-email-from{display:flex;align-items:center;gap:8px;font-size:12px;color:#555;margin-bottom:6px}
+    .demo-nl-from-dot{width:28px;height:28px;background:red;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;flex-shrink:0}
+    .demo-nl-from-dot::after{content:"T"}
+    .demo-nl-email-subject-line{font-size:16px;font-weight:800;color:#191c1e;padding-left:36px}
+    .demo-nl-loading{padding:48px;text-align:center;color:#94a3b8;font-size:13px}
+    /* NL: 토픽 섹션 */
+    .demo-nl-topic-section{padding:24px 20px;border-bottom:1px solid #f0f2f4}
+    .demo-nl-topic-section:last-child{border-bottom:none}
+    .demo-nl-topic-label{font-size:11px;color:red;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px}
+    .demo-nl-topic-title{font-size:26px;font-weight:800;color:#191c1e;line-height:1.2;margin-bottom:16px;word-break:keep-all}
+    .demo-nl-two-col{display:grid;grid-template-columns:54% 46%;gap:14px;margin-bottom:14px}
+    @media(max-width:700px){.demo-nl-two-col{grid-template-columns:1fr}}
+    .demo-nl-col{background:#f7f9fb;border-radius:10px;padding:14px}
+    .demo-nl-col-hdr{font-size:11px;font-weight:700;color:#515f74;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+    .demo-nl-bullet{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:#444;line-height:1.65;margin-bottom:8px}
+    .demo-nl-bullet:last-child{margin-bottom:0}
+    .demo-nl-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:7px}
+    /* NL: 소스 카드 */
+    .demo-nl-sources{padding:0 20px 20px}
+    .demo-nl-sources-title{font-size:12px;font-weight:700;color:#191c1e;border-bottom:2px solid red;padding-bottom:4px;margin-bottom:14px;display:inline-block}
+    .demo-nl-video-card{display:flex;gap:12px;align-items:flex-start;text-decoration:none;color:inherit;margin-bottom:14px}
+    .demo-nl-video-card:last-child{margin-bottom:0}
+    .demo-nl-video-thumb{width:96px;flex-shrink:0}
+    .demo-nl-video-thumb img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;display:block}
+    .demo-nl-video-info{flex:1;min-width:0}
+    .demo-nl-video-title{font-size:12px;font-weight:500;color:#191c1e;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+    .demo-nl-video-card:hover .demo-nl-video-title{color:red}
+    .demo-nl-video-meta{display:flex;gap:4px;flex-wrap:wrap}
+
+    /* SIDE PANEL REPLICA — matches side_panel.html */
+    .sp-keyword-title{font-size:24px;font-weight:900;color:#191c1e;letter-spacing:-0.6px;line-height:1.2}
+    .sp-keyword-underline{width:48px;height:4px;background:red;border-radius:9999px;margin:8px 0 20px}
+    .sp-section-block{background:#f2f4f6;border-radius:12px;padding:16px 16px 16px 20px;border-left:4px solid transparent}
+    .sp-border-red{border-left-color:#bc0100}
+    .sp-border-gray{border-left-color:#aaa}
+    .sp-border-green{border-left-color:#2e7d32}
+    .sp-border-yellow{border-left-color:#b45309}
+    .sp-section-label{font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+    .sp-bullet-item{display:flex;gap:10px;font-size:13px;color:#444;line-height:1.65;margin-bottom:6px;align-items:flex-start}
+    .sp-bullet-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:7px}
+    .sp-source-card-compact{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e6e8ea}
+    .sp-source-card-compact:last-child{border-bottom:none}
+    .sp-source-thumb-compact{width:96px;height:54px;object-fit:cover;border-radius:6px;flex-shrink:0;background:#e6e8ea}
+    .sp-source-info{flex:1;min-width:0}
+    .sp-source-title-compact{font-size:12px;font-weight:600;line-height:1.4;color:#191c1e;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:4px}
+    .sp-source-meta{display:flex;flex-wrap:wrap;gap:4px}
+    .sp-badge{display:inline-block;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600}
+
+    /* NEWSLETTER REPLICA — matches mailer.py HTML output */
+    .nl-email-subject{font-size:20px;font-weight:800;color:#191c1e;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #e6e8ea}
+    .nl-topic-section{margin-bottom:32px}
+    .nl-topic-label{font-size:11px;color:#bc0100;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px}
+    .nl-topic-title{font-size:28px;font-weight:800;color:#191c1e;line-height:1.2;margin-bottom:18px}
+    .nl-two-col{display:grid;grid-template-columns:54% 46%;gap:16px;margin-bottom:16px}
+    @media(max-width:700px){.nl-two-col{grid-template-columns:1fr}}
+    .nl-col-left,.nl-col-right{background:#f7f9fb;border-radius:10px;padding:14px}
+    .nl-col-header{font-size:12px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+    .nl-bullet-item{display:flex;gap:10px;font-size:13px;color:#444;line-height:1.65;margin-bottom:6px;align-items:flex-start}
+    .nl-bullet-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:7px}
+    .nl-sources-wrap{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+    .nl-video-card{display:flex;gap:12px;align-items:flex-start;background:#f7f9fb;border-radius:10px;padding:10px;text-decoration:none;color:inherit;transition:background .15s}
+    .nl-video-card:hover{background:#eef0f2}
+    .nl-video-thumb{width:120px;height:68px;object-fit:cover;border-radius:6px;flex-shrink:0;background:#e6e8ea}
+    .nl-video-info{flex:1;min-width:0}
+    .nl-video-title{font-size:13px;font-weight:600;color:#191c1e;line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .nl-video-meta{display:flex;flex-wrap:wrap;gap:4px}
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="login-logo">Tubify</div>
+    <div class="login-sub">Admin Dashboard</div>
+    <div class="lf"><label>아이디</label><input id="login-u" type="text" value="admin"></div>
+    <div class="lf"><label>비밀번호</label><input id="login-p" type="password" placeholder="비밀번호 입력"></div>
+    <div id="login-error">아이디 또는 비밀번호가 올바르지 않습니다.</div>
+    <button class="btn-login" onclick="doLogin()">로그인</button>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav id="main-nav" style="display:none">
+  <a class="nav-logo" href="#">Tubify</a>
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-tab="pipeline">파이프라인</button>
+    <button class="nav-tab" data-tab="trace">파이프라인 테스트</button>
+    <button class="nav-tab" data-tab="overview">시스템 현황 및 사용자 관리</button>
+    <button class="nav-tab" data-tab="gallery">서비스 데모</button>
+    <button class="nav-tab" data-tab="service">사용자 화면</button>
+  </div>
+  <div class="nav-right">
+    <span class="nav-admin" id="nav-admin-name"></span>
+    <button class="btn-logout" onclick="doLogout()">로그아웃</button>
+  </div>
+</nav>
+
+<!-- ① 시스템 현황 -->
+<div class="tab-panel" id="panel-overview">
+  <div class="panel-content">
+
+    <!-- ── ① 서비스 현황 헤더 ── -->
+    <div class="sec-hdr">
+      <div class="sec-title" style="margin-bottom:0">시스템 현황 및 사용자 관리</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-sm" onclick="loadOverview()">새로고침</button>
+        <span id="health-dot-inline" style="font-size:12px;color:#888"></span>
+      </div>
+    </div>
+
+    <!-- ── ② 서비스 규모 & 활동 지표 ── -->
+    <div class="ov-section-label">서비스 규모</div>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      <div class="stat-card"><div class="stat-label">총 가입자</div><div class="stat-value" id="s-users">—</div></div>
+      <div class="stat-card"><div class="stat-label">오늘 신규 가입</div><div class="stat-value red" id="s-new-users">—</div></div>
+      <div class="stat-card"><div class="stat-label">총 분석 횟수</div><div class="stat-value" id="s-total-runs">—</div><div class="stat-sub">사이드패널 실사용</div></div>
+      <div class="stat-card"><div class="stat-label">오늘 분석 요청</div><div class="stat-value red" id="s-today">—</div></div>
+      <div class="stat-card"><div class="stat-label">총 뉴스레터 발송</div><div class="stat-value" id="s-nl-total">—</div></div>
+      <div class="stat-card"><div class="stat-label">뉴스레터 성공률</div><div class="stat-value" id="s-rate">—</div></div>
+    </div>
+
+    <!-- ── ③ AI 파이프라인 품질 지표 ── -->
+    <div class="ov-section-label" style="margin-top:20px">AI 파이프라인 품질 <span style="font-size:11px;font-weight:400;color:#aaa">최근 7일 기준</span></div>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      <div class="stat-card"><div class="stat-label">평균 분석 시간</div><div class="stat-value" id="s-latency">—</div><div class="stat-sub">watch 요청</div></div>
+      <div class="stat-card"><div class="stat-label">자막 수집 성공률</div><div class="stat-value" id="s-transcript">—</div><div class="stat-sub">transcript ≠ none</div></div>
+      <div class="stat-card"><div class="stat-label">평균 신뢰도 점수</div><div class="stat-value" id="s-avg-cred">—</div><div class="stat-sub">credibility_score</div></div>
+      <div class="stat-card"><div class="stat-label">광고 탐지 비율</div><div class="stat-value" id="s-ad">—</div><div class="stat-sub">ad_score ≥ 31</div></div>
+    </div>
+
+    <!-- ── ④ 뉴스레터 발송 시스템 ── -->
+    <div class="ov-section-label" style="margin-top:20px">뉴스레터 발송 시스템</div>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px">
+      <div class="stat-card"><div class="stat-label">APScheduler</div><div class="stat-value" id="sched-running-val">—</div></div>
+      <div class="stat-card"><div class="stat-label">prepared 큐</div><div class="stat-value" id="sched-prepared-val">—</div></div>
+      <div class="stat-card"><div class="stat-label">발송 완료 (sent)</div><div class="stat-value" id="sched-sent-val">—</div></div>
+      <div class="stat-card"><div class="stat-label">관심 토픽 보유 유저</div><div class="stat-value" id="sched-users-val">—</div></div>
+    </div>
+    <div class="chart-card" style="margin-bottom:14px">
+      <div class="chart-title">다음 예약 발송</div>
+      <div id="sched-jobs-body" style="font-size:13px;line-height:2;padding:4px 0"></div>
+    </div>
+
+    <!-- ── ⑤ 실시간 분석 로그 ── -->
+    <div class="ov-section-label" style="margin-top:20px">실시간 분석 로그 <span style="font-size:11px;font-weight:400;color:#aaa">익스텐션 실사용 포함 최근 50건</span></div>
+    <div class="table-wrap" style="margin-bottom:24px">
+      <table>
+        <thead><tr><th>타입</th><th>사용자</th><th>영상 / 키워드</th><th>소요시간</th><th>자막 경로</th><th>Ad</th><th>신뢰도</th><th>시각</th></tr></thead>
+        <tbody id="runs-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- ── ⑥ 사용자 관리 ── -->
+    <div class="ov-section-label">사용자 관리</div>
+    <div class="filter-bar">
+      <input id="user-search" type="text" placeholder="이메일 검색" style="width:220px" oninput="filterUsers()">
+      <select id="user-status-filter" onchange="loadUsers()" class="ctrl">
+        <option value="all">전체</option>
+        <option value="active">구독중</option>
+        <option value="inactive">구독취소</option>
+      </select>
+    </div>
+    <div class="table-wrap" style="margin-bottom:24px">
+      <table>
+        <thead><tr><th>이메일</th><th>가입일</th><th>구독 상태</th><th>뉴스레터 수신</th><th>작업</th></tr></thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+      <div class="pagination" id="users-pagination"></div>
+    </div>
+
+    <!-- ── ⑦ 발송 이력 ── -->
+    <div class="ov-section-label">발송 이력</div>
+    <div class="filter-bar">
+      <input id="analysis-date-from" type="date">
+      <input id="analysis-date-to" type="date">
+      <select id="analysis-status" onchange="loadAnalysis()" class="ctrl">
+        <option value="">전체 상태</option>
+        <option value="generated">generated</option>
+        <option value="prepared">prepared</option>
+        <option value="sent">sent</option>
+      </select>
+      <button class="btn-sm" onclick="loadAnalysis()">조회</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>사용자</th><th>제목</th><th>상태</th><th>발송 시각</th><th></th></tr></thead>
+        <tbody id="analysis-tbody"></tbody>
+      </table>
+      <div class="pagination" id="analysis-pagination"></div>
+    </div>
+
+    <!-- 숨겨진 호환 IDs -->
+    <span id="sched-status-body" style="display:none"></span>
+    <span id="sched-prepared" style="display:none"></span>
+    <span id="sched-failed" style="display:none"></span>
+    <span id="sched-topics" style="display:none"></span>
+  </div><!-- /panel-content -->
+</div><!-- /panel-overview -->
+
+<!-- ② 파이프라인 (Architecture + Live Trace 통합) -->
+<div class="tab-panel" id="panel-pipeline">
+  <div class="panel-content">
+    <div class="sec-title">파이프라인</div>
+
+    <!-- Architecture -->
+    <div class="pipe-wrap">
+      <div class="pipe-container" id="pipeline-diagram"></div>
+      <div class="pipe-sidebar">
+        <div class="card" style="margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:10px">기술 스택</div>
+          <div style="font-size:12px;line-height:2;color:#555">
+            <div>🔍 <b>YouTube Data API v3</b></div>
+            <div>📝 <b>youtube-transcript-api</b> (자막 1순위)</div>
+            <div>🌐 <b>Supadata API</b> (429 감지 시 우선)</div>
+            <div>🔧 <b>yt-dlp</b> (자막 3순위 fallback)</div>
+            <div>🤖 <b>gemini-3.1-flash-lite</b></div>
+            <div>⏰ <b>APScheduler</b> (뉴스레터 배치)</div>
+            <div>🗄️ <b>PostgreSQL + asyncpg</b></div>
+            <div>⚡ <b>FastAPI + asyncio</b></div>
+            <div>🔒 <b>Google OAuth 2.0 + JWT</b></div>
+          </div>
+        </div>
+        <div class="card">
+          <div style="font-size:13px;font-weight:700;margin-bottom:10px">신뢰도 산정 공식</div>
+          <div style="background:#f7f9fb;border-radius:8px;padding:10px;font-family:monospace;font-size:11px;color:#191c1e;line-height:1.8">
+            신뢰도 =<br>
+            &nbsp;자막품질 × <b style="color:#bc0100">0.20</b><br>
+            &nbsp;+ 광고없음 × <b style="color:#bc0100">0.35</b><br>
+            &nbsp;+ 채널신뢰도 × <b style="color:#bc0100">0.25</b><br>
+            &nbsp;+ 정보일관성 × <b style="color:#bc0100">0.20</b>
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:8px">단일 영상 분석 시 일관성 제외,<br>나머지 3개 가중치를 0.80으로 정규화</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Trace (합쳐진 섹션) -->
+      </div>
+</div>
+
+<!-- ② 분석 추적 탭 -->
+<div class="tab-panel" id="panel-trace">
+  <div class="panel-content">
+    <div class="sec-title">분석 추적</div>
+    <div class="card">
+      <div style="font-size:13px;color:#555;margin-bottom:12px">YouTube URL 또는 video ID(11자)를 입력하면 파이프라인 전 단계를 실시간 추적합니다.</div>
+      <div class="input-row">
+        <input id="test-url" type="text" placeholder="https://youtube.com/watch?v=... 또는 video ID">
+        <button class="btn-primary" id="btn-analyze" onclick="runTrace()">분석 실행</button>
+      </div>
+      <div id="trace-result"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ④ 서비스 -->
+<div class="tab-panel" id="panel-service">
+  <iframe id="service-iframe" src="/mypage.html" style="flex:1;width:100%;border:none"></iframe>
+</div>
+
+<!-- ⑥ 데모 갤러리 -->
+<div class="tab-panel" id="panel-gallery">
+  <div class="panel-content">
+    <div class="sec-title">서비스 데모</div>
+    <div class="demo-url-row">
+      <input id="demo-url-input" type="text" placeholder="YouTube URL 또는 video ID 입력 (기본값: 동국대 다전공 영상)" />
+      <button onclick="demoLoadVideo()">분석</button>
+    </div>
+    <div class="demo-layout">
+      <!-- 좌: 유튜브 + 뉴스레터 -->
+      <div>
+        <div class="demo-video-wrap">
+          <iframe id="demo-iframe" src="https://www.youtube.com/embed/5sfFGbo6YNs" allowfullscreen></iframe>
+        </div>
+        <div id="demo-heart-hint" style="text-align:center;font-size:13px;color:#888;margin:10px 0 4px">
+          ❤️ 하트를 눌러 뉴스레터를 생성해보세요
+        </div>
+        <!-- 뉴스레터 결과 -->
+        <div id="demo-nl-wrap" style="display:none;margin-top:16px">
+          <!-- 실제 이메일 뉴스레터 UI -->
+          <div class="demo-nl-email-wrap">
+            <div class="demo-nl-email-header">
+              <div class="demo-nl-email-from">
+                <span class="demo-nl-from-dot"></span>
+                <span><strong>Tubify</strong> &lt;newsletter@tubify.kr&gt;</span>
+              </div>
+              <div class="demo-nl-email-subject-line" id="demo-nl-subject-line">뉴스레터</div>
+            </div>
+            <div id="demo-nl-body"></div>
+          </div>
+        </div>
+      </div>
+      <!-- 우: 사이드패널 — 실제 익스텐션 UI 재현 -->
+      <div>
+        <div class="demo-sp-frame">
+          <!-- 헤더 -->
+          <div class="demo-sp-hdr">
+            <div class="demo-sp-brand">
+              <div class="demo-sp-logo-box">
+                <svg viewBox="0 0 24 24" fill="#fff" width="14" height="14"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+              </div>
+              <div>
+                <div class="demo-sp-title">Tubify</div>
+                <div class="demo-sp-subtitle">AI VIDEO ANALYST</div>
+              </div>
+            </div>
+          </div>
+          <!-- 탭 네비 + 콘텐츠 -->
+          <div class="demo-sp-body-wrap">
+            <div class="demo-sp-tab-nav">
+              <button class="demo-tab-btn active" data-tab="summary">
+                <span class="demo-tab-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                </span>
+                <span class="demo-tab-label">요약</span>
+              </button>
+              <button class="demo-tab-btn" data-tab="insights">
+                <span class="demo-tab-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </span>
+                <span class="demo-tab-label">분석</span>
+              </button>
+              <button class="demo-tab-btn" data-tab="sources">
+                <span class="demo-tab-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </span>
+                <span class="demo-tab-label">출처</span>
+              </button>
+              <div style="flex:1"></div>
+            </div>
+            <div class="demo-sp-content" id="demo-sp-body">
+              <div class="demo-sp-state-screen">
+                <span style="font-size:2rem;display:block;margin-bottom:12px">▶</span>
+                영상이 로드되면 자동으로 분석합니다
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let adminToken = localStorage.getItem('admin_token') || '';
+let allUsers = [], usersPage = 1;
+let galleryData = [];
+let chartDaily, chartStatus, chartTopics, chartTranscript, schedChart;
+
+/* AUTH */
+async function doLogin() {
+  const u = document.getElementById('login-u').value.trim();
+  const p = document.getElementById('login-p').value;
+  document.getElementById('login-error').style.display = 'none';
+  try {
+    const r = await fetch('/api/auth/admin-login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:u, password:p})
+    });
+    if (!r.ok) { document.getElementById('login-error').style.display='block'; return; }
+    const d = await r.json();
+    adminToken = d.access_token;
+    localStorage.setItem('admin_token', adminToken);
+    localStorage.setItem('admin_username', u);
+    showDashboard(u);
+  } catch(e) { document.getElementById('login-error').style.display='block'; }
+}
+document.getElementById('login-p').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+function doLogout() {
+  fetch('/api/auth/admin-logout', {method:'POST', headers:ah()}).catch(()=>{});
+  localStorage.removeItem('admin_token');
+  adminToken = '';
+  location.reload();
+}
+function ah() { return {'Authorization':'Bearer '+adminToken,'Content-Type':'application/json'}; }
+
+function showDashboard(username) {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('main-nav').style.display = 'flex';
+  document.getElementById('nav-admin-name').textContent = username || localStorage.getItem('admin_username') || 'admin';
+  setupTabs();
+  // 첫 탭: 파이프라인
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-tab="pipeline"]').classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-pipeline').classList.add('active');
+  buildPipelineDiagram();
+}
+
+/* TABS */
+function setupTabs() {
+  document.querySelectorAll('.nav-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('panel-'+tab).classList.add('active');
+      if (tab === 'overview') { loadUsers(); loadScheduler(); loadAnalysis(); }
+      if (tab === 'gallery') demoInit();
+    });
+  });
+}
+
+/* OVERVIEW */
+async function safeApi(url) {
+  try {
+    const r = await fetch(url, {headers: ah()});
+    if (!r.ok) { console.warn('API', url, r.status); return {}; }
+    return await r.json();
+  } catch(e) { console.warn('API fetch fail', url, e); return {}; }
+}
+
+async function loadOverview() {
+  const [stats, pipe] = await Promise.all([
+    safeApi('/api/admin/stats'),
+    safeApi('/api/admin/pipeline-stats'),
+  ]);
+  // 서비스 규모
+  document.getElementById('s-users').textContent      = stats.total_users ?? '—';
+  document.getElementById('s-new-users').textContent  = stats.trends?.today_users ?? '—';
+  document.getElementById('s-total-runs').textContent = pipe.total_analysis_count ?? '—';
+  document.getElementById('s-today').textContent      = pipe.today_analysis_count ?? stats.trends?.today_count ?? '—';
+  document.getElementById('s-nl-total').textContent   = stats.total_analysis ?? '—';
+  document.getElementById('s-rate').textContent       = stats.delivery_rate != null ? stats.delivery_rate+'%' : '—';
+  // AI 품질
+  document.getElementById('s-latency').textContent    = pipe.avg_latency_ms ? (pipe.avg_latency_ms/1000).toFixed(1)+'s' : '—';
+  document.getElementById('s-transcript').textContent = pipe.transcript_success_rate != null ? pipe.transcript_success_rate+'%' : '—';
+  document.getElementById('s-avg-cred').textContent   = pipe.avg_credibility_score != null ? pipe.avg_credibility_score+'%' : '—';
+  document.getElementById('s-ad').textContent         = pipe.ad_suspect_rate != null ? pipe.ad_suspect_rate+'%' : '—';
+  // 분석 로그
+  renderRunsTable(pipe.recent_runs || []);
+  loadHealthInline();
+  loadScheduler();
+  loadAnalysis();
+}
+
+/* renderOverviewCharts removed */
+
+function renderRunsTable(runs) {
+  const typeLabel = {watch:'사이드패널',search:'검색',admin_test:'테스트',newsletter:'뉴스레터'};
+  document.getElementById('runs-tbody').innerHTML = runs.map(r=>{
+    const uid = r.user_id || '—';
+    const shortUid = uid.length > 20 ? uid.slice(0,18)+'…' : uid;
+    const target = r.video_id ? `<a href="https://youtube.com/watch?v=${r.video_id}" target="_blank" style="color:#1565c0;font-size:11px">${r.video_id}</a>` : (r.keyword ? `<span style="font-size:11px">${r.keyword}</span>` : '—');
+    return `<tr>
+      <td><span class="rtype rtype-${r.request_type}">${typeLabel[r.request_type]||r.request_type}</span></td>
+      <td style="font-size:11px;color:#555;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${uid}">${shortUid}</td>
+      <td style="max-width:140px">${target}</td>
+      <td>${r.latency_ms ? (r.latency_ms/1000).toFixed(1)+'s' : '—'}</td>
+      <td style="font-size:11px">${r.transcript_source||'—'}</td>
+      <td>${r.ad_score != null ? r.ad_score : '—'}</td>
+      <td>${r.credibility_score != null ? r.credibility_score+'%' : '—'}</td>
+      <td style="font-size:11px;color:#888;white-space:nowrap">${r.started_at?r.started_at.slice(0,16).replace('T',' '):''}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:24px">분석 기록 없음 — 익스텐션으로 영상을 분석하면 자동으로 쌓입니다</td></tr>';
+}
+
+async function loadHealthInline() {
+  try {
+    const r = await fetch('/api/admin/health', {headers:ah()});
+    const d = await r.json();
+    const ok = d.api_status==='ok' && d.db_status==='ok';
+    document.getElementById('health-dot-inline').innerHTML =
+      `<span style="color:${ok?'#4caf50':'#bc0100'}">● ${ok?'정상':'이상'}</span> | API: ${d.api_status||'—'} | DB: ${d.db_status||'—'}`;
+  } catch(e) {}
+}
+
+/* PIPELINE DIAGRAM */
+function buildPipelineDiagram() {
+  const nodes = [
+    {title:'YouTube URL / 검색어 입력', tech:'Chrome Extension · Side Panel', desc:'사용자의 YouTube 탐색 행동 감지 → video_id 추출'},
+    {arrow:true},
+    {title:'Title Topic AI', tech:'gemini-3.1-flash-lite', desc:'영상 제목에서 관심 토픽 추출 (한국어/영어)'},
+    {arrow:true},
+    {title:'Intent AI', tech:'gemini-3.1-flash-lite', desc:'유희형 / 지식형 / 구매형 분류 → 뉴스레터 포맷 결정'},
+    {arrow:true},
+    {title:'Selector AI', tech:'YouTube Data API v3 + 점수화', desc:'후보 영상 수집 후 ViewRate × 채널신뢰도 × 카테고리 매칭 × 클릭채널 점수로 상위 영상 선정', hl:false},
+    {arrow:true},
+    {sectionLabel:'자막 수집 — 4단계 Fallback Chain'},
+    {branch:[
+      {title:'youtube-transcript-api', tech:'1순위 (무료·즉시)', desc:'공개 자막 수집'},
+      {title:'Supadata API', tech:'2순위 (429 감지 시 우선)', desc:'YouTube 차단 감지 즉시 전환'},
+      {title:'yt-dlp', tech:'3순위 fallback', desc:'API 실패 시 직접 파싱'},
+      {title:'Supadata API', tech:'최종 fallback', desc:'yt-dlp도 실패 시 재시도'},
+    ]},
+    {arrow:true},
+    {sectionLabel:'광고 탐지 — 4-Layer Blending'},
+    {branch:[
+      {title:'Layer 1', tech:'Description 규칙', desc:'패턴 매칭 (즉시)'},
+      {title:'Layer 2', tech:'Transcript 규칙', desc:'자막 키워드 분석'},
+      {title:'Layer 3', tech:'YouTube API Flag', desc:'paidProductPlacement'},
+      {title:'Layer 4', tech:'Gemini LLM', desc:'의미론적 문맥 판단'},
+    ]},
+    {arrow:true},
+    {title:'Analyzer AI', tech:'gemini-3.1-flash-lite', desc:'요약 · 핵심 주장 추출 · intent_type별 맞춤 분석', hl:true},
+    {arrow:true},
+    {title:'Credibility Scorer', tech:'가중합 공식 (4개 컴포넌트)', desc:'자막품질×0.20 + 광고없음×0.35 + 채널신뢰도×0.25 + 정보일관성×0.20', hl:true},
+    {arrow:true},
+    {title:'Cross Analysis', tech:'Multi-video 비교', desc:'동일 토픽 여러 영상 간 공통사실 일관성 검증'},
+    {arrow:true},
+    {branch:[
+      {title:'Side Panel', tech:'Chrome Extension', desc:'실시간 분석 결과 표시'},
+      {title:'Newsletter', tech:'APScheduler + SMTP', desc:'개인화 뉴스레터 정시 발송'},
+    ]},
+  ];
+
+  const c = document.getElementById('pipeline-diagram');
+  c.innerHTML = nodes.map(n => {
+    if (n.arrow) return `<div class="pipe-arrow"></div>`;
+    if (n.sectionLabel) return `<div class="pipe-section-label">${n.sectionLabel}</div>`;
+    if (n.branch) return `<div class="pipe-branch">${n.branch.map(b=>`
+      <div class="pipe-branch-node">
+        <div class="pipe-branch-title">${b.title}</div>
+        <div class="pipe-branch-tech">${b.tech}</div>
+        <div class="pipe-branch-desc">${b.desc}</div>
+      </div>`).join('')}</div>`;
+    return `<div class="pipe-node${n.hl?' hl':''}">
+      <div class="pipe-node-title">${n.title}</div>
+      <div class="pipe-node-tech">${n.tech}</div>
+      <div class="pipe-node-desc">${n.desc}</div>
+    </div>`;
+  }).join('');
+}
+
+/* LIVE TRACE */
+async function runTrace() {
+  const url = document.getElementById('test-url').value.trim();
+  if (!url) return;
+  const btn = document.getElementById('btn-analyze');
+  btn.disabled=true; btn.textContent='분석 중…';
+  document.getElementById('trace-result').innerHTML =
+    '<div style="text-align:center;padding:18px;color:#888;font-size:13px">⏳ 파이프라인 실행 중… (10~30초 소요)</div>';
+  try {
+    const r = await fetch('/api/admin/test-analysis', {
+      method:'POST', headers:ah(), body:JSON.stringify({youtube_url:url})
+    });
+    const d = await r.json();
+    if (d.detail) { document.getElementById('trace-result').innerHTML=`<div style="color:#bc0100;font-size:13px;margin-top:10px">오류: ${d.detail}</div>`; return; }
+    renderTrace(d);
+  } catch(e) {
+    document.getElementById('trace-result').innerHTML=`<div style="color:#bc0100;font-size:13px;margin-top:10px">오류: ${e.message}</div>`;
+  } finally { btn.disabled=false; btn.textContent='분석 실행'; }
+}
+
+function renderTrace(d) {
+  const adColor = d.ad_score<=30?'#4caf50':d.ad_score<=60?'#ff9800':'#bc0100';
+  const adBC    = d.ad_score<=30?'badge-green':d.ad_score<=60?'badge-yellow':'badge-red';
+  const traceHtml = (d.pipeline_trace||[]).map(s=>{
+    const sc = s.status==='ok'?'badge-green':s.status==='error'?'badge-red':'badge-yellow';
+    return `<div class="trace-step" onclick="this.classList.toggle('open')">
+      <div class="trace-hdr">
+        <div class="trace-num">${s.step}</div>
+        <div class="trace-name">${s.name}</div>
+        <div class="trace-provider">${s.provider||''}</div>
+        <div class="trace-ms">${s.latency_ms?s.latency_ms+'ms':''}</div>
+        <span class="badge ${sc}">${s.status}</span>
+      </div>
+      <div class="trace-body">${s.detail||''}</div>
+    </div>`;
+  }).join('');
+
+  const layers = d.ad_layers||{};
+  const layerDefs = [
+    {key:'layer1_description',label:'Layer 1',sub:'Description 규칙'},
+    {key:'layer2_transcript', label:'Layer 2',sub:'Transcript 규칙'},
+    {key:'layer3_api',        label:'Layer 3',sub:'YouTube API Flag'},
+    {key:'layer4_gemini',     label:'Layer 4',sub:'Gemini LLM'},
+  ];
+  const adLayersHtml = layerDefs.map(l=>{
+    const sigs = layers[l.key]||[];
+    const score = sigs.reduce((a,s)=>a+s.score,0);
+    const sigHtml = sigs.length ? sigs.map(s=>`<div class="ad-signal"><div class="ad-signal-rule">${s.rule} (+${s.score})</div><div>${s.evidence||''}</div></div>`).join('') : `<div class="ad-no">탐지 신호 없음</div>`;
+    return `<div class="ad-layer-card">
+      <div class="ad-layer-title">${l.label}<span class="ad-layer-sub">${l.sub}</span></div>
+      ${sigHtml}
+      <div class="ad-bar"><div class="ad-bar-fill" style="width:${Math.min(score,100)}%;background:${score>30?'#bc0100':'#4caf50'}"></div></div>
+      <div style="font-size:10px;color:#888;margin-top:3px">기여 점수: ${score}</div>
+    </div>`;
+  }).join('');
+
+  const comp = d.credibility_components||{};
+  const credHtml = [
+    {key:'transcript_quality',label:'자막 품질',w:20},
+    {key:'ad_free',           label:'광고 없음',w:35},
+    {key:'channel_credibility',label:'채널 신뢰도',w:25},
+  ].map(c=>{
+    const val = comp[c.key]??0;
+    return `<div class="cred-comp">
+      <div class="cred-comp-label">${c.label}</div>
+      <div class="cred-comp-val">${val}%</div>
+      <div class="cred-comp-w">× ${(c.w/100).toFixed(2)}</div>
+      <div class="cred-bar"><div class="cred-bar-fill" style="width:${val}%"></div></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('trace-result').innerHTML = `
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap">
+      <img src="${d.thumbnail_url||''}" style="width:112px;height:63px;border-radius:8px;object-fit:cover;background:#e6e8ea" onerror="this.style.display='none'">
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700;margin-bottom:3px">${d.title||''}</div>
+        <div style="font-size:12px;color:#888;margin-bottom:7px">${d.channel_title||''} · 구독자 ${(d.subscriber_count||0).toLocaleString()}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span class="badge ${adBC}">${d.ad_grade||''} (${d.ad_score}점)</span>
+          <span class="badge badge-blue">신뢰도 ${d.trust_score}%</span>
+          <span class="badge badge-gray">자막 ${d.transcript_available?d.transcript_source+' '+d.transcript_len+'자':'없음'}</span>
+          <span class="badge badge-gray">${(d.processing_time_ms/1000).toFixed(1)}s</span>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">Pipeline Trace <span style="font-size:11px;color:#888">(클릭하면 상세)</span></div>
+    <div class="trace-wrap">${traceHtml}</div>
+    <div style="font-size:13px;font-weight:700;margin:16px 0 8px">Ad Detection — 4-Layer Breakdown</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="font-size:12px;color:#555">Ad Score:</span>
+      <span style="font-size:20px;font-weight:800;color:${adColor}">${d.ad_score}</span>
+      <span class="badge ${adBC}">${d.ad_grade}</span>
+    </div>
+    <div class="ad-layers">${adLayersHtml}</div>
+    <div style="font-size:13px;font-weight:700;margin:16px 0 8px">Credibility Formula</div>
+    <div class="cred-grid">${credHtml}</div>
+    <div class="cred-final">
+      <span style="font-size:13px;font-weight:700">최종 신뢰도</span>
+      <span style="font-size:26px;font-weight:800">${d.trust_score}%</span>
+    </div>
+    <div style="font-size:13px;font-weight:700;margin:16px 0 8px">Gemini 분석 결과</div>
+    <div style="background:#f7f9fb;border-radius:10px;padding:14px;font-size:13px;line-height:1.8;color:#555">
+      <div style="font-weight:700;margin-bottom:5px;color:#191c1e">요약</div>
+      <div style="margin-bottom:10px">${d.summary||'—'}</div>
+      <div style="font-weight:700;margin-bottom:5px;color:#191c1e">핵심 주장</div>
+      ${(d.key_claims||[]).map((c,i)=>`<div>${i+1}. ${c}</div>`).join('')||'—'}
+    </div>`;
+}
+
+/* SCHEDULER */
+async function loadScheduler() {
+  const d = await safeApi('/api/admin/scheduler-status');
+  const running = d.scheduler_running;
+
+  // 새 stat 카드 채우기
+  const sv = document.getElementById('sched-running-val');
+  if (sv) sv.innerHTML = running ? '<span style="color:#16a34a">실행 중</span>' : '<span style="color:#bc0100">중지됨</span>';
+  const pv = document.getElementById('sched-prepared-val');
+  if (pv) pv.textContent = d.prepared_queue ?? '—';
+  const sd = d.newsletter_status_distribution || {};
+  const sentV = document.getElementById('sched-sent-val');
+  if (sentV) sentV.textContent = sd['sent'] ?? '—';
+  const uv = document.getElementById('sched-users-val');
+  if (uv) uv.textContent = d.users_with_topics ?? '—';
+
+  // 차트
+  if (Object.keys(sd).length) {
+    if (schedChart) schedChart.destroy();
+    schedChart = new Chart(document.getElementById('chart-sched-status'), {
+      type: 'doughnut',
+      data: {labels: Object.keys(sd), datasets: [{data: Object.values(sd), backgroundColor: ['#4caf50','#bc0100','#ff9800','#90a4ae','#1565c0']}]},
+      options: {plugins: {legend: {position: 'bottom'}}}
+    });
+  }
+
+  // 다음 예약 발송
+  const jobsEl = document.getElementById('sched-jobs-body');
+  if (jobsEl) {
+    const jobs = d.jobs || [];
+    jobsEl.innerHTML = jobs.length
+      ? jobs.map(j => `<div class="sched-row"><span class="dot green"></span>${j.name||j.id} → ${j.next_run ? j.next_run.slice(0,16).replace('T',' ') : '—'}</div>`).join('')
+      : '<div style="font-size:12px;color:#aaa">등록된 스케줄 없음</div>';
+  }
+}
+
+/* ANALYSIS HISTORY */
+async function loadAnalysis(page=1) {
+  const from   = document.getElementById('analysis-date-from').value;
+  const to     = document.getElementById('analysis-date-to').value;
+  const status = document.getElementById('analysis-status').value;
+  let url = `/api/admin/analysis?page=${page}&limit=20`;
+  if(from) url+=`&date_from=${from}`;
+  if(to)   url+=`&date_to=${to}`;
+  if(status) url+=`&status=${status}`;
+  try {
+    const r = await fetch(url, {headers:ah()});
+    const d = await r.json();
+    // 백엔드는 logs 반환
+    const sb = {sent:'badge-green',generated:'badge-gray',prepared:'badge-yellow',failed:'badge-red'};
+    document.getElementById('analysis-tbody').innerHTML = (d.logs||[]).map(n=>`
+      <tr>
+        <td style="font-size:11px;color:#555">${n.user||n.user_id||''}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${n.subject||''}</td>
+        <td><span class="badge ${sb[n.delivery_status]||'badge-gray'}">${n.delivery_status||''}</span></td>
+        <td style="font-size:11px;color:#888;white-space:nowrap">${n.timestamp||''}</td>
+        <td><button class="btn-sm" onclick="viewAnalysis('${n.id}')">상세</button></td>
+      </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:20px">발송 이력 없음</td></tr>';
+    renderPaging('analysis-pagination', d.total_count||0, 20, page, loadAnalysis);
+  } catch(e) { console.error(e); }
+}
+async function viewAnalysis(id) {
+  const r = await fetch(`/api/admin/analysis/${id}`, {headers:ah()});
+  const d = await r.json();
+  alert(JSON.stringify(d, null, 2));
+}
+
+/* USERS */
+async function loadUsers(page=1) {
+  usersPage = page;
+  const search = document.getElementById('user-search').value.trim();
+  const status = document.getElementById('user-status-filter').value;
+  // 백엔드는 limit 파라미터
+  let url = `/api/admin/users?page=${page}&limit=20&status=${status}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  try {
+    const r = await fetch(url, {headers:ah()});
+    const d = await r.json();
+    allUsers = d.users || [];
+    // 백엔드: status = "Active"/"Inactive" (is_subscribed 없음)
+    document.getElementById('users-tbody').innerHTML = allUsers.map(u=>`
+      <tr>
+        <td>${u.email||''}</td>
+        <td>${u.created_at||''}</td>
+        <td><span class="badge ${u.status==='Active'?'badge-green':'badge-gray'}">${u.status||''}</span></td>
+        <td>${u.analysis_count??0}</td>
+        <td><button class="btn-sm red" onclick="deleteUser('${u.google_id}','${u.email}')">비활성화</button></td>
+      </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:20px">사용자 없음</td></tr>';
+    // 백엔드: total_count
+    renderPaging('users-pagination', d.total_count||0, 20, page, loadUsers);
+  } catch(e) { console.error(e); }
+}
+function filterUsers() {
+  // 검색어 변경 시 1페이지부터 다시 조회
+  loadUsers(1);
+}
+async function deleteUser(gid, email) {
+  if (!confirm(`${email} 사용자를 비활성화하시겠습니까?`)) return;
+  await fetch(`/api/admin/users/${gid}`, {method:'DELETE', headers:ah()});
+  loadUsers(usersPage);
+}
+
+/* GALLERY */
+async function loadGallery() {
+  // 데모 탭: 기본 영상으로 자동 분석 시작
+  demoInit();
+}
+
+/* ── DEMO ────────────────────────────────────────────────────── */
+const DEMO_DEFAULT_ID = '5sfFGbo6YNs';
+let demoCurrentId = DEMO_DEFAULT_ID;
+let demoHearted = false;
+let demoTopic = '';
+let demoDefaultNlCache = null;      // 기본 영상 뉴스레터 캐시
+let demoDefaultNlPromise = null;    // 진행 중인 프리페치 Promise
+
+function demoInit() {
+  demoCurrentId = DEMO_DEFAULT_ID;
+  document.getElementById('demo-url-input').value = '';
+  document.getElementById('demo-iframe').src = 'https://www.youtube.com/embed/' + demoCurrentId;
+  document.getElementById('demo-heart-hint').style.display = 'block';
+  document.getElementById('demo-nl-wrap').style.display = 'none';
+  demoHearted = false;
+  demoLoadFromCache(DEMO_DEFAULT_ID);
+}
+
+async function demoLoadFromCache(videoId) {
+  const spBody = document.getElementById('demo-sp-body');
+  // 1초 로딩 화면
+  spBody.innerHTML = demoLoadingHtml('분석 불러오는 중...');
+  await new Promise(r => setTimeout(r, 1000));
+  try {
+    const r = await fetch(`/api/admin/demo-cache/${videoId}`, { headers: ah() });
+    const d = await r.json();
+    if (d.hit && d.analysis) {
+      demoTopic = d.analysis.topic || d.analysis.title || videoId;
+      demoRenderPanel(d.analysis);
+      if (d.newsletter) demoDefaultNlCache = d.newsletter;
+      return;
+    }
+  } catch(e) {}
+  demoRunAnalysis(videoId);
+  if (!demoDefaultNlCache && !demoDefaultNlPromise) {
+    demoDefaultNlPromise = fetch('/api/admin/demo-newsletter', {
+      method: 'POST', headers: { ...ah(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: 'AI 학습', video_id: DEMO_DEFAULT_ID }),
+    }).then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) demoDefaultNlCache = d; demoDefaultNlPromise = null; return d; })
+      .catch(() => { demoDefaultNlPromise = null; });
+  }
+}
+
+function demoLoadingHtml(label = '분석 중...') {
+  return `<div class="demo-loading-wrap">
+    <div class="demo-loading-kw">AI 분석</div>
+    <div class="demo-loading-sub">${label} <span class="demo-loading-dots"><span></span><span></span><span></span></span></div>
+    <div class="demo-step-list">
+      ${[['토픽 추출','영상 제목 분석 중'],['영상 분석','신뢰도 · 광고 · 요약'],['출처 수집','관련 영상 탐색']].map(([l,d],i)=>`
+      <div class="demo-step-item ${i===0?'active':''}">
+        <div class="demo-step-ind">${i===0?'<div class="demo-step-ring"></div>':'<span class="demo-step-num">'+(i+1)+'</span>'}</div>
+        <div class="demo-step-content">
+          <div class="demo-step-label">${l}</div>
+          <div class="demo-step-desc">${d}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function demoLoadVideo() {
+  const raw = document.getElementById('demo-url-input').value.trim();
+  if (!raw) { demoInit(); return; }
+  const m = raw.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  const vid = m ? m[1] : (raw.length === 11 ? raw : null);
+  if (!vid) { alert('유효한 YouTube URL 또는 video ID를 입력해주세요 (11자)'); return; }
+  demoCurrentId = vid;
+  document.getElementById('demo-iframe').src = 'https://www.youtube.com/embed/' + vid;
+  document.getElementById('demo-nl-wrap').style.display = 'none';
+  document.getElementById('demo-heart-hint').style.display = 'none';
+  demoHearted = false;
+  demoRunAnalysis(vid);
+}
+
+async function demoRunAnalysis(videoId) {
+  const spBody = document.getElementById('demo-sp-body');
+  spBody.innerHTML = demoLoadingHtml('AI 분석 중...');
+  demoHearted = false; demoTopic = '';
+  try {
+    const r = await fetch('/api/admin/demo-analyze', {
+      method: 'POST', headers: { ...ah(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_id: videoId })
+    });
+    if (!r.ok) throw new Error('분석 실패 ' + r.status);
+    const d = await r.json();
+    demoTopic = d.topic || d.title || videoId;
+    demoRenderPanel(d);
+  } catch(e) {
+    spBody.innerHTML = `<div class="demo-sp-state-screen"><span style="font-size:1.5rem;display:block;margin-bottom:8px">⚠️</span>분석 중 오류가 발생했습니다.<br><small style="color:#bc0100">${e.message}</small></div>`;
+  }
+}
+
+/* 사이드패널 탭 전환 */
+function demoSwitchTab(tab) {
+  document.querySelectorAll('.demo-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  const spBody = document.getElementById('demo-sp-body');
+  if (!spBody._tabData) return;
+  const d = spBody._tabData;
+  if (tab === 'summary') _demoRenderSummaryTab(d, spBody);
+  else if (tab === 'insights') _demoRenderInsightsTab(d, spBody);
+  else _demoRenderSourcesTab(d, spBody);
+}
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.demo-tab-btn');
+  if (btn) demoSwitchTab(btn.dataset.tab);
+});
+
+function demoRenderPanel(d) {
+  const spBody = document.getElementById('demo-sp-body');
+  demoTopic = d.topic || d.title || '';
+  spBody._tabData = d;
+  _demoRenderSummaryTab(d, spBody);
+  // 하트 버튼 상태 복원
+  const btn = document.getElementById('demo-heart-btn');
+  if (btn) btn.className = 'demo-btn-heart' + (demoHearted ? ' hearted' : '');
+}
+
+function _demoRenderSummaryTab(d, spBody) {
+  const trustScore = d.trust_score ?? 0;
+  const adScore = d.ad_score ?? 0;
+  const trustCol = trustScore >= 70 ? '#16a34a' : trustScore >= 40 ? '#b45309' : '#dc2626';
+  const adCol    = adScore >= 50 ? '#dc2626' : adScore >= 20 ? '#b45309' : '#16a34a';
+
+  const summaryArr = Array.isArray(d.summary) ? d.summary : (d.summary ? [d.summary] : []);
+  const summaryBullets = summaryArr.map(s =>
+    `<div class="demo-bullet-item"><span class="demo-bullet-dot dot-red"></span><span>${s}</span></div>`).join('');
+
+  const claims = (d.key_claims || []).map(c =>
+    `<div class="demo-bullet-item"><span class="demo-bullet-dot dot-gray"></span><span>${c}</span></div>`).join('');
+
+  spBody.innerHTML = `
+    <div class="demo-kw-title-row">
+      <div>
+        <div class="demo-kw-title">${demoTopic}</div>
+        <div class="demo-kw-underline"></div>
+      </div>
+      <button class="demo-btn-heart${demoHearted?' hearted':''}" id="demo-heart-btn" onclick="demoToggleHeart()" title="관심 토픽">
+        <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+      </button>
+    </div>
+    <!-- 점수 배지 -->
+    <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
+      <span style="font-size:12px;background:#f7f9fb;border-radius:8px;padding:6px 12px;font-weight:700;color:${trustCol}">신뢰도 ${trustScore}%</span>
+      <span style="font-size:12px;background:#f7f9fb;border-radius:8px;padding:6px 12px;font-weight:700;color:${adCol}">광고점수 ${adScore}</span>
+      <span style="font-size:12px;background:#f7f9fb;border-radius:8px;padding:6px 12px;color:#515f74">${d.transcript_source||'—'}</span>
+    </div>
+    ${summaryBullets ? `<div class="demo-section-block brd-red" style="margin-bottom:12px">
+      <div class="demo-section-hdr">
+        <div class="demo-section-icon icon-red"><svg viewBox="0 0 24 24" fill="none" stroke="red" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+        <span class="demo-section-title">핵심 내용</span>
+      </div>
+      <div class="demo-bullet-list">${summaryBullets}</div>
+    </div>` : ''}
+    ${claims ? `<div class="demo-section-block brd-gray">
+      <div class="demo-section-hdr">
+        <div class="demo-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#515f74" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+        <span class="demo-section-title">핵심 주장</span>
+      </div>
+      <div class="demo-bullet-list">${claims}</div>
+    </div>` : ''}
+  `;
+}
+
+function _demoRenderInsightsTab(d, spBody) {
+  spBody.innerHTML = `<div class="demo-sp-state-screen" style="text-align:left;padding:0">
+    <div class="demo-section-block brd-yellow" style="margin-bottom:12px">
+      <div class="demo-section-hdr"><span class="demo-section-title">분석 정보</span></div>
+      <div class="demo-bullet-list">
+        <div class="demo-bullet-item"><span class="demo-bullet-dot dot-yellow"></span><span>신뢰도: ${d.trust_score ?? '—'}%</span></div>
+        <div class="demo-bullet-item"><span class="demo-bullet-dot dot-yellow"></span><span>광고 점수: ${d.ad_score ?? '—'}</span></div>
+        <div class="demo-bullet-item"><span class="demo-bullet-dot dot-yellow"></span><span>자막 경로: ${d.transcript_source || '—'}</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function _demoRenderSourcesTab(d, spBody) {
+  const sources = (d.sources || []).slice(0, 5);
+  if (!sources.length) {
+    spBody.innerHTML = `<div class="demo-sp-state-screen">관련 출처 영상이 없습니다</div>`; return;
+  }
+  spBody.innerHTML = `<div>
+    <div style="font-size:14px;font-weight:700;color:#191c1e;border-bottom:2px solid red;padding-bottom:4px;margin-bottom:16px;display:inline-block">출처 영상</div>
+    ${sources.map(s => {
+      const vid = s.video_id || '';
+      const adB = (s.ad_score ?? 0) >= 30 ? '<span class="demo-badge demo-badge-ad">광고의심</span>' : '<span class="demo-badge demo-badge-noad">광고없음</span>';
+      const credB = s.credibility_score != null ? `<span class="demo-badge demo-badge-cred">신뢰 ${s.credibility_score}%</span>` : '';
+      return `<div class="demo-source-card">
+        <div class="demo-source-thumb">
+          <img src="https://img.youtube.com/vi/${vid}/mqdefault.jpg" onerror="this.parentNode.innerHTML='<div class=\'demo-source-thumb-placeholder\'>📹</div>'">
+        </div>
+        <div class="demo-source-info">
+          <a href="https://youtube.com/watch?v=${vid}" target="_blank" class="demo-source-title">${s.title || vid}</a>
+          <div class="demo-source-ch">${s.channel_title || ''}</div>
+          <div class="demo-source-badges">${credB}${adB}</div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function demoRenderNewsletter(d) {
+  const nlBody = document.getElementById('demo-nl-body');
+  const subject = d.subject || d.title || '뉴스레터';
+  const topics = d.topics || d.sections || d.items || [];
+
+  // subject 줄 업데이트
+  const subjectLine = document.getElementById('demo-nl-subject-line');
+  if (subjectLine) subjectLine.textContent = subject;
+
+  if (!topics.length) {
+    nlBody.innerHTML = `<div class="demo-nl-loading">뉴스레터 내용을 불러오지 못했습니다.</div>`; return;
+  }
+
+  let html = d._fallback ? `<div style="font-size:11px;color:#888;text-align:center;padding:8px 0">⚡ 간소화 모드</div>` : '';
+
+  topics.forEach(sec => {
+    const title = sec.topic || sec.title || sec.keyword || '';
+    const summaryArr = Array.isArray(sec.summary) ? sec.summary : (sec.summary ? [sec.summary] : []);
+    const controversies = (sec.controversies || sec.cons || []).filter(Boolean);
+    const refs = (sec.sources || sec.references || []).filter(s => s.url || s.video_id).slice(0, 4);
+
+    const sumBullets = summaryArr.map(s =>
+      `<div class="demo-nl-bullet"><span class="demo-nl-dot" style="background:red"></span><span>${s}</span></div>`).join('');
+    const contBullets = controversies.map(c =>
+      `<div class="demo-nl-bullet"><span class="demo-nl-dot" style="background:#f59e0b"></span><span>${c}</span></div>`).join('');
+
+    const srcCards = refs.map(r => {
+      const vid = r.video_id || (r.url||'').match(/v=([^&]+)/)?.[1] || '';
+      const href = r.url || (vid ? `https://youtube.com/watch?v=${vid}` : '#');
+      const credB = r.credibility_score != null ? `<span class="demo-badge demo-badge-cred">신뢰 ${r.credibility_score}%</span>` : '';
+      const adB = (r.ad_score ?? 0) >= 30 ? `<span class="demo-badge demo-badge-ad">광고의심</span>` : '';
+      return `<a href="${href}" target="_blank" class="demo-nl-video-card">
+        <div class="demo-nl-video-thumb"><img src="https://img.youtube.com/vi/${vid}/mqdefault.jpg" onerror="this.style.background='#e6e8ea'"></div>
+        <div class="demo-nl-video-info">
+          <div class="demo-nl-video-title">${r.title || r.channel_title || vid}</div>
+          <div class="demo-nl-video-meta">${credB}${adB}</div>
+        </div>
+      </a>`;
+    }).join('');
+
+    html += `<div class="demo-nl-topic-section">
+      <div class="demo-nl-topic-label">TOPIC</div>
+      <div class="demo-nl-topic-title">${title}</div>
+      <div class="demo-nl-two-col">
+        <div class="demo-nl-col">
+          ${sumBullets ? `<div class="demo-nl-col-hdr">핵심 내용</div>${sumBullets}` : ''}
+        </div>
+        <div class="demo-nl-col">
+          ${contBullets ? `<div class="demo-nl-col-hdr">주요 쟁점</div>${contBullets}` : ''}
+        </div>
+      </div>
+      ${srcCards ? `<div class="demo-nl-sources"><div class="demo-nl-sources-title">출처 영상</div>${srcCards}</div>` : ''}
+    </div>`;
+  });
+
+  nlBody.innerHTML = html;
+}
+
+async function demoToggleHeart() {
+  const btn = document.getElementById('demo-heart-btn');
+  if (!btn) return;
+
+  if (demoHearted) {
+    demoHearted = false;
+    btn.classList.remove('hearted');
+    demoShowToast('관심 토픽에서 제거됐어요.');
+    document.getElementById('demo-nl-wrap').style.display = 'none';
+    return;
+  }
+
+  demoHearted = true;
+  btn.classList.add('hearted');
+
+  // 플로팅 멘트 → 사라지고 → 1초 로딩 → 뉴스레터
+  demoShowToast(`'${demoTopic}'에 대한 뉴스레터를 보내드릴게요! 💌`);
+  await new Promise(r => setTimeout(r, 1800)); // 토스트 보여주는 동안 대기
+
+  const nlWrap = document.getElementById('demo-nl-wrap');
+  const nlBody = document.getElementById('demo-nl-body');
+  nlWrap.style.display = 'block';
+  nlWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  nlBody.innerHTML = `<div class="demo-nl-loading">📰 뉴스레터 불러오는 중<span class="demo-loading-dots" style="display:inline-flex;gap:3px;margin-left:6px"><span></span><span></span><span></span></span></div>`;
+  await new Promise(r => setTimeout(r, 1000)); // 1초 로딩
+
+  if (demoCurrentId === DEMO_DEFAULT_ID) {
+    if (demoDefaultNlCache) { demoRenderNewsletter(demoDefaultNlCache); return; }
+    if (demoDefaultNlPromise) {
+      const d = await demoDefaultNlPromise;
+      if (d) { demoRenderNewsletter(d); return; }
+    }
+  }
+
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 100000);
+    nlBody.innerHTML = `<div class="demo-nl-loading">📰 AI가 뉴스레터를 작성 중입니다... (최대 90초)</div>`;
+    const r = await fetch('/api/admin/demo-newsletter', {
+      method: 'POST', headers: { ...ah(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: demoTopic, video_id: demoCurrentId }),
+      signal: ctrl.signal
+    });
+    clearTimeout(tid);
+    if (!r.ok) { const err = await r.json().catch(()=>({})); throw new Error(err.detail || '생성 실패 ' + r.status); }
+    demoRenderNewsletter(await r.json());
+  } catch(e) {
+    nlBody.innerHTML = `<div class="demo-nl-loading" style="color:#bc0100">오류: ${e.name==='AbortError'?'타임아웃':e.message}</div>`;
+  }
+}
+
+function demoShowToast(msg) {
+  let t = document.getElementById('demo-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'demo-toast';
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(10px);background:#191c1e;color:#fff;font-size:12px;font-weight:500;padding:9px 16px;border-radius:9999px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:9999;max-width:90%;text-align:center';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => { t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(10px)'; }, 2800);
+}
+
+/* PAGINATION */
+function renderPaging(elId, total, perPage, current, cb) {
+  const pages = Math.ceil(total/perPage);
+  const el = document.getElementById(elId);
+  if (pages<=1) { el.innerHTML=''; return; }
+  let html='';
+  for(let i=1;i<=Math.min(pages,10);i++)
+    html+=`<button class="page-btn ${i===current?'active':''}" onclick="${cb.name}(${i})">${i}</button>`;
+  el.innerHTML = html;
+}
+
+/* INIT */
+(async function init() {
+  if (!adminToken) return;
+  try {
+    const r = await fetch('/api/auth/admin-me', {headers:ah()});
+    if (r.ok) {
+      const d = await r.json();
+      showDashboard(d.username);
+    } else {
+      localStorage.removeItem('admin_token');
+    }
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
