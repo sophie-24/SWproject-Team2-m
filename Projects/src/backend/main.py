@@ -124,7 +124,7 @@ async def _seed_demo_gallery():
 
 
 # ── Demo 분석/뉴스레터 DB 캐시 ────────────────────────────────────────────────
-DEMO_DEFAULT_VIDEO_ID = "5sfFGbo6YNs"
+DEMO_DEFAULT_VIDEO_ID = "5qcAT32gGj4"
 
 async def _ensure_demo_cache_table():
     """demo_analysis_cache 테이블 생성 (없으면)"""
@@ -197,7 +197,7 @@ async def _warm_demo_cache():
             {"video_id": v.get("video_id", ""), "title": v.get("title", ""), "channel_title": v.get("channel_title", "")}
             for v in (raw_sources or []) if v.get("video_id") != DEMO_DEFAULT_VIDEO_ID
         ][:5]
-        topic = result.get("extracted_topic") or result.get("topic") or title[:30]
+        topic = result.get("extracted_topic") or result.get("topic") or title
         analysis_data = {
             "video_id": DEMO_DEFAULT_VIDEO_ID, "title": title, "topic": topic,
             "trust_score": trust_score, "ad_score": result.get("ad_score", 0),
@@ -207,6 +207,33 @@ async def _warm_demo_cache():
             "sources": sources,
         }
         logger.info(f"[demo_cache] 분석 완료: trust={trust_score}")
+
+        # pipeline_a 실행 → keyword_analysis 저장 (INSIGHTS 탭용)
+        try:
+            from pipeA_orchestrator import run_pipeline_a
+            pipeline_result = await asyncio.wait_for(
+                run_pipeline_a(keyword=topic),
+                timeout=120
+            )
+            analysis_data["keyword_analysis"] = {
+                "keyword":                  pipeline_result.get("keyword", topic),
+                "category":                 pipeline_result.get("category", "정보탐색형"),
+                "layout":                   pipeline_result.get("layout", "summary_focus"),
+                "intent_type":              pipeline_result.get("intent_type", "지식형"),
+                "summary_lines":            pipeline_result.get("summary_lines", []),
+                "summary_citations":        pipeline_result.get("summary_citations", []),
+                "common_facts":             pipeline_result.get("common_facts", []),
+                "common_facts_citations":   pipeline_result.get("common_facts_citations", []),
+                "controversies":            pipeline_result.get("controversies", []),
+                "controversies_citations":  pipeline_result.get("controversies_citations", []),
+                "recommended_videos":       pipeline_result.get("recommended_videos", []),
+                "pros":                     pipeline_result.get("pros", []),
+                "cons":                     pipeline_result.get("cons", []),
+            }
+            logger.info(f"[demo_cache] pipeline_a 완료: summary_lines={len(pipeline_result.get('summary_lines', []))}개")
+        except Exception as ep:
+            logger.warning(f"[demo_cache] pipeline_a 실패 (INSIGHTS 탭 빈 상태로 저장): {ep}")
+
     except Exception as e:
         logger.warning(f"[demo_cache] 분석 실패: {e}")
 
@@ -1781,13 +1808,16 @@ async def analyze_search(
         if cached is not None:
             return JSONResponse(cached)
 
-        interest_result = await db.execute(
-            select(UserInterest.category)
-            .where(UserInterest.user_id == user_id)
-            .order_by(UserInterest.weight.desc())
-            .limit(10)
-        )
-        user_categories = [row[0] for row in interest_result.all()]
+        try:
+            interest_result = await db.execute(
+                select(UserInterest.category)
+                .where(UserInterest.user_id == user_id)
+                .order_by(UserInterest.weight.desc())
+                .limit(10)
+            )
+            user_categories = [row[0] for row in interest_result.all()]
+        except Exception:
+            user_categories = []
 
         # ── 구독 채널 ID 조회 (/subscriptions 호출 시 캐싱된 값) ──────────────
         user_row = await db.execute(select(User).where(User.google_id == user_id))
@@ -1812,18 +1842,7 @@ async def analyze_search(
             result = {"keyword": keyword, "videos": [], "common_facts": [], "controversies": []}
 
         _cache_set(cache_key, result)
-        _search_elapsed_ms = int((time.time() - _search_start) * 1000)
-
-        # analysis_runs 로깅
-        try:
-            from sqlalchemy import text as _t2
-            await db.execute(_t2(
-                "INSERT INTO analysis_runs (request_type, keyword, user_id, status, finished_at, total_latency_ms, cache_hit) "
-                "VALUES (:rt, :kw, :uid, 'completed', NOW(), :ms, false)"
-            ), {"rt": "search", "kw": keyword, "uid": user_id, "ms": _search_elapsed_ms})
-            await db.commit()
-        except Exception:
-            pass
+        _search_elapsed_ms = int((time.time() - _search_start) * 1000)  # noqa: F841
 
     return JSONResponse(result)
 
@@ -1999,6 +2018,7 @@ async def analyze_video(
     # pipeline을 백그라운드 태스크로 먼저 시작
     pipeline_task = asyncio.create_task(_run_pipeline())
     # single은 먼저 await (pipeline과 실질적으로 병렬 진행)
+    run_start = time.time()   # analysis_runs 로깅용 시작 시각
     single_result = await _run_single()
 
     # ── Step 3.5: 시청 채널 ID 누적 저장 ───────────────────────────────────────
@@ -2617,6 +2637,7 @@ async def admin_dashboard_users(
             "status": "Active" if u.is_subscribed else "Inactive",
             "analysis_count": cnt_r.scalar() or 0,
             "delivery_type": u.delivery_type or "email",
+            "send_time": _parse_send_times(u.send_time)[0] if u.send_time else "21:00",
         })
 
     return JSONResponse({"users": user_list, "total_count": total_count, "page": page, "limit": limit,
@@ -2735,9 +2756,12 @@ async def admin_pipeline_stats(admin=Depends(get_admin_user), db: AsyncSession =
     import datetime as _dt
     today_start = _dt.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # 오늘 분석 수
+    # 오늘 분석 수 (watch + admin_test만)
     total_res = await db.execute(
-        select(func.count(AnalysisRun.id)).where(AnalysisRun.started_at >= today_start)
+        select(func.count(AnalysisRun.id)).where(
+            AnalysisRun.started_at >= today_start,
+            AnalysisRun.request_type.in_(["watch", "admin_test"]),
+        )
     )
     today_count = total_res.scalar() or 0
 
@@ -2766,36 +2790,54 @@ async def admin_pipeline_stats(admin=Depends(get_admin_user), db: AsyncSession =
     total7 = total_res7.scalar() or 1
     cache_hit_rate = round(cache_hits / total7 * 100)
 
-    # 자막 성공률 (최근 7일, source != 'none')
+    # watch 전용 분모 (자막·광고·신뢰도는 영상 분석에만 해당)
+    watch7_res = await db.execute(
+        select(func.count(AnalysisRun.id)).where(
+            AnalysisRun.request_type == "watch",
+            AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
+        )
+    )
+    watch7 = watch7_res.scalar() or 1
+
+    # 자막 성공률 (최근 7일 watch, source != 'none')
     transcript_ok_res = await db.execute(
         select(func.count(AnalysisRun.id)).where(
+            AnalysisRun.request_type == "watch",
             AnalysisRun.transcript_source.notin_(["none", None]),
             AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
         )
     )
     transcript_ok = transcript_ok_res.scalar() or 0
-    transcript_success_rate = round(transcript_ok / total7 * 100)
+    transcript_success_rate = round(transcript_ok / watch7 * 100)
 
-    # 자막 소스 분포 (최근 7일)
+    # 자막 소스 분포 (최근 7일 watch)
     src_res = await db.execute(
         select(AnalysisRun.transcript_source, func.count(AnalysisRun.id))
-        .where(AnalysisRun.started_at >= today_start - _dt.timedelta(days=7))
+        .where(
+            AnalysisRun.request_type == "watch",
+            AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
+        )
         .group_by(AnalysisRun.transcript_source)
     )
     transcript_source_distribution = {row[0] or "none": row[1] for row in src_res.fetchall()}
 
-    # 광고 의심 비율 (ad_score >= 30, 최근 7일)
+    # 광고 의심 비율 (ad_score >= 30, 최근 7일 watch)
     ad_res = await db.execute(
         select(func.count(AnalysisRun.id)).where(
+            AnalysisRun.request_type == "watch",
             AnalysisRun.ad_score >= 30,
             AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
         )
     )
     ad_suspect = ad_res.scalar() or 0
-    ad_suspect_rate = round(ad_suspect / total7 * 100)
+    ad_suspect_rate = round(ad_suspect / watch7 * 100)
 
-    # 전체 분석 수 (analysis_runs 전체)
-    total_all_res = await db.execute(select(func.count(AnalysisRun.id)))
+    # 전체 분석 수 (watch + admin_test만)
+    total_all_res = await db.execute(
+        select(func.count(AnalysisRun.id)).where(
+            AnalysisRun.request_type.in_(["watch", "admin_test"])
+        )
+    )
     total_all = total_all_res.scalar() or 0
 
     # 오늘 신규 가입자
@@ -2808,9 +2850,10 @@ async def admin_pipeline_stats(admin=Depends(get_admin_user), db: AsyncSession =
     except Exception:
         today_new_users = 0
 
-    # 평균 신뢰도 점수 (최근 7일, credibility_score IS NOT NULL)
+    # 평균 신뢰도 점수 (최근 7일 watch, credibility_score IS NOT NULL)
     avg_cred_res = await db.execute(
         select(func.avg(AnalysisRun.credibility_score)).where(
+            AnalysisRun.request_type == "watch",
             AnalysisRun.credibility_score.isnot(None),
             AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
         )
@@ -3235,7 +3278,7 @@ async def demo_analyze(data: DemoAnalyzeRequest, admin=Depends(get_admin_user), 
     except Exception:
         sources = []
 
-    topic = result.get("extracted_topic") or result.get("topic") or title[:30]
+    topic = result.get("extracted_topic") or result.get("topic") or title
 
     return JSONResponse({
         "video_id": video_id,
@@ -3422,7 +3465,7 @@ async def demo_analyze(data: DemoAnalyzeRequest, admin=Depends(get_admin_user), 
     except Exception:
         sources = []
 
-    topic = result.get("extracted_topic") or result.get("topic") or title[:30]
+    topic = result.get("extracted_topic") or result.get("topic") or title
     return JSONResponse({
         "video_id": video_id, "title": title, "topic": topic,
         "trust_score": trust_score, "ad_score": ad_score,
