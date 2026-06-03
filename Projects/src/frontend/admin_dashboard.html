@@ -319,14 +319,14 @@
     .demo-step-item.done .demo-step-desc{color:rgba(22,163,74,.55)}
 
     /* 뉴스레터 이메일 UI */
-    .demo-nl-email-wrap{background:#fff;border-radius:12px;border:1px solid #e6e8ea;overflow:hidden}
-    .demo-nl-email-header{background:#f7f9fb;border-bottom:1px solid #e6e8ea;padding:14px 18px}
+    .demo-nl-email-wrap{background:#fff;border-radius:12px;border:1px solid #e6e8ea;overflow:hidden;max-width:720px;margin:0 auto}
+    .demo-nl-email-header{background:#f7f9fb;border-bottom:1px solid #e6e8ea;padding:16px 32px}
     .demo-nl-email-from{display:flex;align-items:center;gap:8px;font-size:12px;color:#555;margin-bottom:6px}
     .demo-nl-from-dot{width:28px;height:28px;background:red;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;flex-shrink:0}
     .demo-nl-from-dot::after{content:"T"}
     .demo-nl-email-subject-line{font-size:16px;font-weight:800;color:#191c1e;padding-left:36px}
     .demo-nl-loading{padding:48px;text-align:center;color:#94a3b8;font-size:13px}
-    #demo-nl-body{padding:0 12px}
+    #demo-nl-body{padding:0 28px}
     /* NL: 토픽 섹션 */
     .demo-nl-topic-section{padding:24px 20px;border-bottom:1px solid #f0f2f4}
     .demo-nl-topic-section:last-child{border-bottom:none}
@@ -409,8 +409,7 @@
   <a class="nav-logo" href="#">Tubify</a>
   <div class="nav-tabs">
     <button class="nav-tab active" data-tab="pipeline">파이프라인</button>
-    <button class="nav-tab" data-tab="trace">파이프라인 테스트</button>
-    <button class="nav-tab" data-tab="overview">시스템 현황 및 사용자 관리</button>
+    <button class="nav-tab" data-tab="overview">모니터링</button>
     <button class="nav-tab" data-tab="gallery">서비스 데모</button>
     <button class="nav-tab" data-tab="service">사용자 화면</button>
   </div>
@@ -426,7 +425,7 @@
 
     <!-- ── ① 서비스 현황 헤더 ── -->
     <div class="sec-hdr">
-      <div class="sec-title" style="margin-bottom:0">시스템 현황 및 사용자 관리</div>
+      <div class="sec-title" style="margin-bottom:0">모니터링</div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn-sm" onclick="loadOverview()">새로고침</button>
         <span id="health-dot-inline" style="font-size:12px;color:#888"></span>
@@ -434,7 +433,7 @@
     </div>
 
     <!-- ── ② 서비스 규모 & 활동 지표 ── -->
-    <div class="ov-section-label">서비스 규모</div>
+    <div class="ov-section-label">서비스 규모 <span style="font-size:11px;font-weight:400;color:#aaa">— 카드 클릭 시 상세 로그 확인</span></div>
     <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
       <div class="stat-card clickable" onclick="showDetail('users')"><div class="stat-label">총 가입자</div><div class="stat-value" id="s-users">—</div></div>
       <div class="stat-card clickable" onclick="showDetail('runs-all')"><div class="stat-label">총 분석 횟수</div><div class="stat-value" id="s-total-runs">—</div><div class="stat-sub">사이드패널 실사용</div></div>
@@ -471,7 +470,7 @@
     </div>
 
     <!-- ── ⑥ 실시간 분석 로그 ── -->
-    <div class="ov-section-label" style="margin-top:20px">실시간 분석 로그 <span style="font-size:11px;font-weight:400;color:#aaa">익스텐션 실사용 포함 최근 50건</span></div>
+    <div class="ov-section-label" style="margin-top:20px">실시간 분석 로그 <span style="font-size:11px;font-weight:400;color:#aaa">익스텐션 실사용 기준 최근 50건 · 30초 자동 갱신</span></div>
     <div class="table-wrap" style="margin-bottom:24px">
       <table>
         <thead><tr><th>타입</th><th>사용자</th><th>영상 / 키워드</th><th>소요시간</th><th>자막 경로</th><th>Ad</th><th>신뢰도</th><th>시각</th></tr></thead>
@@ -542,14 +541,8 @@
       </div>
     </div>
 
-    <!-- Live Trace (합쳐진 섹션) -->
-      </div>
-</div>
-
-<!-- ② 분석 추적 탭 -->
-<div class="tab-panel" id="panel-trace">
-  <div class="panel-content">
-    <div class="sec-title">분석 추적</div>
+    <!-- Live Trace (파이프라인 탭 하단 통합) -->
+    <div class="sec-sub" style="margin-top:28px">파이프라인 테스트 — 실시간 단계별 추적</div>
     <div class="card">
       <div style="font-size:13px;color:#555;margin-bottom:12px">YouTube URL 또는 video ID(11자)를 입력하면 파이프라인 전 단계를 실시간 추적합니다.</div>
       <div class="input-row">
@@ -558,6 +551,13 @@
       </div>
       <div id="trace-result"></div>
     </div>
+      </div>
+</div>
+
+<!-- ② 분석 추적 탭 (호환용 — 파이프라인 탭으로 통합됨) -->
+<div class="tab-panel" id="panel-trace">
+  <div class="panel-content">
+    <div style="padding:60px;text-align:center;color:#aaa;font-size:14px">이 탭은 <b style="color:#bc0100">파이프라인</b> 탭 하단으로 통합되었습니다.</div>
   </div>
 </div>
 
@@ -570,8 +570,21 @@
 <div class="tab-panel" id="panel-gallery">
   <div class="panel-content">
     <div class="sec-title">서비스 데모</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e6e8ea;border-radius:20px;padding:6px 14px;font-size:12px;color:#555">
+        <span style="font-weight:700;color:#bc0100">①</span> 영상 로드 후 AI 분석 자동 시작
+      </div>
+      <div style="color:#bbb;font-size:12px">→</div>
+      <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e6e8ea;border-radius:20px;padding:6px 14px;font-size:12px;color:#555">
+        <span style="font-weight:700;color:#bc0100">②</span> 요약 / Insights / 출처 탭 확인
+      </div>
+      <div style="color:#bbb;font-size:12px">→</div>
+      <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e6e8ea;border-radius:20px;padding:6px 14px;font-size:12px;color:#555">
+        <span style="font-weight:700;color:#bc0100">③</span> ❤️ 하트 클릭 → 개인화 뉴스레터 생성
+      </div>
+    </div>
     <div class="demo-url-row">
-      <input id="demo-url-input" type="text" placeholder="YouTube URL 또는 video ID 입력 (기본값: 동국대 다전공 영상)" />
+      <input id="demo-url-input" type="text" placeholder="YouTube URL 또는 video ID 입력 (기본값: 동국대학교 다전공 소개 영상)" />
       <button onclick="demoLoadVideo()">분석</button>
     </div>
     <div class="demo-layout">
@@ -715,6 +728,12 @@ function showDashboard(username) {
       loadAnalysis();
     }
   }, 30000);
+  // How-to-use 투어 팝업
+  if (typeof tourShouldShow === 'function' && tourShouldShow()) {
+    tourStep = 0;
+    tourRender();
+    document.getElementById('tour-overlay').style.display = 'flex';
+  }
 }
 
 /* TABS */
@@ -735,7 +754,12 @@ function setupTabs() {
 /* UTC → KST 변환 유틸 */
 function toKST(isoStr) {
   if (!isoStr) return '—';
-  const d = new Date(isoStr.endsWith('Z') ? isoStr : isoStr + 'Z');
+  // Ensure valid UTC parse: if no Z and no offset, append Z; if has offset, parse as-is
+  const hasOffset = /[+-]\d{2}:\d{2}$/.test(isoStr);
+  const normalized = (!hasOffset && !isoStr.endsWith('Z')) ? isoStr + 'Z' : isoStr;
+  const d = new Date(normalized);
+  if (isNaN(d.getTime())) return '—';
+  // d.getTime() is always UTC epoch; add 9h to display as KST
   const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
   return kst.toISOString().slice(0, 16).replace('T', ' ');
 }
@@ -1208,7 +1232,7 @@ function _demoBuildCredBar(credScore, components, adScore) {
     channel_credibility: Math.max(0,Math.min(1,credNorm)),
   };
   const compMap = [{key:'transcript_quality',label:'자막 품질'},{key:'ad_free',label:'광고 없음'},{key:'channel_credibility',label:'채널 신뢰도'}];
-  const barRow = '<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:6px;background:#e6e8ea;border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:3px;"></div></div><span style="font-size:12px;font-weight:700;color:'+color+';">'+pct+'% '+label+'</span><button onclick="var d=this.nextElementSibling;d.hidden=!d.hidden;this.textContent=d.hidden?\'더 보기 ▾\':\'접기 ▴\'" style="font-size:10px;color:#888;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap;">더 보기 ▾</button></div>';
+  const barRow = '<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:6px;background:#e6e8ea;border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:3px;"></div></div><span style="font-size:12px;font-weight:700;color:'+color+';">'+pct+'% '+label+'</span><button onclick="var el=this.parentElement.nextElementSibling;el.hidden=!el.hidden;this.textContent=el.hidden?\'더 보기 ▾\':\'접기 ▴\'" style="font-size:10px;color:#888;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap;">더 보기 ▾</button></div>';
   const detailRows = compMap.map((c,i,a)=>{
     const v=comps[c.key]||0; const vPct=Math.round(v*100);
     const vColor=vPct>=70?'#16a34a':vPct>=40?'#d97706':'#dc2626';
@@ -1274,10 +1298,15 @@ function _demoRenderSummaryTab(d, spBody) {
 }
 
 function _demoRenderInsightsTab(d, spBody) {
-  const ka     = d.keyword_analysis || d;
+  const ka     = d.keyword_analysis || {};
   const layout = ka.layout || 'summary_focus';
   const cat    = ka.category || '';
-  const SL  = ka.summary_lines      || [];
+  // keyword_analysis가 없을 경우 단일영상 summary/key_claims로 fallback
+  const sv = d.single_video || d;
+  const fallbackSL = ka.summary_lines?.length ? ka.summary_lines
+    : (Array.isArray(sv.key_claims) && sv.key_claims.length ? sv.key_claims
+      : (typeof sv.summary === 'string' && sv.summary ? [sv.summary] : []));
+  const SL  = fallbackSL;
   const CF  = ka.common_facts        || [];
   const CV  = ka.controversies       || [];
   const PR  = ka.pros                || [];
@@ -1329,7 +1358,22 @@ function _demoRenderInsightsTab(d, spBody) {
 }
 
 function _demoRenderSourcesTab(d, spBody) {
-  const videos = d.sources || [];
+  const sv = d.single_video || d;
+  // 현재 분석 영상을 맨 앞에 추가 (중복 제거)
+  const refVideos = (d.sources || []);
+  const currentVid = demoCurrentId || DEMO_DEFAULT_ID;
+  const alreadyIncluded = refVideos.some(v => (v.video_id||v.id) === currentVid);
+  const currentCard = (!alreadyIncluded && (sv.title || sv.summary)) ? [{
+    video_id: currentVid,
+    title: sv.title || demoTopic || currentVid,
+    channel_title: sv.channel_title || '',
+    thumbnail_url: 'https://img.youtube.com/vi/'+currentVid+'/mqdefault.jpg',
+    ad_detected: sv.ad_score > 5,
+    credibility_score: sv.trust_score ?? sv.credibility_score ?? null,
+    summary: sv.summary ? (typeof sv.summary === 'string' ? sv.summary.slice(0,80) : '') : '',
+    selection_tags: ['분석 영상']
+  }] : [];
+  const videos = [...currentCard, ...refVideos];
   if (!videos.length) { spBody.innerHTML = '<div class="demo-sp-state-screen">관련 출처 영상이 없습니다</div>'; return; }
   const cards = videos.map(v=>{
     const vid=v.video_id||v.id||''; const url='https://youtube.com/watch?v='+vid;
@@ -1375,7 +1419,7 @@ function demoRenderNewsletter(d) {
 
   // mailer.py _source_video_cards 동일
   function _nlSourceCards(sources) {
-    return (sources||[]).slice(0,3).map(s => {
+    return (sources||[]).slice(0,5).map(s => {
       const vid = s.video_id || '';
       const url = s.url || (vid ? 'https://youtube.com/watch?v='+vid : '#');
       const thumb = s.thumbnail_url || (vid ? 'https://img.youtube.com/vi/'+vid+'/mqdefault.jpg' : '');
@@ -1449,7 +1493,7 @@ function demoRenderNewsletter(d) {
       if (sources.length) body += _nlSectionLabel('참고 영상','#94a3b8') + _nlSourceCards(sources);
     }
 
-    html += '<div style="margin-bottom:48px;">'+heading+body+'</div>';
+    html += '<div style="margin-bottom:56px;padding:0 4px;">'+heading+body+'</div>';
   });
 
   nlBody.innerHTML = html;
@@ -1583,7 +1627,7 @@ async function showDetail(type) {
     const users = d.users || [];
     if (!users.length) { drawerBody.innerHTML = '<div class="detail-empty">가입자 없음</div>'; return; }
     drawerBody.innerHTML = `<table>
-      <thead><tr><th>이메일</th><th>가입일</th><th>상태</th><th>예약발송</th><th>분석수</th></tr></thead>
+      <thead><tr><th>이메일</th><th>가입일</th><th>상태</th><th>발송예약시간</th><th>분석수</th></tr></thead>
       <tbody>${users.map(u=>`<tr>
         <td>${u.email||'—'}</td>
         <td>${toKST(u.created_at).slice(0,10)}</td>
@@ -1607,7 +1651,7 @@ async function showDetail(type) {
         <td><span class="badge badge-gray">${r.request_type||'—'}</span></td>
         <td style="font-size:11px">${r.user_id?.slice(0,20)||'—'}</td>
         <td style="font-size:11px">${r.video_id||r.keyword||'—'}</td>
-        <td>${r.total_latency_ms ? (r.total_latency_ms/1000).toFixed(1)+'s' : '—'}</td>
+        <td>${r.latency_ms ? (r.latency_ms/1000).toFixed(1)+'s' : '—'}</td>
         <td>${r.credibility_score!=null ? r.credibility_score+'%' : '—'}</td>
         <td style="font-size:11px">${toKST(r.started_at)}</td>
       </tr>`).join('')}</tbody>
@@ -1619,12 +1663,19 @@ async function showDetail(type) {
     let url = `/api/admin/analysis?page=1&limit=50`;
     if (statusFilter) url += `&status=${statusFilter}`;
     const d = await safeApi(url);
-    const items = d.newsletters || d.items || d.analyses || [];
+    // API returns { logs: [...] } — also accept legacy keys
+    const items = d.logs || d.newsletters || d.items || d.analyses || [];
     if (!items.length) { drawerBody.innerHTML = '<div class="detail-empty">발송 이력 없음</div>'; return; }
+
+    // normalize field names: API uses delivery_status / user / subject / timestamp
+    const _email  = i => i.user_email || i.email || i.user || i.user_id || '—';
+    const _title  = i => i.subject || i.topic || i.title || '—';
+    const _status = i => i.delivery_status || i.status || '—';
+    const _time   = i => toKST(i.timestamp || i.sent_at || i.created_at || i.delivered_at);
 
     if (type === 'nl-rate') {
       const byStatus = {};
-      items.forEach(i => { byStatus[i.status] = (byStatus[i.status]||0)+1; });
+      items.forEach(i => { const s = _status(i); byStatus[s] = (byStatus[s]||0)+1; });
       const total = items.length;
       drawerBody.innerHTML = `
         <div class="detail-section">발송 상태 분포</div>
@@ -1634,18 +1685,18 @@ async function showDetail(type) {
         <div class="detail-section" style="margin-top:20px">최근 발송 목록</div>
         <table><thead><tr><th>사용자</th><th>상태</th><th>발송 시각</th></tr></thead>
         <tbody>${items.slice(0,30).map(i=>`<tr>
-          <td style="font-size:11px">${i.user_email||i.email||'—'}</td>
-          <td><span class="badge ${i.status==='sent'?'badge-green':'badge-gray'}">${i.status}</span></td>
-          <td style="font-size:11px">${toKST(i.sent_at||i.created_at)}</td>
+          <td style="font-size:11px">${_email(i)}</td>
+          <td><span class="badge ${_status(i)==='sent'?'badge-green':'badge-gray'}">${_status(i)}</span></td>
+          <td style="font-size:11px">${_time(i)}</td>
         </tr>`).join('')}</tbody></table>`;
     } else {
       drawerBody.innerHTML = `<table>
         <thead><tr><th>사용자</th><th>제목</th><th>상태</th><th>발송 시각</th></tr></thead>
         <tbody>${items.map(i=>`<tr>
-          <td style="font-size:11px">${i.user_email||i.email||'—'}</td>
-          <td style="font-size:11px">${i.topic||i.title||'—'}</td>
-          <td><span class="badge ${i.status==='sent'?'badge-green':'badge-gray'}">${i.status}</span></td>
-          <td style="font-size:11px">${toKST(i.sent_at||i.created_at)}</td>
+          <td style="font-size:11px">${_email(i)}</td>
+          <td style="font-size:11px">${_title(i)}</td>
+          <td><span class="badge ${_status(i)==='sent'?'badge-green':'badge-gray'}">${_status(i)}</span></td>
+          <td style="font-size:11px">${_time(i)}</td>
         </tr>`).join('')}</tbody>
       </table>`;
     }
@@ -1654,7 +1705,7 @@ async function showDetail(type) {
     const pipe = await safeApi('/api/admin/pipeline-stats');
     const runs = (pipe.recent_runs||[]).filter(r => r.request_type==='watch');
     const colMap = {
-      'pipe-latency':   { label:'소요시간', fn: r => r.total_latency_ms ? (r.total_latency_ms/1000).toFixed(1)+'s' : '—' },
+      'pipe-latency':   { label:'소요시간', fn: r => r.latency_ms ? (r.latency_ms/1000).toFixed(1)+'s' : '—' },
       'pipe-transcript':{ label:'자막경로',  fn: r => r.transcript_source||'—' },
       'pipe-cred':      { label:'신뢰도',    fn: r => r.credibility_score!=null ? r.credibility_score+'%' : '—' },
       'pipe-ad':        { label:'Ad점수',    fn: r => r.ad_score!=null ? r.ad_score : '—' },
@@ -1704,3 +1755,166 @@ async function showDetail(type) {
 </script>
 
 <!-- Detai
+
+
+<!-- ══════════════════════════════════════════════════
+     HOW TO USE TOUR POPUP
+══════════════════════════════════════════════════ -->
+<style>
+  #tour-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center}
+  #tour-card{background:#fff;border-radius:16px;width:520px;max-width:92vw;box-shadow:0 24px 64px rgba(0,0,0,.22);overflow:hidden;font-family:'Noto Sans KR',sans-serif}
+  .tour-header{background:linear-gradient(135deg,#bc0100 0%,#e53935 100%);padding:28px 32px 22px;color:#fff}
+  .tour-step-badge{display:inline-block;background:rgba(255,255,255,.25);border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:10px}
+  .tour-title{font-size:22px;font-weight:800;line-height:1.3;margin:0 0 6px}
+  .tour-subtitle{font-size:13px;opacity:.88;margin:0}
+  .tour-body{padding:24px 32px 20px}
+  .tour-desc{font-size:14px;color:#333;line-height:1.8;margin:0 0 20px}
+  .tour-highlight{background:#fff3f3;border-left:3px solid #bc0100;border-radius:0 8px 8px 0;padding:12px 16px;margin:0 0 16px}
+  .tour-highlight p{margin:0;font-size:13px;color:#444;line-height:1.7}
+  .tour-highlight p+p{margin-top:6px}
+  .tour-icon-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .tour-icon-chip{display:flex;align-items:center;gap:6px;background:#f7f9fb;border:1px solid #e6e8ea;border-radius:8px;padding:8px 12px;font-size:12px;color:#333;font-weight:600}
+  .tour-icon-chip span{font-size:16px}
+  .tour-footer{padding:16px 32px 22px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #f0f2f4}
+  .tour-skip{background:none;border:none;font-size:12px;color:#aaa;cursor:pointer;padding:0}
+  .tour-skip:hover{color:#555}
+  .tour-dots{display:flex;gap:6px;align-items:center}
+  .tour-dot{width:7px;height:7px;border-radius:50%;background:#e6e8ea;transition:background .2s,width .2s}
+  .tour-dot.active{background:#bc0100;width:20px;border-radius:4px}
+  .tour-nav{display:flex;gap:8px;align-items:center}
+  .tour-btn-prev{background:#f7f9fb;border:1px solid #e6e8ea;color:#555;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  .tour-btn-prev:hover{background:#efefef}
+  .tour-btn-next{background:#bc0100;color:#fff;border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s}
+  .tour-btn-next:hover{background:#a00000}
+  .tour-no-show-row{padding:0 32px 18px;display:flex;align-items:center;gap:8px}
+  .tour-no-show-row label{font-size:12px;color:#888;cursor:pointer;display:flex;align-items:center;gap:6px}
+  .tour-no-show-row input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#bc0100}
+</style>
+
+<div id="tour-overlay" style="display:none">
+  <div id="tour-card">
+    <div class="tour-header">
+      <div class="tour-step-badge" id="tour-step-badge">STEP 1 / 5</div>
+      <div class="tour-title" id="tour-title"></div>
+      <div class="tour-subtitle" id="tour-subtitle"></div>
+    </div>
+    <div class="tour-body" id="tour-body"></div>
+    <div class="tour-no-show-row">
+      <label><input type="checkbox" id="tour-no-show"> 오늘 하루 보지 않기</label>
+    </div>
+    <div class="tour-footer">
+      <button class="tour-skip" onclick="tourClose()">건너뛰기</button>
+      <div class="tour-dots" id="tour-dots"></div>
+      <div class="tour-nav">
+        <button class="tour-btn-prev" id="tour-btn-prev" onclick="tourPrev()">이전</button>
+        <button class="tour-btn-next" id="tour-btn-next" onclick="tourNext()">다음 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOUR_STEPS = [
+  {
+    title: 'Tubify 관리자 대시보드',
+    subtitle: '교수님, 처음 오셨나요? 30초로 핵심을 안내드립니다.',
+    body: `
+      <p class="tour-desc">이 대시보드에서는 <strong>실시간 서비스 현황</strong>을 한눈에 파악하고,<br>AI 파이프라인 동작을 직접 확인할 수 있습니다.</p>
+      <div class="tour-icon-row">
+        <div class="tour-icon-chip"><span>📊</span> 실시간 분석 로그</div>
+        <div class="tour-icon-chip"><span>🤖</span> AI 파이프라인 추적</div>
+        <div class="tour-icon-chip"><span>💌</span> 뉴스레터 현황</div>
+        <div class="tour-icon-chip"><span>🎬</span> 서비스 데모 시연</div>
+      </div>`
+  },
+  {
+    title: '파이프라인 탭',
+    subtitle: 'AI 분석 아키텍처 & 실시간 추적',
+    body: `
+      <p class="tour-desc">YouTube 영상이 어떻게 분석되는지 <strong>단계별로 추적</strong>할 수 있습니다.</p>
+      <div class="tour-highlight">
+        <p>🏗️ <strong>상단</strong> — Tubify AI 파이프라인 전체 구조 (수집 → 분석 → 뉴스레터)</p>
+        <p>🔬 <strong>하단</strong> — YouTube URL 또는 video ID 입력 → 분석 실행 → 각 단계 실시간 추적</p>
+      </div>
+      <p class="tour-desc" style="margin:0;font-size:13px;color:#666">직접 영상 URL을 입력해 AI가 어떤 과정을 거치는지 확인해보세요.</p>`
+  },
+  {
+    title: '모니터링 탭',
+    subtitle: '실시간 서비스 집계 · 30초 자동 갱신',
+    body: `
+      <p class="tour-desc">가입자 수, 분석 횟수, 뉴스레터 발송 현황 등 <strong>핵심 지표</strong>를 실시간으로 확인합니다.</p>
+      <div class="tour-highlight">
+        <p>🃏 <strong>카드 클릭</strong> → 상세 로그 Drawer가 열립니다</p>
+        <p>📋 총 가입자, 분석 횟수, 파이프라인 품질(신뢰도·자막·광고), 스케줄러 상태 확인</p>
+        <p>⏱️ 30초마다 자동 갱신 — 사용자들의 실시간 활동이 반영됩니다</p>
+      </div>`
+  },
+  {
+    title: '서비스 데모 탭',
+    subtitle: '실제 사용자 화면을 직접 체험',
+    body: `
+      <p class="tour-desc">Tubify Chrome 확장 프로그램의 사이드패널이 어떻게 동작하는지 <strong>직접 체험</strong>할 수 있습니다.</p>
+      <div class="tour-highlight">
+        <p>① 영상 로드 후 <strong>AI 분석 자동 시작</strong></p>
+        <p>② 요약 / Insights / 출처 탭에서 분석 결과 확인</p>
+        <p>③ ❤️ 하트 클릭 → 개인화 뉴스레터 생성</p>
+      </div>
+      <p class="tour-desc" style="margin:0;font-size:13px;color:#666">기본 데모 영상 외에 다른 YouTube URL을 입력해도 분석됩니다.</p>`
+  },
+  {
+    title: '사용자 화면 탭',
+    subtitle: '실제 서비스 페이지 미리보기',
+    body: `
+      <p class="tour-desc">실제 사용자들이 접하는 <strong>웹 서비스 화면</strong>을 탭 별로 미리볼 수 있습니다.</p>
+      <div class="tour-highlight">
+        <p>🏠 소개 페이지, 로그인, 마이페이지, 가이드 등 실서비스 화면 내장</p>
+        <p>🔗 실제 URL 접근과 동일하게 렌더링됩니다</p>
+      </div>
+      <p class="tour-desc" style="margin:0;font-size:13px;color:#666">이 탭으로 사용자 경험을 직접 확인하고 피드백을 주실 수 있습니다.</p>`
+  }
+];
+
+let tourStep = 0;
+
+function tourRender() {
+  const step = TOUR_STEPS[tourStep];
+  const total = TOUR_STEPS.length;
+  document.getElementById('tour-step-badge').textContent = `STEP ${tourStep+1} / ${total}`;
+  document.getElementById('tour-title').textContent = step.title;
+  document.getElementById('tour-subtitle').textContent = step.subtitle;
+  document.getElementById('tour-body').innerHTML = step.body;
+  // dots
+  const dots = document.getElementById('tour-dots');
+  dots.innerHTML = TOUR_STEPS.map((_,i)=>`<div class="tour-dot${i===tourStep?' active':''}"></div>`).join('');
+  // prev btn
+  document.getElementById('tour-btn-prev').style.display = tourStep === 0 ? 'none' : '';
+  // next btn
+  const nextBtn = document.getElementById('tour-btn-next');
+  nextBtn.textContent = tourStep === total-1 ? '시작하기 ✓' : '다음 →';
+}
+
+function tourNext() {
+  if (tourStep < TOUR_STEPS.length - 1) { tourStep++; tourRender(); }
+  else tourClose();
+}
+
+function tourPrev() {
+  if (tourStep > 0) { tourStep--; tourRender(); }
+}
+
+function tourClose() {
+  if (document.getElementById('tour-no-show').checked) {
+    const today = new Date().toISOString().slice(0,10);
+    localStorage.setItem('tubify_tour_skip', today);
+  }
+  document.getElementById('tour-overlay').style.display = 'none';
+}
+
+function tourShouldShow() {
+  const skip = localStorage.getItem('tubify_tour_skip');
+  const today = new Date().toISOString().slice(0,10);
+  return skip !== today;
+}
+
+// 투어는 showDashboard() 내부에서 직접 호출됩니다.
+</script>

@@ -1842,7 +1842,29 @@ async def analyze_search(
             result = {"keyword": keyword, "videos": [], "common_facts": [], "controversies": []}
 
         _cache_set(cache_key, result)
-        _search_elapsed_ms = int((time.time() - _search_start) * 1000)  # noqa: F841
+        _search_elapsed_ms = int((time.time() - _search_start) * 1000)
+
+        # analysis_runs 로깅 (검색어 분석)
+        try:
+            from sqlalchemy import text as _tlog
+            async with AsyncSessionLocal() as _log_db:
+                await _log_db.execute(_tlog(
+                    "INSERT INTO analysis_runs "
+                    "(request_type, video_id, keyword, user_id, status, started_at, finished_at, "
+                    "total_latency_ms, cache_hit, transcript_source, transcript_len, "
+                    "ad_score, credibility_score) "
+                    "VALUES (:rt, :vid, :kw, :uid, 'completed', NOW(), NOW(), :ms, false, "
+                    "'search', 0, NULL, NULL)"
+                ), {
+                    "rt": "search",
+                    "vid": "",
+                    "kw": keyword,
+                    "uid": user_id,
+                    "ms": _search_elapsed_ms,
+                })
+                await _log_db.commit()
+        except Exception as _log_err:
+            logger.warning(f"[analyze_search] analysis_runs 로깅 실패: {_log_err}")
 
     return JSONResponse(result)
 
@@ -2756,11 +2778,11 @@ async def admin_pipeline_stats(admin=Depends(get_admin_user), db: AsyncSession =
     import datetime as _dt
     today_start = _dt.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # 오늘 분석 수 (watch + admin_test만)
+    # 오늘 분석 수 (watch + search + admin_test)
     total_res = await db.execute(
         select(func.count(AnalysisRun.id)).where(
             AnalysisRun.started_at >= today_start,
-            AnalysisRun.request_type.in_(["watch", "admin_test"]),
+            AnalysisRun.request_type.in_(["watch", "search", "admin_test"]),
         )
     )
     today_count = total_res.scalar() or 0
@@ -2832,10 +2854,10 @@ async def admin_pipeline_stats(admin=Depends(get_admin_user), db: AsyncSession =
     ad_suspect = ad_res.scalar() or 0
     ad_suspect_rate = round(ad_suspect / watch7 * 100)
 
-    # 전체 분석 수 (watch + admin_test만)
+    # 전체 분석 수 (watch + search + admin_test)
     total_all_res = await db.execute(
         select(func.count(AnalysisRun.id)).where(
-            AnalysisRun.request_type.in_(["watch", "admin_test"])
+            AnalysisRun.request_type.in_(["watch", "search", "admin_test"])
         )
     )
     total_all = total_all_res.scalar() or 0
