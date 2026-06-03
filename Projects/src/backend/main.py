@@ -1,4 +1,5 @@
 import os
+import time
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Depends, BackgroundTasks, Cookie
@@ -2132,10 +2133,10 @@ async def analyze_video(
             async with AsyncSessionLocal() as _log_db:
                 await _log_db.execute(_t3(
                     "INSERT INTO analysis_runs "
-                    "(request_type, video_id, keyword, user_id, status, finished_at, "
+                    "(request_type, video_id, keyword, user_id, status, started_at, finished_at, "
                     "total_latency_ms, cache_hit, transcript_source, transcript_len, "
                     "ad_score, credibility_score) "
-                    "VALUES (:rt, :vid, :kw, :uid, 'completed', NOW(), :ms, false, "
+                    "VALUES (:rt, :vid, :kw, :uid, 'completed', NOW(), NOW(), :ms, false, "
                     ":tsrc, :tlen, :ad, :cred)"
                 ), {
                     "rt": "watch", "vid": video_id, "kw": extracted_topic,
