@@ -946,7 +946,9 @@ function renderTrace(d) {
     {key:'ad_free',           label:'광고 없음',w:35},
     {key:'channel_credibility',label:'채널 신뢰도',w:25},
   ].map(c=>{
-    const val = comp[c.key]??0;
+    const raw = comp[c.key]??0;
+    // backend returns 0~1 float; convert to 0~100
+    const val = Math.round((raw <= 1 ? raw * 100 : raw));
     return `<div class="cred-comp">
       <div class="cred-comp-label">${c.label}</div>
       <div class="cred-comp-val">${val}%</div>
