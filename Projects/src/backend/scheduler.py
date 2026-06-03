@@ -188,9 +188,11 @@ async def _run_batch_for_send_time(send_time: str) -> None:
                 deliver_result = await _deliver_newsletter(user, newsletter)
                 if deliver_result.get("success", True):
                     nl_record.delivery_status = "sent"
+                    nl_record.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     logger.info(f"  [done] {user.email}")
                 else:
                     nl_record.delivery_status = "failed"
+                    nl_record.delivered_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     nl_record.error_message = deliver_result.get("error", "Unknown error")
                     logger.error(f"  [fail] {user.email} — {nl_record.error_message}")
 
