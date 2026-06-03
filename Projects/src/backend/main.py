@@ -124,7 +124,7 @@ async def _seed_demo_gallery():
 
 
 # ── Demo 분석/뉴스레터 DB 캐시 ────────────────────────────────────────────────
-DEMO_DEFAULT_VIDEO_ID = "5qcAT32gGj4"
+DEMO_DEFAULT_VIDEO_ID = "5sfFGbo6YNs"
 
 async def _ensure_demo_cache_table():
     """demo_analysis_cache 테이블 생성 (없으면)"""
