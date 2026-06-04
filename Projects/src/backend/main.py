@@ -184,13 +184,13 @@ async def _warm_demo_cache():
         }
         semaphore = asyncio.Semaphore(1)
         result = await _analyze_single_video(title, video_info, transcript_text, semaphore)
-        comp = _calc_credibility(result, meta)
-        trust_score = round(
+        cred = _calc_credibility(result, [])
+        comp = cred.get("components", {})
+        trust_score = round(min(1.0, (
             comp.get("transcript_quality", 0) * 0.20 +
             comp.get("ad_free", 0) * 0.35 +
-            comp.get("channel_credibility", 0) * 0.25 +
-            comp.get("information_consistency", 0) * 0.20
-        )
+            comp.get("channel_credibility", 0) * 0.25
+        ) / 0.80) * 100)
         from youtube_search import search_videos
         topic_for_search = result.get("extracted_topic") or title[:40]
         raw_sources = await asyncio.to_thread(search_videos, topic_for_search, max_results=6)
@@ -3086,13 +3086,13 @@ async def admin_test_analysis(
         elif ad_score >= 30: ad_grade = "medium"
 
         # Credibility
-        comp = _calc_credibility(result, meta)
-        trust_score = round(
+        cred = _calc_credibility(result, [])
+        comp = cred.get("components", {})
+        trust_score = round(min(1.0, (
             comp.get("transcript_quality", 0) * 0.20 +
             comp.get("ad_free", 0) * 0.35 +
-            comp.get("channel_credibility", 0) * 0.25 +
-            comp.get("information_consistency", 0) * 0.20
-        )
+            comp.get("channel_credibility", 0) * 0.25
+        ) / 0.80) * 100)
 
         trace.append({"step": 3, "name": "광고 탐지 (4-Layer)", "provider": "Rule+API+Gemini",
                        "status": "ok", "latency_ms": analyze_latency,
@@ -3100,7 +3100,7 @@ async def admin_test_analysis(
 
         trace.append({"step": 4, "name": "신뢰도 채점", "provider": "credibility_scorer",
                        "status": "ok", "latency_ms": 0,
-                       "detail": f"trust={trust_score} | transcript_quality={round(comp.get('transcript_quality',0)*100)}, ad_free={round(comp.get('ad_free',0)*100)}, channel={round(comp.get('channel_credibility',0)*100)}"})
+                       "detail": f"trust={trust_score}% | transcript_quality={round(comp.get('transcript_quality',0)*100)}, ad_free={round(comp.get('ad_free',0)*100)}, channel={round(comp.get('channel_credibility',0)*100)}"})
 
         _summary_len = len(result.get("summary") or "")
         _claims_count = len(result.get("key_claims") or [])
@@ -3279,13 +3279,13 @@ async def demo_analyze(data: DemoAnalyzeRequest, admin=Depends(get_admin_user), 
         }
         semaphore = asyncio.Semaphore(1)
         result = await _analyze_single_video(title, video_info, transcript_text, semaphore)
-        comp = _calc_credibility(result, meta)
-        trust_score = round(
+        cred = _calc_credibility(result, [])
+        comp = cred.get("components", {})
+        trust_score = round(min(1.0, (
             comp.get("transcript_quality", 0) * 0.20 +
             comp.get("ad_free", 0) * 0.35 +
-            comp.get("channel_credibility", 0) * 0.25 +
-            comp.get("information_consistency", 0) * 0.20
-        )
+            comp.get("channel_credibility", 0) * 0.25
+        ) / 0.80) * 100)
         ad_score = result.get("ad_score", 0)
     except Exception:
         pass
@@ -3466,13 +3466,13 @@ async def demo_analyze(data: DemoAnalyzeRequest, admin=Depends(get_admin_user), 
         }
         semaphore = asyncio.Semaphore(1)
         result = await _analyze_single_video(title, video_info, transcript_text, semaphore)
-        comp = _calc_credibility(result, meta)
-        trust_score = round(
+        cred = _calc_credibility(result, [])
+        comp = cred.get("components", {})
+        trust_score = round(min(1.0, (
             comp.get("transcript_quality", 0) * 0.20 +
             comp.get("ad_free", 0) * 0.35 +
-            comp.get("channel_credibility", 0) * 0.25 +
-            comp.get("information_consistency", 0) * 0.20
-        )
+            comp.get("channel_credibility", 0) * 0.25
+        ) / 0.80) * 100)
         ad_score = result.get("ad_score", 0)
     except Exception:
         pass

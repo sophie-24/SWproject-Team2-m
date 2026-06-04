@@ -427,6 +427,7 @@
     <div class="sec-hdr">
       <div class="sec-title" style="margin-bottom:0">모니터링</div>
       <div style="display:flex;gap:8px;align-items:center">
+        <span id="data-freshness" class="badge badge-blue">실제 API 응답 기반</span>
         <button class="btn-sm" onclick="loadOverview()">새로고침</button>
         <span id="health-dot-inline" style="font-size:12px;color:#888"></span>
       </div>
@@ -449,6 +450,13 @@
       <div class="stat-card clickable" onclick="showDetail('pipe-transcript')"><div class="stat-label">자막 수집 성공률</div><div class="stat-value" id="s-transcript">—</div><div class="stat-sub">transcript ≠ none</div></div>
       <div class="stat-card clickable" onclick="showDetail('pipe-cred')"><div class="stat-label">평균 신뢰도 점수</div><div class="stat-value" id="s-avg-cred">—</div><div class="stat-sub">credibility_score</div></div>
       <div class="stat-card clickable" onclick="showDetail('pipe-ad')"><div class="stat-label">광고 탐지 비율</div><div class="stat-value" id="s-ad">—</div><div class="stat-sub">ad_score ≥ 31</div></div>
+      <div class="stat-card"><div class="stat-label">캐시 히트율</div><div class="stat-value" id="s-cache">—</div><div class="stat-sub">최근 7일 전체 요청</div></div>
+    </div>
+    <div class="card" style="padding:14px 16px;margin-top:-8px;margin-bottom:20px;font-size:12px;color:#555;line-height:1.7">
+      <b style="color:#191c1e">성능 측정 범위</b> —
+      평균 분석 시간, 자막 성공률, 광고 탐지 비율, 평균 신뢰도, 캐시 히트율은
+      <b>PostgreSQL analysis_runs 테이블의 최근 7일 watch/admin 로그</b>에서 집계됩니다.
+      실시간 분석 로그는 DB 기준 최근 50건이며 30초마다 자동 갱신됩니다.
     </div>
 
     <!-- ── ④ 뉴스레터 발송 시스템 ── -->
@@ -470,7 +478,7 @@
     </div>
 
     <!-- ── ⑥ 실시간 분석 로그 ── -->
-    <div class="ov-section-label" style="margin-top:20px">실시간 분석 로그 <span style="font-size:11px;font-weight:400;color:#aaa">익스텐션 실사용 기준 최근 50건 · 30초 자동 갱신</span></div>
+    <div class="ov-section-label" style="margin-top:20px">실시간 분석 로그 <span style="font-size:11px;font-weight:400;color:#aaa">DB 기준 최근 50건 · 실제 API 응답 · 30초 자동 갱신</span></div>
     <div class="table-wrap" style="margin-bottom:24px">
       <table>
         <thead><tr><th>타입</th><th>사용자</th><th>영상 / 키워드</th><th>소요시간</th><th>자막 경로</th><th>Ad</th><th>신뢰도</th><th>시각</th></tr></thead>
@@ -514,17 +522,21 @@
       <div class="pipe-container" id="pipeline-diagram"></div>
       <div class="pipe-sidebar">
         <div class="card" style="margin-bottom:12px">
-          <div style="font-size:13px;font-weight:700;margin-bottom:10px">기술 스택</div>
-          <div style="font-size:12px;line-height:2;color:#555">
-            <div>🔍 <b>YouTube Data API v3</b></div>
-            <div>📝 <b>youtube-transcript-api</b> (자막 1순위)</div>
-            <div>🌐 <b>Supadata API</b> (429 감지 시 우선)</div>
-            <div>🔧 <b>yt-dlp</b> (자막 3순위 fallback)</div>
-            <div>🤖 <b>gemini-3.1-flash-lite</b></div>
-            <div>⏰ <b>APScheduler</b> (뉴스레터 배치)</div>
-            <div>🗄️ <b>PostgreSQL + asyncpg</b></div>
-            <div>⚡ <b>FastAPI + asyncio</b></div>
-            <div>🔒 <b>Google OAuth 2.0 + JWT</b></div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:10px">기술 스택 · 문제 해결 근거</div>
+          <div style="font-size:12px;line-height:1.75;color:#555">
+            <div><b>YouTube Data API v3</b><br><span style="font-size:11px;color:#777">영상 후보/채널 메타데이터 수집. 실패 시 기존 캐시와 fallback 자막 경로로 분석 지속.</span></div>
+            <div style="margin-top:8px"><b>youtube-transcript-api → Supadata → yt-dlp</b><br><span style="font-size:11px;color:#777">무료·저지연 경로를 우선 사용하고, 429/IP 차단 감지 시 Supadata로 즉시 우회.</span></div>
+            <div style="margin-top:8px"><b>Gemini</b><br><span style="font-size:11px;color:#777">요약, 핵심 주장, 광고 문맥 판단 수행. 빈 응답/오류는 fallback 요약으로 복구.</span></div>
+            <div style="margin-top:8px"><b>APScheduler + SMTP</b><br><span style="font-size:11px;color:#777">개인화 뉴스레터 정시 발송. prepared/sent/failed 상태를 DB에 기록해 추적.</span></div>
+            <div style="margin-top:8px"><b>PostgreSQL + FastAPI</b><br><span style="font-size:11px;color:#777">분석 로그, 성능 지표, 발송 상태를 저장하고 관리자 화면에 실시간 집계.</span></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:10px">설계 근거</div>
+          <div style="font-size:12px;color:#555;line-height:1.75">
+            신뢰도 가중치는 초기 휴리스틱 기반입니다. 광고성 콘텐츠가 정보 신뢰도에 가장 직접적인 왜곡 요인이라고 판단해
+            <b>광고없음 0.35</b>를 최우선으로 두고, 자막품질·채널신뢰도·교차 일관성을 보조 지표로 설계했습니다.
+            각 컴포넌트 점수는 분리 저장되어 추후 사용자 평가 데이터로 보정할 수 있습니다.
           </div>
         </div>
         <div class="card">
@@ -537,6 +549,9 @@
             &nbsp;+ 정보일관성 × <b style="color:#bc0100">0.20</b>
           </div>
           <div style="font-size:11px;color:#888;margin-top:8px">단일 영상 분석 시 일관성 제외,<br>나머지 3개 가중치를 0.80으로 정규화</div>
+          <div style="font-size:11px;color:#666;margin-top:8px;line-height:1.6">
+            발표 기준: 실험으로 확정된 계수가 아니라, 광고성·자막품질·채널규모·공통사실 일치도를 분리해 검증 가능하게 만든 초기 모델입니다.
+          </div>
         </div>
       </div>
     </div>
@@ -789,6 +804,9 @@ async function loadOverview() {
   document.getElementById('s-transcript').textContent = pipe.transcript_success_rate != null ? pipe.transcript_success_rate+'%' : '—';
   document.getElementById('s-avg-cred').textContent   = pipe.avg_credibility_score != null ? pipe.avg_credibility_score+'%' : '—';
   document.getElementById('s-ad').textContent         = pipe.ad_suspect_rate != null ? pipe.ad_suspect_rate+'%' : '—';
+  document.getElementById('s-cache').textContent      = pipe.cache_hit_rate != null ? pipe.cache_hit_rate+'%' : '—';
+  const freshness = document.getElementById('data-freshness');
+  if (freshness) freshness.textContent = `실제 API 응답 기반 · 마지막 갱신 ${toKST(new Date().toISOString())}`;
   // 분석 로그
   renderRunsTable(pipe.recent_runs || []);
   loadHealthInline();
@@ -841,7 +859,7 @@ function buildPipelineDiagram() {
     {sectionLabel:'자막 수집 — 4단계 Fallback Chain'},
     {branch:[
       {title:'youtube-transcript-api', tech:'1순위 (무료·즉시)', desc:'공개 자막 수집'},
-      {title:'Supadata API', tech:'2순위 (429 감지 시 우선)', desc:'YouTube 차단 감지 즉시 전환'},
+      {title:'Supadata API', tech:'2순위 (429/IP 차단 감지 시 우선)', desc:'비용·속도 때문에 기본 1순위는 아니며, 429 감지 시 5분간 우선 모드'},
       {title:'yt-dlp', tech:'3순위 fallback', desc:'API 실패 시 직접 파싱'},
       {title:'Supadata API', tech:'최종 fallback', desc:'yt-dlp도 실패 시 재시도'},
     ]},
@@ -856,9 +874,9 @@ function buildPipelineDiagram() {
     {arrow:true},
     {title:'Analyzer AI', tech:'gemini-3.1-flash-lite', desc:'요약 · 핵심 주장 추출 · intent_type별 맞춤 분석', hl:true},
     {arrow:true},
-    {title:'Credibility Scorer', tech:'가중합 공식 (4개 컴포넌트)', desc:'자막품질×0.20 + 광고없음×0.35 + 채널신뢰도×0.25 + 정보일관성×0.20', hl:true},
+    {title:'Credibility Scorer', tech:'휴리스틱 가중합 (컴포넌트 분리 저장)', desc:'광고성 왜곡 위험을 최우선으로 반영: 자막품질×0.20 + 광고없음×0.35 + 채널신뢰도×0.25 + 정보일관성×0.20', hl:true},
     {arrow:true},
-    {title:'Cross Analysis', tech:'Multi-video 비교', desc:'동일 토픽 여러 영상 간 공통사실 일관성 검증'},
+    {title:'Cross Analysis', tech:'LLM 주장 추출 + 키워드 매칭', desc:'여러 영상의 key_claims에서 공통사실/쟁점을 생성하고, 공통사실과 각 영상 주장 간 단어 매칭 비율로 consistency 계산'},
     {arrow:true},
     {branch:[
       {title:'Side Panel', tech:'Chrome Extension', desc:'실시간 분석 결과 표시'},
