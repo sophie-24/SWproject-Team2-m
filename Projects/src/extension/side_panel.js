@@ -575,11 +575,14 @@ function renderResults(data, watchMode) {
 
   // 쟁점: card_highlight는 인라인에 포함했으므로 별도 섹션 비움
   var controversyHTML = "";
-  if (controversies.length && layout !== "card_highlight") {
+  if (layout !== "card_highlight") {
+    var controversyContent = controversies.length
+      ? '<div class="bullet-list">' + _makeBullets(controversies, "dot-yellow", controversiesCitations) + '</div>'
+      : '<div style="font-size:12px;color:#888;padding:4px 0;">분석된 영상 간 유의미한 의견 차이가 없습니다.</div>';
     controversyHTML = '<div class="section-block border-yellow"><div class="section-header">'
       + '<div class="section-icon-box icon-yellow">' + SECTION_ICONS[2] + '</div>'
       + '<div class="section-title-text">주요 쟁점</div></div>'
-      + '<div class="bullet-list">' + _makeBullets(controversies, "dot-yellow", controversiesCitations) + '</div></div>';
+      + controversyContent + '</div>';
   }
   document.getElementById("controversy-section").innerHTML = controversyHTML;
 

@@ -1351,8 +1351,16 @@ function _demoRenderInsightsTab(d, spBody) {
     if (CF.length) html += _demoMakeSect('brd-gray',  _DI_GRAY, FT[cat]||'공통 사실',  _demoBullets(CF, 'dot-blue', CFC));
   }
   // 주요 쟁점 — card_highlight는 인라인 포함이므로 별도 섹션 생략
-  if (CV.length && layout !== 'card_highlight') {
-    html += _demoMakeSect('brd-yellow', _DI_YELL, '주요 쟁점', _demoBullets(CV, 'dot-yellow', CVC));
+  if (layout !== 'card_highlight') {
+    const _DEMO_CONTROVERSIES = [
+      '전공 선택 시기에 대한 견해 차이: 일부 영상은 1학년 때 바로 다전공을 결정해야 유리하다고 주장하는 반면, 다른 영상은 전공 탐색 기간이 필요하므로 2학년 이후 신청이 현실적이라고 설명함.',
+      '학점 관리 부담에 대한 상반된 평가: 다전공이 취업 경쟁력에 확실히 도움이 된다는 긍정적 시각과, 학점 하락 위험으로 오히려 역효과가 날 수 있다는 우려가 공존함.',
+      '복수전공 vs 부전공 선택 기준: 부전공으로도 충분하다는 의견과 복수전공 취득이 공식 학위로 더 인정받는다는 의견이 엇갈리며, 목표 직무에 따라 전략이 달라져야 한다는 점을 강조함.',
+    ];
+    const controversyContent = CV.length
+      ? _demoBullets(CV, 'dot-yellow', CVC)
+      : _demoBullets(_DEMO_CONTROVERSIES, 'dot-yellow');
+    html += _demoMakeSect('brd-yellow', _DI_YELL, '주요 쟁점', controversyContent);
   }
   if (!html) html = '<div class="demo-sp-state-screen" style="font-size:13px;color:#555;">관련 영상 분석 정보가 없습니다.</div>';
 

@@ -467,7 +467,7 @@ async def _cross_and_generate(
                 item = _re.sub(r'\s*\[영상\s*[\d,\s,]+\]', '', item).strip()
             # 마크다운 기호 제거
             item = _re.sub(r'\*+', '', item).strip()
-            if item and item != "없음":
+            if item and item.rstrip('.') != "없음":
                 texts.append(item)
                 citations_list.append(cites or _infer_citations(item))
         return texts, citations_list

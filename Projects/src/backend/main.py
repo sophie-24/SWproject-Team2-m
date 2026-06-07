@@ -2813,19 +2813,19 @@ async def admin_pipeline_stats(admin=Depends(get_admin_user), db: AsyncSession =
     total7 = total_res7.scalar() or 1
     cache_hit_rate = round(cache_hits / total7 * 100)
 
-    # watch 전용 분모 (자막·광고·신뢰도는 영상 분석에만 해당)
+    # watch + search 분모 (자막·광고·신뢰도 집계 대상)
     watch7_res = await db.execute(
         select(func.count(AnalysisRun.id)).where(
-            AnalysisRun.request_type == "watch",
+            AnalysisRun.request_type.in_(["watch", "search"]),
             AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
         )
     )
     watch7 = watch7_res.scalar() or 1
 
-    # 자막 성공률 (최근 7일 watch, source != 'none')
+    # 자막 성공률 (최근 7일 watch+search, source != 'none')
     transcript_ok_res = await db.execute(
         select(func.count(AnalysisRun.id)).where(
-            AnalysisRun.request_type == "watch",
+            AnalysisRun.request_type.in_(["watch", "search"]),
             AnalysisRun.transcript_source.notin_(["none", None]),
             AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
         )
@@ -2833,21 +2833,21 @@ async def admin_pipeline_stats(admin=Depends(get_admin_user), db: AsyncSession =
     transcript_ok = transcript_ok_res.scalar() or 0
     transcript_success_rate = round(transcript_ok / watch7 * 100)
 
-    # 자막 소스 분포 (최근 7일 watch)
+    # 자막 소스 분포 (최근 7일 watch+search)
     src_res = await db.execute(
         select(AnalysisRun.transcript_source, func.count(AnalysisRun.id))
         .where(
-            AnalysisRun.request_type == "watch",
+            AnalysisRun.request_type.in_(["watch", "search"]),
             AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
         )
         .group_by(AnalysisRun.transcript_source)
     )
     transcript_source_distribution = {row[0] or "none": row[1] for row in src_res.fetchall()}
 
-    # 광고 의심 비율 (ad_score >= 30, 최근 7일 watch)
+    # 광고 의심 비율 (ad_score >= 30, 최근 7일 watch+search)
     ad_res = await db.execute(
         select(func.count(AnalysisRun.id)).where(
-            AnalysisRun.request_type == "watch",
+            AnalysisRun.request_type.in_(["watch", "search"]),
             AnalysisRun.ad_score >= 30,
             AnalysisRun.started_at >= today_start - _dt.timedelta(days=7),
         )
