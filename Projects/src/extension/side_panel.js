@@ -555,6 +555,7 @@ function renderResults(data, watchMode) {
   } else {
     // search 모드: INSIGHTS 탭에 내용, SUMMARY 탭은 비움
     document.getElementById("kw-title-insights").textContent = keyword;
+    document.getElementById("btn-heart-insights").style.display = "";
     document.getElementById("insights-kw-header").style.display = "";
     document.getElementById("insights-kw-underline").style.display = "";
     document.getElementById("kw-header-row").style.display = "none";
