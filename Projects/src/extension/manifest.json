@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tubify",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "유튜브 검색 결과 상단에 AI 요약 대시보드를 오버레이로 표시합니다.",
 
   "permissions": [
