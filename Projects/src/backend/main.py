@@ -36,7 +36,7 @@ EXTENSION_ID = os.getenv("EXTENSION_ID", "")
 # (HTML 템플릿에서 const EXTENSION_ID = "__EXTENSION_ID__" 형태로 이미 따옴표로 감싸져 있음)
 _ext_ids = [x.strip() for x in EXTENSION_ID.split(",") if x.strip()]
 EXTENSION_IDS_JS = _ext_ids[0] if _ext_ids else ""
-EXTENSION_STORE_URL = os.getenv("EXTENSION_STORE_URL", "")
+EXTENSION_STORE_URL = os.getenv("EXTENSION_STORE_URL", "https://chromewebstore.google.com/detail/bkaidbnjdbhdnkohbmageebgjmgaijld?utm_source=item-share-cb")
 
 
 @asynccontextmanager
@@ -585,9 +585,12 @@ class AdminLogsResponse(BaseModel):
 
 # ── 정적 파일 ─────────────────────────────────────────────────────────────────
 
-@app.get("/", tags=["프론트엔드"], summary="서비스 소개 페이지 제공 ✅", response_class=FileResponse)
+@app.get("/", tags=["프론트엔드"], summary="서비스 소개 페이지 제공 ✅", response_class=HTMLResponse)
 def root():
-    return FileResponse(os.path.join(FRONTEND_DIR, "intro.html"))
+    with open(os.path.join(FRONTEND_DIR, "intro.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("__EXTENSION_STORE_URL__", EXTENSION_STORE_URL)
+    return HTMLResponse(content=html)
 
 @app.get("/login", tags=["프론트엔드"], summary="로그인 페이지 제공 ✅", response_class=HTMLResponse)
 def login_page():
@@ -624,9 +627,12 @@ def privacy():
 def terms():
     return FileResponse(os.path.join(FRONTEND_DIR, "terms.html"))
 
-@app.get("/intro.html", tags=["프론트엔드"], summary="서비스 소개 페이지 제공 ✅", response_class=FileResponse)
+@app.get("/intro.html", tags=["프론트엔드"], summary="서비스 소개 페이지 제공 ✅", response_class=HTMLResponse)
 def intro():
-    return FileResponse(os.path.join(FRONTEND_DIR, "intro.html"))
+    with open(os.path.join(FRONTEND_DIR, "intro.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("__EXTENSION_STORE_URL__", EXTENSION_STORE_URL)
+    return HTMLResponse(content=html)
 
 @app.get("/google4e4f8b2b24380b5d.html", tags=["프론트엔드"], summary="Google 도메인 소유권 확인", response_class=FileResponse, include_in_schema=False)
 def google_site_verification():

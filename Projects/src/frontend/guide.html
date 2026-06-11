@@ -141,7 +141,7 @@
       border-radius: 16px;
       padding: 32px 40px;
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 16px;
     }
     .toc-item {
@@ -603,6 +603,7 @@
       .hero-title { font-size: 36px; letter-spacing: -1.5px; }
       .hero-desc { font-size: 15px; }
       .toc-inner { grid-template-columns: repeat(2, 1fr); }
+      .toc-inner .toc-item:last-child { grid-column: span 2; }
       .feature-grid { grid-template-columns: 1fr; }
       .newsletter-grid { grid-template-columns: 1fr; }
       .result-preview { grid-template-columns: 1fr; }
@@ -651,17 +652,22 @@
       <a href="#section-analyze" class="toc-item">
         <span class="toc-num">STEP 02</span>
         <span class="toc-label">실시간 분석</span>
-        <span class="toc-sub">AI 사이드패널 사용법</span>
+        <span class="toc-sub">AI 분석 진행 · 인사이트</span>
       </a>
       <a href="#section-heart" class="toc-item">
         <span class="toc-num">STEP 03</span>
         <span class="toc-label">관심 토픽 등록</span>
         <span class="toc-sub">하트로 뉴스레터 구독</span>
       </a>
-      <a href="#section-newsletter" class="toc-item">
+      <a href="#section-mypage" class="toc-item">
         <span class="toc-num">STEP 04</span>
-        <span class="toc-label">뉴스레터 설정</span>
-        <span class="toc-sub">발송 시간 및 구독 관리</span>
+        <span class="toc-label">마이페이지 설정</span>
+        <span class="toc-sub">토픽 관리 · 수신 시간 설정</span>
+      </a>
+      <a href="#section-newsletter" class="toc-item">
+        <span class="toc-num">STEP 05</span>
+        <span class="toc-label">뉴스레터</span>
+        <span class="toc-sub">구성 및 발송 안내</span>
       </a>
     </div>
   </div>
@@ -752,7 +758,7 @@
     </div>
 
     <!-- 사용 방법 -->
-    <div class="how-list" style="margin-bottom: 40px;">
+    <div class="how-list" style="margin-bottom: 48px;">
       <div class="how-item">
         <div class="how-num">1</div>
         <div class="how-content">
@@ -767,39 +773,82 @@
           <div class="how-desc">클릭하면 화면 오른쪽에 Tubify 사이드패널이 열립니다. 관련 영상들을 자동으로 수집하고 AI 분석을 시작합니다.</div>
         </div>
       </div>
+    </div>
+
+    <!-- 분석 진행 과정 -->
+    <div style="margin-bottom: 16px;">
+      <div style="font-size:18px;font-weight:800;color:#191c1e;letter-spacing:-0.5px;margin-bottom:4px;">분석 진행 — AI가 이런 과정으로 분석합니다</div>
+      <div style="font-size:14px;color:#515f74;margin-bottom:24px;">영상 검색 → 자막 분석 → AI 교차분석 단계를 실시간으로 보여줍니다</div>
+    </div>
+    <div style="display:grid;grid-template-columns:320px 1fr;gap:40px;align-items:start;margin-bottom:48px;">
+      <img src="/static/images/guide/analysis.png" alt="분석 진행 화면" style="width:100%;border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 8px 24px rgba(0,0,0,0.10);" />
+      <div>
+    <div class="how-list" style="margin-bottom: 0;">
+      <div class="how-item">
+        <div class="how-num">1</div>
+        <div class="how-content">
+          <div class="how-title">분석 중인 영상 주제</div>
+          <div class="how-desc">사용자가 검색·시청한 영상의 주제를 자동으로 감지합니다.</div>
+        </div>
+      </div>
+      <div class="how-item">
+        <div class="how-num">2</div>
+        <div class="how-content">
+          <div class="how-title">영상 검색</div>
+          <div class="how-desc">주제와 관련된 유튜브 영상을 자동으로 수집합니다. 쇼츠·유료광고 영상은 사전에 제거됩니다.</div>
+        </div>
+      </div>
       <div class="how-item">
         <div class="how-num">3</div>
         <div class="how-content">
-          <div class="how-title">3단계 로딩 후 결과를 확인하세요</div>
-          <div class="how-desc">① 의도 분류 → ② 영상 선정 → ③ 자막 분석 순서로 진행됩니다. 보통 10~20초 내에 완료됩니다.</div>
+          <div class="how-title">자막 분석</div>
+          <div class="how-desc">각 영상의 자막을 추출·처리합니다. 자막이 없는 영상은 광고 탐지만 수행됩니다.</div>
+        </div>
+      </div>
+      <div class="how-item">
+        <div class="how-num">4</div>
+        <div class="how-content">
+          <div class="how-title">AI 교차 분석</div>
+          <div class="how-desc">여러 영상의 핵심 내용을 비교·종합합니다. 보통 10~20초 내에 완료됩니다.</div>
         </div>
       </div>
     </div>
+      </div>
+    </div>
 
-    <!-- 분석 결과 미리보기 -->
-    <div class="result-preview">
-      <div class="result-item">
-        <div class="result-label"><div class="result-label-dot red"></div>광고 탐지</div>
-        <div class="result-content">자막·설명란·API 플래그 4계층으로 광고 여부를 0~100점으로 표시합니다. 협찬·유료광고 영상을 자동으로 구분해드립니다.</div>
-      </div>
-      <div class="result-item">
-        <div class="result-label"><div class="result-label-dot green"></div>신뢰도 점수</div>
-        <div class="result-score">87<span style="font-size:14px;font-weight:500;color:#64748b"> / 100</span></div>
-        <div style="font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:0.5px;">예시 수치</div>
-        <div class="result-bar"><div class="result-bar-fill" style="width:87%"></div></div>
-        <div class="result-content" style="font-size:12px;color:#64748b">채널 구독자 수, 자막 품질, 정보 일관성 등을 종합해 산출</div>
-      </div>
-      <div class="result-item">
-        <div class="result-label"><div class="result-label-dot blue"></div>핵심 요약</div>
-        <div class="result-content">관련 영상 5개의 자막을 교차 분석해 <strong>공통으로 언급된 사실</strong>과 <strong>영상 간 의견 차이(쟁점)</strong>를 분리해서 보여줍니다.</div>
-      </div>
-      <div class="result-item">
-        <div class="result-label"><div class="result-label-dot orange"></div>의도별 레이아웃</div>
-        <div class="result-content">
-          검색 의도를 자동 판별해 화면 구성을 다르게 보여줍니다.<br>
-          · <strong>유희형</strong> — 영상 카드 우선 노출<br>
-          · <strong>지식형</strong> — 요약 + 공통사실/쟁점<br>
-          · <strong>구매형</strong> — 장단점 비교 패널
+    <!-- 인사이트 패널 -->
+    <div style="margin-bottom: 16px;">
+      <div style="font-size:18px;font-weight:800;color:#191c1e;letter-spacing:-0.5px;margin-bottom:4px;">인사이트 — 장점·단점·핵심요약과 출처</div>
+      <div style="font-size:14px;color:#515f74;margin-bottom:24px;">여러 영상을 종합한 결론과, 각 주장의 근거 출처(citation)를 함께 제공합니다</div>
+    </div>
+    <div style="display:grid;grid-template-columns:320px 1fr;gap:40px;align-items:start;margin-bottom:8px;">
+      <img src="/static/images/guide/insights.png" alt="인사이트 화면" style="width:100%;border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 8px 24px rgba(0,0,0,0.10);" />
+      <div class="feature-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="feature-card">
+          <div class="feature-icon">🗂️</div>
+          <div class="feature-title">탭 전환</div>
+          <div class="feature-desc">요약 · 인사이트 · 출처(SOURCES)를 탭으로 전환하며 확인할 수 있습니다.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">♥</div>
+          <div class="feature-title">관심 토픽 등록</div>
+          <div class="feature-desc">하트를 누르면 관심 토픽으로 저장되어 매일 뉴스레터로 발송됩니다.</div>
+          <span class="feature-tag">최대 5개</span>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚖️</div>
+          <div class="feature-title">장점 · 단점</div>
+          <div class="feature-desc">여러 영상이 공통으로 언급한 장단점을 항목별로 정리해 보여줍니다.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📝</div>
+          <div class="feature-title">핵심 요약</div>
+          <div class="feature-desc">영상들을 종합한 핵심 결론과 쟁점을 한눈에 확인할 수 있습니다.</div>
+        </div>
+        <div class="feature-card" style="grid-column:span 2;">
+          <div class="feature-icon">🔗</div>
+          <div class="feature-title">출처 표시 (citation)</div>
+          <div class="feature-desc">각 주장이 어느 영상·채널에 근거하는지 뱃지로 표시합니다.</div>
         </div>
       </div>
     </div>
@@ -867,48 +916,92 @@
 
   <div class="divider-line page-wrap"></div>
 
-  <!-- STEP 04 — 뉴스레터 -->
-  <div class="section" id="section-newsletter">
+  <!-- STEP 04 — 마이페이지 설정 -->
+  <div class="section" id="section-mypage">
     <div class="section-header">
       <div class="section-num">4</div>
       <div>
-        <div class="section-title">뉴스레터 설정</div>
-        <div class="section-desc">발송 시간을 설정하고 매일 AI가 큐레이션한 유튜브 브리핑을 받아보세요.</div>
+        <div class="section-title">마이페이지 설정</div>
+        <div class="section-desc">관심 토픽을 관리하고 뉴스레터 수신 시간을 원하는 대로 설정하세요.</div>
       </div>
     </div>
 
+    <div class="feature-grid" style="margin-bottom: 32px;">
+      <div class="feature-card">
+        <div class="feature-icon">✨</div>
+        <div class="feature-title">관심 토픽 관리</div>
+        <div class="feature-desc">등록된 관심 토픽 목록을 확인하고 <strong>+ 관심사 수정</strong> 버튼으로 추가·삭제할 수 있습니다. 최대 5개까지 저장됩니다.</div>
+        <span class="feature-tag">최대 5개</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⏰</div>
+        <div class="feature-title">Delivery Schedule</div>
+        <div class="feature-desc"><strong>요약 레포트 수신 시간</strong>을 클릭해 원하는 시간을 설정하세요. 매일 해당 시간에 맞춰 자동으로 발송됩니다.</div>
+        <span class="feature-tag">KST 기준</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📬</div>
+        <div class="feature-title">이용 가이드 · 계정 관리</div>
+        <div class="feature-desc">이용 가이드 바로가기와 회원 탈퇴도 마이페이지에서 처리할 수 있습니다.</div>
+      </div>
+    </div>
+
+    <div class="step-tip" style="font-size:14px; padding: 20px 24px;">
+      <strong>💡 수신 시간을 설정하지 않으면 뉴스레터가 발송되지 않습니다.</strong> 처음 로그인 후 마이페이지에서 수신 시간을 반드시 설정해주세요.
+    </div>
+
+  </div>
+
+  <div class="divider-line page-wrap"></div>
+
+  <!-- STEP 05 — 뉴스레터 -->
+  <div class="section" id="section-newsletter">
+    <div class="section-header">
+      <div class="section-num">5</div>
+      <div>
+        <div class="section-title">뉴스레터</div>
+        <div class="section-desc">검색하지 않아도, 등록한 관심 토픽의 최신 분석이 매일 메일로 도착합니다.</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div style="font-size:18px;font-weight:800;color:#191c1e;letter-spacing:-0.5px;margin-bottom:4px;">뉴스레터 — 관심 토픽이 이렇게 정리되어 도착합니다</div>
+    </div>
+    <div style="display:flex;justify-content:center;margin-bottom:32px;">
+      <img src="/static/images/guide/newsletter_panel.png" alt="뉴스레터 화면" style="width:320px;border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 8px 24px rgba(0,0,0,0.10);" />
+    </div>
     <div class="newsletter-grid">
       <div class="nl-card">
-        <div class="nl-icon">⏰</div>
-        <div class="nl-title">발송 시간 설정</div>
-        <div class="nl-desc">마이페이지 → <strong>발송 시간 설정</strong>에서 원하는 시간을 입력하세요. 매일 해당 시간에 맞춰 자동으로 발송됩니다.</div>
-        <span class="nl-chip">24시간 형식 HH:MM</span>
+        <div class="nl-icon">🏷️</div>
+        <div class="nl-title">관심 토픽</div>
+        <div class="nl-desc">하트로 등록한 토픽별로 정리되어 도착합니다. 등록한 토픽 수만큼 섹션이 구성됩니다.</div>
+        <span class="nl-chip">토픽별 섹션</span>
       </div>
       <div class="nl-card">
-        <div class="nl-icon">🧠</div>
-        <div class="nl-title">의도 맞춤 뉴스레터</div>
-        <div class="nl-desc">등록한 토픽의 특성을 AI가 분석해 유희형·지식형·구매형에 맞는 형식과 말투로 내용을 구성합니다.</div>
-        <span class="nl-chip">AI 자동 판별</span>
+        <div class="nl-icon">📊</div>
+        <div class="nl-title">핵심 사실 · 주요 쟁점</div>
+        <div class="nl-desc">여러 영상을 종합한 요약 — 공통 사실과 영상 간 의견 차이를 분리해서 보여줍니다.</div>
+        <span class="nl-chip">AI 교차 분석</span>
       </div>
       <div class="nl-card">
-        <div class="nl-icon">📬</div>
-        <div class="nl-title">발송 이력 확인</div>
-        <div class="nl-desc">마이페이지 → <strong>뉴스레터 히스토리</strong>에서 지금까지 받은 뉴스레터 내용을 모두 다시 확인할 수 있습니다.</div>
-        <span class="nl-chip">발송 이력 보관</span>
+        <div class="nl-icon">🔗</div>
+        <div class="nl-title">출처 표시</div>
+        <div class="nl-desc">각 내용의 근거가 된 영상·채널을 뱃지로 표시합니다. 직접 확인하고 싶은 영상으로 바로 이동할 수 있습니다.</div>
+        <span class="nl-chip">citation</span>
       </div>
       <div class="nl-card">
-        <div class="nl-icon">🚫</div>
-        <div class="nl-title">수신 거부</div>
-        <div class="nl-desc">뉴스레터 하단의 수신 거부 링크를 클릭하거나, 마이페이지에서 전체 구독을 취소할 수 있습니다. 언제든지 다시 구독할 수 있습니다.</div>
-        <span class="nl-chip">즉시 적용</span>
+        <div class="nl-icon">🎬</div>
+        <div class="nl-title">분석된 영상 카드</div>
+        <div class="nl-desc">썸네일 + 신뢰도 · 광고 여부 뱃지와 함께 분석에 활용된 영상들을 추천합니다.</div>
+        <span class="nl-chip">신뢰도 포함</span>
       </div>
     </div>
 
     <!-- 주의사항 -->
-    <div class="step-tip" style="font-size:14px; padding: 20px 24px;">
+    <div class="step-tip" style="font-size:14px; padding: 20px 24px; margin-top: 32px;">
       <strong>📌 뉴스레터가 오지 않는다면?</strong><br><br>
       · 등록된 관심 토픽이 0개인 경우 해당 회차 발송이 skip됩니다.<br>
-      · 설정한 시간과 서버 시간이 일치해야 합니다 (한국 표준시 KST 기준).<br>
+      · 마이페이지에서 수신 시간이 설정되어 있는지 확인해주세요.<br>
       · 스팸 또는 프로모션 폴더를 확인해주세요.<br>
       · 문의: tutubifyswproject@gmail.com
     </div>
@@ -1021,8 +1114,8 @@
 
     // 스토어 URL 주입
     const STORE_URL = "__EXTENSION_STORE_URL__";
-    document.getElementById("store-btn").href = STORE_URL || "https://chrome.google.com/webstore";
-    document.getElementById("cta-store-btn").href = STORE_URL || "https://chrome.google.com/webstore";
+    document.getElementById("store-btn").href = STORE_URL;
+    document.getElementById("cta-store-btn").href = STORE_URL;
 
     // 로그인 상태에 따라 Nav 변경
     window.addEventListener("DOMContentLoaded", function() {

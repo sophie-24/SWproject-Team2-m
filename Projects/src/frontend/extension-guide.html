@@ -205,7 +205,7 @@
     // 설치하러 가기 버튼 — Chrome Web Store URL 설정
     const STORE_URL = "__EXTENSION_STORE_URL__";
     const btn = document.getElementById("install-btn");
-    btn.href = STORE_URL || "https://chrome.google.com/webstore";
+    btn.href = STORE_URL;
     btn.addEventListener("click", function () {
       // 스토어 탭 열고 마이페이지로 이동
       setTimeout(() => { location.href = "/mypage.html"; }, 300);
