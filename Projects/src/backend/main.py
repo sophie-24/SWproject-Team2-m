@@ -2047,48 +2047,48 @@ async def analyze_video(
         _cache_set(pipeline_cache_key, result)
         return result
 
-    # pipeline을 백그라운드 태스크로 먼저 시작
-    pipeline_task = asyncio.create_task(_run_pipeline())
-    # single은 먼저 await (pipeline과 실질적으로 병렬 진행)
-    run_start = time.time()   # analysis_runs 로깅용 시작 시각
-    single_result = await _run_single()
-
-    # ── Step 3.5: 시청 채널 ID 누적 저장 ───────────────────────────────────────
-    watched_channel_id = single_result.get("channel_id")
-    if db_user and watched_channel_id:
-        try:
-            current = clicked_channel_ids[:]
-            if watched_channel_id not in current:
-                current.append(watched_channel_id)
-            db_user.watched_channels = _json.dumps(current[-50:], ensure_ascii=False)
-            await db.commit()
-        except Exception as e:
-            logger.warning(f"[analyze_video] watched_channels 저장 실패: {e}")
-
-    # ── chunk 1 데이터 조립 ────────────────────────────────────────────────────
-    chunk1_data = {
-        "type":             "summary",
-        "video_id":         video_id,
-        "extracted_topic":  extracted_topic,
-        "normalized_topic": normalized_topic,
-        "single_video": {
-            "video_id":               video_id,
-            "title":                  title,
-            "channel_title":          single_result.get("channel_title", ""),
-            "thumbnail_url":          f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
-            "url":                    f"https://youtube.com/watch?v={video_id}",
-            "summary":                single_result.get("summary", ""),
-            "key_claims":             single_result.get("key_claims", []),
-            "ad_score":               single_result.get("ad_score", 0),
-            "ad_detected":            single_result.get("ad_detected", False),
-            "ad_signals":             single_result.get("ad_signals") or [],
-            "credibility_score":      single_result.get("credibility_score") or 0.5,
-            "credibility_components": single_result.get("credibility_components") or {},
-        },
-    }
-
+    # ── Step 3: 스트리밍 — HTTP 헤더 즉시 전송, 무거운 작업은 제너레이터 안에서 수행
+    # pipeline_task / single_result를 _stream() 안으로 옮겨 Cloudtype 502(proxy timeout) 방지
     async def _stream():
+        _run_start = time.time()
+
+        # pipeline 백그라운드 시작, single과 병렬 진행
+        pipeline_task = asyncio.create_task(_run_pipeline())
+        single_result = await _run_single()
+
+        # 시청 채널 ID 누적 저장
+        watched_channel_id = single_result.get("channel_id")
+        if db_user and watched_channel_id:
+            try:
+                current = clicked_channel_ids[:]
+                if watched_channel_id not in current:
+                    current.append(watched_channel_id)
+                db_user.watched_channels = _json.dumps(current[-50:], ensure_ascii=False)
+                await db.commit()
+            except Exception as e:
+                logger.warning(f"[analyze_video] watched_channels 저장 실패: {e}")
+
         # ── chunk 1: single_video 분석 완료 즉시 전송 ────────────────────────
+        chunk1_data = {
+            "type":             "summary",
+            "video_id":         video_id,
+            "extracted_topic":  extracted_topic,
+            "normalized_topic": normalized_topic,
+            "single_video": {
+                "video_id":               video_id,
+                "title":                  title,
+                "channel_title":          single_result.get("channel_title", ""),
+                "thumbnail_url":          f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+                "url":                    f"https://youtube.com/watch?v={video_id}",
+                "summary":                single_result.get("summary", ""),
+                "key_claims":             single_result.get("key_claims", []),
+                "ad_score":               single_result.get("ad_score", 0),
+                "ad_detected":            single_result.get("ad_detected", False),
+                "ad_signals":             single_result.get("ad_signals") or [],
+                "credibility_score":      single_result.get("credibility_score") or 0.5,
+                "credibility_components": single_result.get("credibility_components") or {},
+            },
+        }
         yield _json.dumps(chunk1_data, ensure_ascii=False) + "\n"
 
         # ── chunk 2: pipeline 완료 대기 후 전송 ──────────────────────────────
@@ -2154,7 +2154,7 @@ async def analyze_video(
 
         # analysis_runs 로깅 (스트리밍 완료 시점)
         try:
-            _elapsed_ms = int((time.time() - run_start) * 1000)
+            _elapsed_ms = int((time.time() - _run_start) * 1000)
             _ad_score = single_result.get("ad_score", 0) or 0
             _cred = single_result.get("credibility_score", 0) or 0
             _cred_int = int(round(_cred * 100)) if _cred <= 1 else int(_cred)
