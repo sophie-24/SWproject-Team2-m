@@ -754,55 +754,62 @@ async function analyzeWatch(videoId, videoTitle, jwt) {
 
         if (chunk.type === "summary") {
           // ── chunk 1: 단일 영상 요약 즉시 렌더링 ────────────────────────────
-          currentKeyword = chunk.extracted_topic || keyword;
-          setHeartState(false);
-          heartedTopic = "";
-          checkHeartState(currentKeyword);
+          try {
+            currentKeyword = chunk.extracted_topic || keyword;
+            setHeartState(false);
+            heartedTopic = "";
+            checkHeartState(currentKeyword);
 
-          setStep(1, "done");
-          setStep(2, "active");
+            setStep(1, "done");
+            setStep(2, "active");
 
-          var sv = chunk.single_video || {};
-          renderVideoSummary(videoTitle, {
-            summary:                sv.summary || "",
-            key_claims:             sv.key_claims || [],
-            credibility_score:      sv.credibility_score,
-            credibility_components: sv.credibility_components || {},
-            ad_score:               sv.ad_score,
-            ad_detected:            sv.ad_detected,
-            ad_signals:             sv.ad_signals || [],
-          });
+            var sv = chunk.single_video || {};
+            renderVideoSummary(videoTitle, {
+              summary:                sv.summary || "",
+              key_claims:             sv.key_claims || [],
+              credibility_score:      sv.credibility_score,
+              credibility_components: sv.credibility_components || {},
+              ad_score:               sv.ad_score,
+              ad_detected:            sv.ad_detected,
+              ad_signals:             sv.ad_signals || [],
+            });
 
-          // INSIGHTS 탭은 로딩 스피너 placeholder로 미리 표시
-          renderInsightsLoading();
+            // INSIGHTS 탭은 로딩 스피너 placeholder로 미리 표시
+            renderInsightsLoading();
 
-          switchTab("summary");
-          summaryRendered = true;
+            switchTab("summary");
+            summaryRendered = true;
+          } catch (renderErr) {
+            console.error("[tubify] summary 렌더링 오류:", renderErr);
+            summaryRendered = true;
+          }
 
         } else if (chunk.type === "insights") {
           // ── chunk 2: 관련 영상 인사이트 + 소스 채워넣기 ──────────────────
-          setStep(2, "done"); setStep(3, "active");
-          await new Promise(function (r) { setTimeout(r, 200); });
-          setStep(3, "done");
+          try {
+            setStep(2, "done"); setStep(3, "active");
+            await new Promise(function (r) { setTimeout(r, 200); });
+            setStep(3, "done");
 
-          var ka = chunk.keyword_analysis || {};
-          // recommended_videos: 신뢰도·selection_tags 포함된 pipeline 분석 영상 우선
-          // fallback: sources (merged_sources, 현재 영상 포함)
-          renderResults({
-            keyword:                 currentKeyword,
-            summary_lines:           ka.summary_lines || [],
-            summary_citations:       ka.summary_citations || [],
-            common_facts:            ka.common_facts || [],
-            common_facts_citations:  ka.common_facts_citations || [],
-            controversies:           ka.controversies || [],
-            controversies_citations: ka.controversies_citations || [],
-            recommended_videos:      ka.recommended_videos || chunk.sources || [],
-            category:                ka.category || "",
-            layout:                  ka.layout || "summary_focus",
-            pros:                    ka.pros || [],
-            cons:                    ka.cons || [],
-            cached:                  false,
-          }, true);
+            var ka = chunk.keyword_analysis || {};
+            renderResults({
+              keyword:                 currentKeyword,
+              summary_lines:           ka.summary_lines || [],
+              summary_citations:       ka.summary_citations || [],
+              common_facts:            ka.common_facts || [],
+              common_facts_citations:  ka.common_facts_citations || [],
+              controversies:           ka.controversies || [],
+              controversies_citations: ka.controversies_citations || [],
+              recommended_videos:      ka.recommended_videos || chunk.sources || [],
+              category:                ka.category || "",
+              layout:                  ka.layout || "summary_focus",
+              pros:                    ka.pros || [],
+              cons:                    ka.cons || [],
+              cached:                  false,
+            }, true);
+          } catch (renderErr) {
+            console.error("[tubify] insights 렌더링 오류:", renderErr);
+          }
         }
       }
     }

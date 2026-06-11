@@ -2062,7 +2062,16 @@ async def analyze_video(
             yield "\n"
             await asyncio.sleep(5)
 
-        single_result = await single_task
+        try:
+            single_result = await single_task
+        except Exception as _se:
+            logger.error(f"[analyze_video] single 분석 실패: {_se}")
+            single_result = {
+                "summary": "분석 중 오류가 발생했습니다.", "key_claims": [],
+                "ad_score": 0, "ad_detected": False, "ad_signals": [],
+                "credibility_score": 0.5, "credibility_components": {},
+                "channel_title": "", "channel_id": "",
+            }
 
         # 시청 채널 ID 누적 저장
         watched_channel_id = single_result.get("channel_id")
