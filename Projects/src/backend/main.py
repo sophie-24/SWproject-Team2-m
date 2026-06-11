@@ -2054,7 +2054,15 @@ async def analyze_video(
 
         # pipeline 백그라운드 시작, single과 병렬 진행
         pipeline_task = asyncio.create_task(_run_pipeline())
-        single_result = await _run_single()
+        single_task   = asyncio.ensure_future(_run_single())
+
+        # chunk1 완료 전까지 5초마다 빈 줄 전송 — Cloudtype idle timeout 방지
+        # (빈 줄은 JS의 NDJSON 파서에서 무시됨)
+        while not single_task.done():
+            yield "\n"
+            await asyncio.sleep(5)
+
+        single_result = await single_task
 
         # 시청 채널 ID 누적 저장
         watched_channel_id = single_result.get("channel_id")
@@ -2091,7 +2099,11 @@ async def analyze_video(
         }
         yield _json.dumps(chunk1_data, ensure_ascii=False) + "\n"
 
-        # ── chunk 2: pipeline 완료 대기 후 전송 ──────────────────────────────
+        # ── chunk 2: pipeline 완료 대기 후 전송 (idle timeout 방지 keepalive) ──
+        while not pipeline_task.done():
+            yield "\n"
+            await asyncio.sleep(5)
+
         try:
             pipeline_result = await pipeline_task
         except Exception as e:
