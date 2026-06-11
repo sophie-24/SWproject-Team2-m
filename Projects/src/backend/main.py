@@ -38,6 +38,9 @@ _ext_ids = [x.strip() for x in EXTENSION_ID.split(",") if x.strip()]
 EXTENSION_IDS_JS = _ext_ids[0] if _ext_ids else ""
 EXTENSION_STORE_URL = os.getenv("EXTENSION_STORE_URL", "https://chromewebstore.google.com/detail/bkaidbnjdbhdnkohbmageebgjmgaijld?utm_source=item-share-cb")
 
+# 자막 수집 동시 호출 제한 — yt-dlp 등 native C 라이브러리의 thread-safety 문제로 인한 heap corruption 방지
+_TRANSCRIPT_SEMAPHORE = asyncio.Semaphore(1)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -2212,8 +2215,15 @@ async def _full_analyze_single_video(
         "has_paid_placement": meta.get("has_paid_placement"),
     }
 
-    # 자막 수집
-    transcript = await asyncio.to_thread(_collect_transcript_for_summary, video_id)
+    # 자막 수집 — Semaphore로 동시 호출 1개 제한 (native 라이브러리 heap corruption 방지)
+    async with _TRANSCRIPT_SEMAPHORE:
+        try:
+            transcript = await asyncio.wait_for(
+                asyncio.to_thread(_collect_transcript_for_summary, video_id),
+                timeout=25.0,
+            )
+        except asyncio.TimeoutError:
+            transcript = None
 
     # 단일 영상 분석 (Semaphore 1 — 단독 호출이므로 제한 불필요)
     semaphore = asyncio.Semaphore(1)
